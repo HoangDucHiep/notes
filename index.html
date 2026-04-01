@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tin Nhắn Bí Mật 💌</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Hiệu ứng rung lắc mạnh cho chú mèo */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg) scale(1); }
+            10% { transform: translate(-2px, -3px) rotate(-10deg) scale(1.1); }
+            20% { transform: translate(-4px, 0px) rotate(10deg) scale(1.1); }
+            30% { transform: translate(4px, 3px) rotate(0deg) scale(1.2); }
+            40% { transform: translate(2px, -2px) rotate(10deg) scale(1.2); }
+            50% { transform: translate(-2px, 3px) rotate(-10deg) scale(1.3); }
+            60% { transform: translate(-4px, 2px) rotate(0deg) scale(1.3); }
+            70% { transform: translate(4px, 2px) rotate(-10deg) scale(1.2); }
+            80% { transform: translate(-2px, -2px) rotate(10deg) scale(1.1); }
+            90% { transform: translate(2px, 3px) rotate(0deg) scale(1.1); }
+            100% { transform: translate(2px, -3px) rotate(-10deg) scale(1); }
+        }
+
+        /* Hiệu ứng nhấp nháy nền loạn xạ */
+        @keyframes strobe {
+            0% { background-color: #ff0000; }
+            20% { background-color: #00ff00; }
+            40% { background-color: #0000ff; }
+            60% { background-color: #ffff00; }
+            80% { background-color: #ff00ff; }
+            100% { background-color: #00ffff; }
+        }
+
+        /* Hiệu ứng rơi từ trên xuống */
+        @keyframes dropIn {
+            0% { transform: translateY(-100vh) scale(0); opacity: 0; }
+            80% { transform: translateY(30px) scale(1.1); opacity: 1; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .cat-shake {
+            display: inline-block;
+            animation: shake 0.5s infinite; /* Rung nhanh hơn cho kịch tính */
+        }
+
+        .party-bg {
+            animation: strobe 0.15s infinite;
+        }
+
+        .drop-in {
+            animation: dropIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        body.trolling {
+            overflow: hidden;
+        }
+
+        .image-container {
+            max-width: 300px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans transition-colors duration-500">
+
+    <!-- PHẦN 1: MÀN HÌNH MỒI NHỬ (BAIT) -->
+    <div id="bait-screen" class="max-w-md w-full mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden text-center p-8 transform transition-transform hover:scale-105 duration-300 border-4 border-pink-200">
+        <div class="text-6xl mb-4 animate-bounce">💌</div>
+        <h1 class="text-2xl font-bold text-purple-600 mb-2 uppercase">Bạn nhận được 1 tin nhắn!</h1>
+        <div class="bg-pink-50 p-4 rounded-lg mb-6">
+            <p class="text-gray-700 font-medium">"Có một người thầm thương trộm nhớ bạn từ rất lâu rồi... Họ muốn gửi tấm hình này cho bạn."</p>
+        </div>
+        
+        <button id="open-btn" class="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white font-bold py-4 px-6 rounded-xl text-xl shadow-lg hover:shadow-2xl hover:brightness-110 transition-all transform hover:-translate-y-1 active:translate-y-1">
+            XEM ẢNH NGƯỜI ẤY ❤️
+        </button>
+        <p class="mt-4 text-xs text-gray-400">Tin nhắn sẽ biến mất sau: <span id="countdown" class="text-pink-500 font-bold">05:00</span></p>
+    </div>
+
+    <!-- PHẦN 2: MÀN HÌNH TẢI GIẢ MẠO (FAKE LOADING) -->
+    <div id="loading-screen" class="hidden flex-col items-center justify-center w-full max-w-md mx-4 bg-white p-8 rounded-2xl shadow-2xl">
+        <div class="w-20 h-20 border-8 border-pink-100 border-t-pink-500 rounded-full animate-spin mb-6"></div>
+        <h2 id="loading-text" class="text-xl font-bold text-gray-800 mb-4">Đang mã hóa dữ liệu...</h2>
+        <div class="w-full bg-gray-200 rounded-full h-6 mb-2 overflow-hidden shadow-inner">
+            <div id="progress-bar" class="bg-gradient-to-r from-purple-400 to-pink-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="progress-text" class="text-sm text-gray-500 font-mono font-bold">0%</p>
+    </div>
+
+    <!-- PHẦN 3: MÀN HÌNH TROLL VỚI CHÚ MÈO -->
+    <div id="troll-screen" class="hidden fixed inset-0 flex flex-col items-center justify-center z-50 bg-black overflow-hidden">
+        <div class="text-center w-full px-4 drop-in">
+            <!-- Hình ảnh chú mèo thay thế ngón giữa emoji -->
+            <div class="cat-shake mb-6">
+                <div class="image-container">
+                    <img src="https://i.pinimg.com/1200x/fe/f5/1a/fef51a57c905e93210e1ec800c3deec2.jpg" 
+                         alt="Cat Troll" 
+                         class="w-full h-auto block"
+                         onerror="this.src='https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJ6dnR6bnR6bnR6bnR6bnR6bnR6bnR6bnR6bnR6bnR6JmVwPXYxX2ludGVybmFsX2dpZl9ieV9pZCZjdD1n/3o72F8t9TDi2xVnxOE/giphy.gif'">
+                </div>
+            </div>
+            
+            <h1 class="text-4xl md:text-7xl font-black text-white mb-4 uppercase italic tracking-tighter drop-shadow-[0_10px_10px_rgba(0,0,0,1)]">
+                🤌🤌🤌🤌🤌🤌!!!
+            </h1>
+            <p class="text-2xl md:text-4xl text-yellow-300 font-bold mb-10 drop-shadow-lg">
+                CHÚC MỪNG NGÀY 1/4 - CÁ THÁNG TƯ 🤡
+            </p>
+            
+            <div class="flex flex-col gap-4 max-w-xs mx-auto">
+                <button id="share-btn" class="bg-white text-black font-black py-4 px-8 rounded-full text-xl hover:bg-yellow-400 transition-all shadow-[0_10px_20px_rgba(255,255,255,0.3)]">
+                    GỬI LINK LỪA ĐỨA KHÁC 🔗
+                </button>
+                <button onclick="location.reload()" class="text-white underline text-sm opacity-50 hover:opacity-100">Xem lại một lần nữa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-black px-8 py-4 rounded-full shadow-2xl font-black opacity-0 transition-opacity duration-300 pointer-events-none z-[60] border-2 border-black">
+        ĐÃ COPY LINK! ĐI TÌM NẠN NHÂN TIẾP THEO THÔI! 😈
+    </div>
+
+    <script>
+        const baitScreen = document.getElementById('bait-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        const trollScreen = document.getElementById('troll-screen');
+        const openBtn = document.getElementById('open-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const loadingText = document.getElementById('loading-text');
+        const shareBtn = document.getElementById('share-btn');
+        const toast = document.getElementById('toast');
+
+        // Countdown ảo
+        let timeLeft = 300;
+        setInterval(() => {
+            if(timeLeft > 0) {
+                timeLeft--;
+                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                const s = (timeLeft % 60).toString().padStart(2, '0');
+                document.getElementById('countdown').innerText = `${m}:${s}`;
+            }
+        }, 1000);
+
+        openBtn.addEventListener('click', () => {
+            baitScreen.classList.add('hidden');
+            loadingScreen.classList.remove('hidden');
+            loadingScreen.classList.add('flex');
+
+            let progress = 0;
+            const stages = [
+                "Đang tìm kiếm danh tính người gửi...",
+                "Đang tải hình ảnh chất lượng cao...",
+                "Đang giải mã lời tỏ tình...",
+                "Chuẩn bị mở ảnh...",
+                "CÓ GÌ ĐÓ SAI SAI... ĐỢI CHÚT!!!"
+            ];
+
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 12) + 3;
+                if (progress > 100) progress = 100;
+
+                progressBar.style.width = `${progress}%`;
+                progressText.innerText = `${progress}%`;
+
+                if (progress < 20) loadingText.innerText = stages[0];
+                else if (progress < 45) loadingText.innerText = stages[1];
+                else if (progress < 70) loadingText.innerText = stages[2];
+                else if (progress < 90) loadingText.innerText = stages[3];
+                else loadingText.innerText = stages[4];
+
+                if (progress === 100) {
+                    clearInterval(interval);
+                    setTimeout(triggerTroll, 1000);
+                }
+            }, 500);
+        });
+
+        function triggerTroll() {
+            loadingScreen.classList.add('hidden');
+            loadingScreen.classList.remove('flex');
+            trollScreen.classList.remove('hidden');
+            document.body.classList.add('party-bg', 'trolling');
+            document.title = "Lêu lêu đồ ngốc! 🤡🖕";
+        }
+
+        shareBtn.addEventListener('click', () => {
+            const el = document.createElement('textarea');
+            el.value = window.location.href;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
