@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nội Suy Ảnh (Image Interpolation)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .gradient-text { background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc); -webkit-background-clip: text; color: transparent; }
+        .theory-text { color: #cbd5e1; line-height: 1.7; font-size: 0.95rem; }
+        .theory-text p { margin-bottom: 1rem; }
+        .math-expr { font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 0.25rem; }
+        .math-block { display: block; font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 0.5rem; text-align: center; margin: 1rem 0; font-size: 1.1rem; }
+        
+        .loader { border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid #38bdf8; width: 24px; height: 24px; -webkit-animation: spin 1s linear infinite; animation: spin 1s linear infinite; }
+        @-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ---------------------------------------------------------
+        // 0. INTERPOLATION THEORY DETAIL (Giải thích cơ chế)
+        // ---------------------------------------------------------
+        const InterpolationTheoryTabs = () => {
+            const [activeTab, setActiveTab] = useState('bilinear');
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-slate-500/30">
+                    <h3 className="text-xl font-bold mb-4 text-emerald-400">1. Cơ Chế Toán Học Chi Tiết</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Để phóng to một bức ảnh, thuật toán không chạy từ ảnh nhỏ sang ảnh lớn, mà nó làm ngược lại: <b>Quét từng điểm trên ảnh đích (lớn), chiếu ngược tọa độ về ảnh nguồn (nhỏ)</b>. Do tọa độ chiếu ngược thường bị lẻ thập phân, ta cần tính toán (nội suy) màu sắc từ các điểm nguyên xung quanh nó.
+                    </p>
+
+                    <div className="flex flex-col md:flex-row gap-4 mb-6">
+                        <button onClick={() => setActiveTab('nearest')} className={`flex-1 p-3 rounded-lg font-bold transition-colors ${activeTab === 'nearest' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Láng giềng gần nhất (Nearest)</button>
+                        <button onClick={() => setActiveTab('bilinear')} className={`flex-1 p-3 rounded-lg font-bold transition-colors ${activeTab === 'bilinear' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Song tuyến tính (Bilinear)</button>
+                        <button onClick={() => setActiveTab('bicubic')} className={`flex-1 p-3 rounded-lg font-bold transition-colors ${activeTab === 'bicubic' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Song khối (Bicubic)</button>
+                    </div>
+
+                    <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 min-h-[300px]">
+                        {activeTab === 'nearest' && (
+                            <div className="animate-[fadeIn_0.3s_ease-in]">
+                                <h4 className="text-red-400 font-bold text-lg mb-2">Nearest Neighbor (Láng giềng gần nhất)</h4>
+                                <p className="text-slate-300 mb-4">Phương pháp thô sơ nhất. Nó bỏ qua phần thập phân bằng cách <b>làm tròn</b> tọa độ chiếu ngược để lấy thẳng giá trị của pixel gần nó nhất.</p>
+                                
+                                <ul className="list-disc ml-6 text-slate-300 space-y-2 mb-4">
+                                    <li>Giả sử điểm cần tìm chiếu ngược về tọa độ thực là <span className="math-expr">(x', y') = (2.8, 4.2)</span></li>
+                                    <li>Làm tròn toán học: <span className="math-expr">X = round(2.8) = 3</span> và <span className="math-expr">Y = round(4.2) = 4</span></li>
+                                    <li>Gán thẳng giá trị: Màu tại đây sẽ copy y hệt màu của pixel tại <span className="math-expr">(3, 4)</span> ở ảnh gốc.</li>
+                                </ul>
+                                
+                                <div className="bg-red-900/20 border border-red-500/50 p-4 rounded text-sm text-red-200">
+                                    <b>Bản chất:</b> Do việc làm tròn cứng nhắc này, các pixel sẽ bị "nhân bản" thành các khối vuông giống hệt nhau khi phóng to, dẫn đến hiện tượng <b>răng cưa (aliasing)</b> cực kỳ nặng ở các đường chéo hoặc viền cong. Tuy nhiên nó tính toán siêu nhanh.
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'bilinear' && (
+                            <div className="animate-[fadeIn_0.3s_ease-in]">
+                                <h4 className="text-blue-400 font-bold text-lg mb-2">Bilinear Interpolation (Nội suy Song tuyến tính)</h4>
+                                <p className="text-slate-300 mb-4">Thay vì lấy bừa 1 điểm gần nhất, Bilinear sử dụng <b>4 pixel bao quanh</b> điểm thập phân đó và lấy trung bình có trọng số (weight). Điểm thập phân càng gần pixel nào thì pixel đó càng đóng góp nhiều màu sắc.</p>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <ul className="list-decimal ml-6 text-slate-300 space-y-2 text-sm">
+                                        <li>Gọi tọa độ chiếu ngược là <span className="math-expr">(x', y')</span>. Lấy phần nguyên để xác định 4 điểm góc: <span className="math-expr">P₁₁, P₂₁, P₁₂, P₂₂</span></li>
+                                        <li>Lấy phần thập phân làm trọng số: <br/><span className="math-expr">dx = x' - floor(x')</span><br/><span className="math-expr">dy = y' - floor(y')</span></li>
+                                        <li>Nội suy tuyến tính theo trục X ở mép trên và mép dưới.</li>
+                                        <li>Tiếp tục nội suy tuyến tính 2 kết quả vừa tính theo trục Y để ra kết quả cuối.</li>
+                                    </ul>
+                                    <div className="bg-slate-800 p-4 rounded border border-slate-600 flex items-center justify-center">
+                                        <div className="text-center text-sm text-blue-300 font-mono">
+                                            v = P₁₁(1-dx)(1-dy) <br/>
+                                              + P₂₁(dx)(1-dy) <br/>
+                                              + P₁₂(1-dx)(dy) <br/>
+                                              + P₂₂(dx)(dy)
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-blue-900/20 border border-blue-500/50 p-4 rounded text-sm text-blue-200 mt-4">
+                                    <b>Bản chất:</b> Phương trình thực chất có dạng <span className="math-expr">v(x,y) = ax + by + cxy + d</span>. Chú ý thành phần <b>cxy</b>, nó chứng tỏ Bilinear <b>không hề là một đường thẳng (tuyến tính)</b> trong không gian 3D, mà bề mặt của nó là một đường cong hyperbol trơn (saddle shape). Nhờ đó, nó khử được răng cưa nhưng làm ảnh bị mờ.
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'bicubic' && (
+                            <div className="animate-[fadeIn_0.3s_ease-in]">
+                                <h4 className="text-emerald-400 font-bold text-lg mb-2">Bicubic Interpolation (Nội suy Song khối)</h4>
+                                <p className="text-slate-300 mb-4">Phương pháp tiên tiến nhất trong nhóm cơ bản. Thay vì 4, nó dùng lưới <b>16 pixel bao quanh (4x4)</b> để nội suy dựa trên các đường cong bậc 3 (cubic splines).</p>
+                                
+                                <div className="math-block">
+                                    v(x,y) = ∑(i=0→3) ∑(j=0→3) aᵢⱼ xⁱ yʲ
+                                </div>
+
+                                <ul className="list-disc ml-6 text-slate-300 space-y-2 mb-4 text-sm">
+                                    <li>Nó cố gắng giải hệ phương trình 16 ẩn số (16 hệ số <span className="math-expr">aᵢⱼ</span>) dựa trên giá trị của 16 điểm lân cận và cả <b>đạo hàm (độ dốc)</b> của chúng.</li>
+                                    <li>Bằng cách sử dụng đường cong bậc 3 (mũ 3), nó không chỉ tạo ra sự chuyển tiếp mượt mà như Bilinear, mà còn <b>bảo toàn độ tương phản ở các cạnh (edges)</b> tốt hơn rất nhiều. Khắc phục được nhược điểm bị "mờ nhòe" của Bilinear.</li>
+                                </ul>
+
+                                <div className="bg-emerald-900/20 border border-emerald-500/50 p-4 rounded text-sm text-emerald-200">
+                                    <b>Thực tế:</b> Đây là tiêu chuẩn vàng của các phần mềm như Adobe Photoshop. Tính toán nặng hơn nhiều so với Bilinear, nhưng với sức mạnh máy tính hiện nay thì thời gian chờ đợi là hoàn toàn xứng đáng.
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // 1. GRID OVERLAY SIMULATION (Khái niệm lưới ảo)
+        // ---------------------------------------------------------
+        const GridOverlaySim = () => {
+            const [hoverPoint, setHoverPoint] = useState(null);
+            const [method, setMethod] = useState('nearest');
+
+            const srcSize = 3;
+            const dstSize = 4;
+            const ratio = (srcSize - 1) / (dstSize - 1); 
+
+            const handleHover = (x, y) => {
+                setHoverPoint({ x, y });
+            };
+
+            const renderSourceGrid = () => {
+                const cells = [];
+                for(let y=0; y<srcSize; y++) {
+                    for(let x=0; x<srcSize; x++) {
+                        let isHighlighted = false;
+                        let highlightClass = '';
+
+                        if (hoverPoint) {
+                            const srcX = hoverPoint.x * ratio;
+                            const srcY = hoverPoint.y * ratio;
+                            
+                            if (method === 'nearest') {
+                                const nx = Math.round(srcX);
+                                const ny = Math.round(srcY);
+                                if (x === nx && y === ny) {
+                                    isHighlighted = true; highlightClass = 'bg-red-500 shadow-[0_0_15px_#ef4444] scale-150 z-10';
+                                }
+                            } else if (method === 'bilinear') {
+                                const fx = Math.floor(srcX); const fy = Math.floor(srcY);
+                                const cx = Math.ceil(srcX);  const cy = Math.ceil(srcY);
+                                if ((x === fx || x === cx) && (y === fy || y === cy)) {
+                                    isHighlighted = true; highlightClass = 'bg-blue-500 shadow-[0_0_15px_#3b82f6] scale-125 z-10';
+                                }
+                            } else if (method === 'bicubic') {
+                                const fx = Math.floor(srcX); const fy = Math.floor(srcY);
+                                if (x >= fx - 1 && x <= fx + 2 && y >= fy - 1 && y <= fy + 2) {
+                                    isHighlighted = true; highlightClass = 'bg-emerald-500 shadow-[0_0_15px_#10b981] scale-110 z-10';
+                                }
+                            }
+                        }
+
+                        cells.push(
+                            <div key={`src-${x}-${y}`} className="relative w-full h-full flex items-center justify-center border border-slate-600/50">
+                                <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isHighlighted ? highlightClass : 'bg-slate-500'}`}></div>
+                            </div>
+                        );
+                    }
+                }
+                return cells;
+            };
+
+            const renderTargetGrid = () => {
+                const cells = [];
+                for(let y=0; y<dstSize; y++) {
+                    for(let x=0; x<dstSize; x++) {
+                        const isHovered = hoverPoint?.x === x && hoverPoint?.y === y;
+                        cells.push(
+                            <div 
+                                key={`dst-${x}-${y}`} 
+                                onMouseEnter={() => handleHover(x, y)}
+                                className={`relative w-full h-full flex flex-col items-center justify-center border border-indigo-500/50 cursor-pointer transition-colors ${isHovered ? 'bg-indigo-500/30' : 'hover:bg-indigo-900/30'}`}
+                            >
+                                <div className={`w-2 h-2 rounded-full ${isHovered ? 'bg-white shadow-[0_0_10px_#fff]' : 'bg-indigo-300/50'}`}></div>
+                                {isHovered && <div className="absolute top-1 text-[10px] text-white font-mono bg-black/50 px-1 rounded">({x},{y})</div>}
+                            </div>
+                        );
+                    }
+                }
+                return cells;
+            };
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-cyan-500/30">
+                    <h3 className="text-xl font-bold mb-4 text-cyan-400">2. Trực quan hóa Lưới Ảo (Grid Overlay)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Ví dụ phóng to ảnh <span className="math-expr">3x3</span> (chấm tròn xám) lên <span className="math-expr">4x4</span> (chấm tròn xanh). Lưới 4x4 sẽ được đặt đè lên lưới 3x3.
+                    </p>
+
+                    <div className="flex flex-col lg:flex-row gap-8 items-center">
+                        <div className="relative w-[300px] h-[300px] bg-slate-900 border-2 border-slate-700 rounded-lg overflow-hidden shadow-2xl">
+                            {/* Source Grid */}
+                            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-60">
+                                {renderSourceGrid()}
+                            </div>
+                            
+                            {/* Target Grid Overlay */}
+                            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 pointer-events-auto">
+                                {renderTargetGrid()}
+                            </div>
+                        </div>
+
+                        <div className="flex-1 space-y-4 w-full">
+                            <div className="text-sm text-amber-300 bg-amber-900/30 p-3 rounded border border-amber-500/30 mb-4">
+                                Rê chuột vào các chấm xanh (Lưới đích) để xem nó kích hoạt những chấm xám (Lưới gốc) nào để mượn dữ liệu.
+                            </div>
+                            
+                            <button onMouseEnter={() => setMethod('nearest')} className={`w-full p-4 rounded-xl text-left border transition-all ${method === 'nearest' ? 'bg-red-900/30 border-red-500' : 'bg-slate-800 border-slate-700'}`}>
+                                <h4 className="font-bold text-red-400">Nearest Neighbor</h4>
+                                <p className="text-xs text-slate-300 mt-1">Chỉ sáng lên đúng <b>1 chấm duy nhất</b> gần nó nhất.</p>
+                            </button>
+
+                            <button onMouseEnter={() => setMethod('bilinear')} className={`w-full p-4 rounded-xl text-left border transition-all ${method === 'bilinear' ? 'bg-blue-900/30 border-blue-500' : 'bg-slate-800 border-slate-700'}`}>
+                                <h4 className="font-bold text-blue-400">Bilinear Interpolation</h4>
+                                <p className="text-xs text-slate-300 mt-1">Sáng lên <b>4 chấm (2x2)</b> bao bọc xung quanh tọa độ chiếu ngược.</p>
+                            </button>
+
+                            <button onMouseEnter={() => setMethod('bicubic')} className={`w-full p-4 rounded-xl text-left border transition-all ${method === 'bicubic' ? 'bg-emerald-900/30 border-emerald-500' : 'bg-slate-800 border-slate-700'}`}>
+                                <h4 className="font-bold text-emerald-400">Bicubic Interpolation</h4>
+                                <p className="text-xs text-slate-300 mt-1">Sáng lên tới <b>16 chấm lân cận</b> để tính đường cong đa thức (Do lưới gốc ở đây chỉ có 3x3 nên nó sẽ sáng toàn bộ các điểm có thể lấy được).</p>
+                            </button>
+
+                            {hoverPoint && (
+                                <div className="mt-4 bg-slate-800 p-4 rounded-lg font-mono text-sm border border-slate-600 text-center">
+                                    Lưới Đích: <span className="text-white">({hoverPoint.x}, {hoverPoint.y})</span> <br/>
+                                    Tọa độ chiếu ngược: <span className="text-cyan-400">({(hoverPoint.x * ratio).toFixed(2)}, {(hoverPoint.y * ratio).toFixed(2)})</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // ---------------------------------------------------------
+        // 2. IMAGE RESAMPLING (SHRINKING & ZOOMING) - VÍ DỤ 2.4
+        // ---------------------------------------------------------
+        const InterpolationDemo = () => {
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [activeMethod, setActiveMethod] = useState('nearest');
+            
+            const origCanvasRef = useRef(null);
+            const destCanvasRef = useRef(null);
+            const [originalData, setOriginalData] = useState(null);
+
+            const ORIG_SIZE = 128; 
+            const ZOOM_SIZE = 512;
+
+            useEffect(() => {
+                const canvas = origCanvasRef.current;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, ORIG_SIZE, ORIG_SIZE);
+                
+                ctx.lineWidth = 4;
+                for(let i = -ORIG_SIZE; i < ORIG_SIZE*2; i+=12) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + ORIG_SIZE, ORIG_SIZE);
+                    ctx.strokeStyle = '#0f172a'; ctx.stroke();
+                }
+
+                for(let r = 10; r < ORIG_SIZE/2; r+=15) {
+                    ctx.beginPath(); ctx.arc(ORIG_SIZE/2, ORIG_SIZE/2, r, 0, Math.PI*2);
+                    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
+                }
+
+                ctx.fillStyle = '#3b82f6';
+                ctx.font = '900 64px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('A', ORIG_SIZE/2, ORIG_SIZE/2);
+
+                const imgData = ctx.getImageData(0, 0, ORIG_SIZE, ORIG_SIZE);
+                setOriginalData(imgData);
+
+                processImage(imgData, 'nearest');
+            }, []);
+
+            const getP = (data, x, y, c) => {
+                x = Math.max(0, Math.min(ORIG_SIZE - 1, x));
+                y = Math.max(0, Math.min(ORIG_SIZE - 1, y));
+                return data.data[(y * ORIG_SIZE + x) * 4 + c];
+            };
+
+            const cubic = (p0, p1, p2, p3, x) => {
+                return p1 + 0.5 * x * (p2 - p0 + x * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + x * (3.0 * (p1 - p2) + p3 - p0)));
+            };
+
+            const processImage = (imgData, method) => {
+                if (!imgData) return;
+                setIsProcessing(true);
+
+                setTimeout(() => {
+                    const canvas = destCanvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    const destData = ctx.createImageData(ZOOM_SIZE, ZOOM_SIZE);
+                    const scale = ZOOM_SIZE / ORIG_SIZE;
+
+                    for (let y = 0; y < ZOOM_SIZE; y++) {
+                        for (let x = 0; x < ZOOM_SIZE; x++) {
+                            const gx = x / scale;
+                            const gy = y / scale;
+                            const destIdx = (y * ZOOM_SIZE + x) * 4;
+
+                            if (method === 'nearest') {
+                                const nx = Math.min(ORIG_SIZE - 1, Math.round(gx));
+                                const ny = Math.min(ORIG_SIZE - 1, Math.round(gy));
+                                const srcIdx = (ny * ORIG_SIZE + nx) * 4;
+                                destData.data[destIdx] = imgData.data[srcIdx];
+                                destData.data[destIdx+1] = imgData.data[srcIdx+1];
+                                destData.data[destIdx+2] = imgData.data[srcIdx+2];
+                                destData.data[destIdx+3] = 255;
+                            } 
+                            else if (method === 'bilinear') {
+                                const fx = Math.floor(gx); const fy = Math.floor(gy);
+                                const cx = Math.min(ORIG_SIZE-1, fx + 1); const cy = Math.min(ORIG_SIZE-1, fy + 1);
+                                const dx = gx - fx; const dy = gy - fy;
+
+                                for(let c=0; c<3; c++) {
+                                    const p00 = getP(imgData, fx, fy, c);
+                                    const p10 = getP(imgData, cx, fy, c);
+                                    const p01 = getP(imgData, fx, cy, c);
+                                    const p11 = getP(imgData, cx, cy, c);
+
+                                    const val = p00 * (1 - dx) * (1 - dy) +
+                                                p10 * dx * (1 - dy) +
+                                                p01 * (1 - dx) * dy +
+                                                p11 * dx * dy;
+                                    destData.data[destIdx + c] = val;
+                                }
+                                destData.data[destIdx+3] = 255;
+                            }
+                            else if (method === 'bicubic') {
+                                const fx = Math.floor(gx); const fy = Math.floor(gy);
+                                const dx = gx - fx; const dy = gy - fy;
+
+                                for(let c=0; c<3; c++) {
+                                    const col0 = cubic(getP(imgData, fx-1, fy-1, c), getP(imgData, fx, fy-1, c), getP(imgData, fx+1, fy-1, c), getP(imgData, fx+2, fy-1, c), dx);
+                                    const col1 = cubic(getP(imgData, fx-1, fy, c),   getP(imgData, fx, fy, c),   getP(imgData, fx+1, fy, c),   getP(imgData, fx+2, fy, c), dx);
+                                    const col2 = cubic(getP(imgData, fx-1, fy+1, c), getP(imgData, fx, fy+1, c), getP(imgData, fx+1, fy+1, c), getP(imgData, fx+2, fy+1, c), dx);
+                                    const col3 = cubic(getP(imgData, fx-1, fy+2, c), getP(imgData, fx, fy+2, c), getP(imgData, fx+1, fy+2, c), getP(imgData, fx+2, fy+2, c), dx);
+                                    
+                                    let val = cubic(col0, col1, col2, col3, dy);
+                                    destData.data[destIdx + c] = Math.max(0, Math.min(255, val));
+                                }
+                                destData.data[destIdx+3] = 255;
+                            }
+                        }
+                    }
+
+                    ctx.putImageData(destData, 0, 0);
+                    setActiveMethod(method);
+                    setIsProcessing(false);
+                }, 50);
+            };
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-amber-500/30">
+                    <h3 className="text-xl font-bold mb-4 text-amber-400">3. Áp dụng Thuật toán: Phóng to Ảnh Thực Tế (Ví dụ 2.4)</h3>
+                    
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        <div className="flex flex-col items-center justify-center bg-slate-900 p-4 rounded-xl border border-slate-700 h-fit">
+                            <h4 className="text-white font-bold text-sm mb-4">Ảnh Nguồn nhỏ (128x128)</h4>
+                            <canvas ref={origCanvasRef} width={ORIG_SIZE} height={ORIG_SIZE} className="bg-white border-2 border-slate-600 w-[128px] h-[128px]"></canvas>
+                        </div>
+
+                        <div className="flex-1 flex flex-col items-center">
+                            <h4 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                                Kết quả Phóng To (400%)
+                                {isProcessing && <span className="loader"></span>}
+                            </h4>
+                            <div className="relative border-4 border-slate-600 bg-black rounded shadow-2xl">
+                                <canvas ref={destCanvasRef} width={ZOOM_SIZE} height={ZOOM_SIZE} className={`w-full max-w-[400px] h-auto bg-black transition-opacity ${isProcessing ? 'opacity-50' : 'opacity-100'}`}></canvas>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 space-y-4">
+                            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                                <h4 className="text-white font-bold block mb-3">So sánh hiệu ứng Thị giác:</h4>
+                                
+                                <div className="space-y-3">
+                                    <button 
+                                        onClick={() => processImage(originalData, 'nearest')} 
+                                        disabled={isProcessing}
+                                        className={`w-full p-3 rounded-lg border text-left transition-all ${activeMethod === 'nearest' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900 border-slate-600 text-slate-300 hover:bg-slate-700'}`}
+                                    >
+                                        <div className="font-bold">Nearest Neighbor</div>
+                                        <div className="text-xs opacity-80 mt-1">Viền chữ A và các vòng tròn bị méo mó, rạn vỡ hoàn toàn do các pixel gốc chỉ đơn giản là bị phóng to lên (blocky).</div>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => processImage(originalData, 'bilinear')} 
+                                        disabled={isProcessing}
+                                        className={`w-full p-3 rounded-lg border text-left transition-all ${activeMethod === 'bilinear' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-slate-600 text-slate-300 hover:bg-slate-700'}`}
+                                    >
+                                        <div className="font-bold">Bilinear Interpolation</div>
+                                        <div className="text-xs opacity-80 mt-1">Các vết răng cưa đã được "chà" mịn màng do sự trung bình hóa. Nhưng đổi lại, toàn bộ ảnh có cảm giác mờ mờ sương (blur).</div>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => processImage(originalData, 'bicubic')} 
+                                        disabled={isProcessing}
+                                        className={`w-full p-3 rounded-lg border text-left transition-all ${activeMethod === 'bicubic' ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-600 text-slate-300 hover:bg-slate-700'}`}
+                                    >
+                                        <div className="font-bold">Bicubic Interpolation</div>
+                                        <div className="text-xs opacity-80 mt-1">Bảo toàn được độ sắc nét tốt nhất. Vòng tròn mượt mà và chữ A không bị mất quá nhiều tương phản ở mép.</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // MAIN APP COMPONENT
+        // ---------------------------------------------------------
+        const App = () => {
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto space-y-8">
+                    
+                    <header className="text-center space-y-4 mb-10 border-b border-slate-700 pb-8">
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="gradient-text">Nội Suy Ảnh (Image Interpolation)</span>
+                        </h1>
+                        <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                            Tài liệu Lý thuyết Toán học và Thuật toán thực chiến (Phần 2.4).
+                        </p>
+                    </header>
+
+                    <InterpolationTheoryTabs />
+                    <GridOverlaySim />
+                    <InterpolationDemo />
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
