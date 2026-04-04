@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Độ Phân Giải & Isopreference (Phần 2.4)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .gradient-text { background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc); -webkit-background-clip: text; color: transparent; }
+        
+        .theory-text { color: #cbd5e1; line-height: 1.7; font-size: 0.95rem; }
+        .theory-text p { margin-bottom: 1rem; }
+        .math-expr { font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 0.25rem; }
+        
+        /* Custom ranges */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #fff; cursor: pointer; margin-top: -7px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #475569; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ---------------------------------------------------------
+        // VÍ DỤ 2.2: ĐỘ PHÂN GIẢI KHÔNG GIAN (SPATIAL RESOLUTION)
+        // ---------------------------------------------------------
+        const SpatialResolutionSim = () => {
+            const [dpi, setDpi] = useState(300);
+            const canvasRef = useRef(null);
+            const originalRef = useRef(null);
+            
+            const dpis = [930, 300, 150, 72, 36];
+            
+            // Vẽ ảnh gốc chất lượng cao (Mặt đồng hồ nhiều chi tiết)
+            useEffect(() => {
+                const canvas = originalRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#1e293b'; // background
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Viền đồng hồ
+                ctx.beginPath();
+                ctx.arc(256, 256, 220, 0, Math.PI * 2);
+                ctx.fillStyle = '#f8fafc';
+                ctx.fill();
+                ctx.lineWidth = 12;
+                ctx.strokeStyle = '#94a3b8';
+                ctx.stroke();
+
+                // Các vạch chỉ phút/giây siêu nhỏ
+                for(let i = 0; i < 60; i++) {
+                    const angle = (i * Math.PI) / 30;
+                    const isHour = i % 5 === 0;
+                    const innerRadius = isHour ? 180 : 200;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(256 + Math.cos(angle) * innerRadius, 256 + Math.sin(angle) * innerRadius);
+                    ctx.lineTo(256 + Math.cos(angle) * 215, 256 + Math.sin(angle) * 215);
+                    ctx.lineWidth = isHour ? 4 : 1.5;
+                    ctx.strokeStyle = '#0f172a';
+                    ctx.stroke();
+                }
+
+                // Chữ số
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('12', 256, 80);
+                ctx.fillText('3', 430, 256);
+                ctx.fillText('6', 256, 430);
+                ctx.fillText('9', 80, 256);
+                
+                // Văn bản rất nhỏ để kiểm tra detail
+                ctx.font = 'italic 12px serif';
+                ctx.fillText('HIGH RESOLUTION CHRONOMETER', 256, 150);
+
+                // Kim đồng hồ
+                ctx.beginPath();
+                ctx.moveTo(256, 256);
+                ctx.lineTo(256 + Math.cos(-Math.PI/4) * 140, 256 + Math.sin(-Math.PI/4) * 140);
+                ctx.lineWidth = 6;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(256, 256);
+                ctx.lineTo(256 + Math.cos(Math.PI/2) * 100, 256 + Math.sin(Math.PI/2) * 100);
+                ctx.lineWidth = 8;
+                ctx.stroke();
+
+                // Kim giây đỏ mảnh
+                ctx.beginPath();
+                ctx.moveTo(256, 256);
+                ctx.lineTo(256 + Math.cos(-Math.PI/2 + 0.2) * 180, 256 + Math.sin(-Math.PI/2 + 0.2) * 180);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ef4444';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(256, 256, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#ef4444';
+                ctx.fill();
+
+            }, []);
+
+            // Xử lý lấy mẫu (Downsampling) và Zoom (Upscaling bằng Nearest Neighbor)
+            useEffect(() => {
+                const src = originalRef.current;
+                const dest = canvasRef.current;
+                const ctx = dest.getContext('2d');
+                
+                // Giả lập DPI (Quy đổi tương đối: 930 dpi ~ 512px, 72 dpi ~ 40px)
+                const targetRes = Math.max(16, Math.floor((dpi / 930) * 512));
+                
+                // B1: Vẽ vào canvas nhỏ (Downsampling)
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = targetRes;
+                tempCanvas.height = targetRes;
+                const tCtx = tempCanvas.getContext('2d');
+                tCtx.drawImage(src, 0, 0, targetRes, targetRes);
+
+                // B2: Phóng to lại kích thước gốc (Zooming như mô tả trong sách để so sánh chi tiết)
+                ctx.imageSmoothingEnabled = false; // Tắt làm mượt để thấy rõ vỡ pixel
+                ctx.clearRect(0, 0, 512, 512);
+                ctx.drawImage(tempCanvas, 0, 0, 512, 512);
+
+            }, [dpi]);
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-blue-500/30">
+                    <h3 className="text-xl font-bold mb-4 text-blue-400">Ví dụ 2.2: Tác động của việc giảm Độ phân giải Không gian</h3>
+                    
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        <div className="w-full lg:w-1/2 flex flex-col items-center">
+                            <canvas ref={originalRef} width="512" height="512" className="hidden" />
+                            <div className="border-4 border-slate-700 bg-black rounded p-1 shadow-lg w-full max-w-[400px] aspect-square relative">
+                                <canvas ref={canvasRef} width="512" height="512" className="w-full h-full bg-black" />
+                                {dpi <= 150 && (
+                                    <div className="absolute top-4 left-4 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded animate-pulse">
+                                        Vỡ hạt (Pixelation)
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-slate-400 font-mono text-sm mt-3">Mô phỏng tại: {dpi} dpi (Đã zoom lại cùng kích thước)</div>
+                        </div>
+
+                        <div className="w-full lg:w-1/2 space-y-6">
+                            <p className="text-slate-300 text-sm">
+                                Thay đổi thông số bên dưới để xem sự suy giảm chi tiết. Khi giảm xuống 72 dpi hoặc thấp hơn, bạn sẽ thấy rõ sự biến dạng của viền đồng hồ, các vạch chia nhỏ biến mất, và chữ số bị <b>vỡ hạt (pixelated)</b>.
+                            </p>
+
+                            <div className="flex flex-wrap gap-2">
+                                {dpis.map(val => (
+                                    <button 
+                                        key={val}
+                                        onClick={() => setDpi(val)}
+                                        className={`px-4 py-2 rounded font-mono text-sm transition-colors border ${dpi === val ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(37,99,235,0.5)]' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}
+                                    >
+                                        {val} dpi
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 mt-4">
+                                <h4 className="text-white font-bold text-sm mb-2">Phân tích (Theo sách giáo trình):</h4>
+                                <ul className="list-disc ml-5 text-sm text-slate-300 space-y-2">
+                                    <li><b>930 &amp; 300 dpi:</b> Rất khó thấy sự khác biệt. 300 dpi là tiêu chuẩn tối thiểu trong ngành xuất bản sách.</li>
+                                    <li><b>150 dpi:</b> Bắt đầu thấy sự suy giảm chi tiết (răng cưa ở viền, nét mảnh bị đứt).</li>
+                                    <li><b>72 dpi:</b> Sự suy giảm hiện rõ trên mọi chi tiết. Đây từng là tiêu chuẩn cũ của màn hình máy tính CRT. Để in ở độ phân giải này, ngành xuất bản phải dùng kỹ thuật đặc biệt (thay đổi kích thước điểm in) để đánh lừa thị giác.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // VÍ DỤ 2.3: ĐỘ PHÂN GIẢI CƯỜNG ĐỘ (INTENSITY RESOLUTION)
+        // ---------------------------------------------------------
+        const IntensityResolutionSim = () => {
+            const [bits, setBits] = useState(8);
+            const canvasRef = useRef(null);
+            const originalRef = useRef(null);
+
+            // Vẽ một dải gradient rất mượt giả lập phim X-quang/CT
+            useEffect(() => {
+                const canvas = originalRef.current;
+                const ctx = canvas.getContext('2d');
+                
+                // Nền gradient radial
+                const bgGrad = ctx.createRadialGradient(256, 256, 50, 256, 256, 350);
+                bgGrad.addColorStop(0, '#a1a1aa'); // Xám nhạt giữa
+                bgGrad.addColorStop(1, '#000000'); // Đen viền
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Khối xương/sọ mô phỏng mượt mà
+                const skullGrad = ctx.createRadialGradient(220, 220, 10, 256, 256, 180);
+                skullGrad.addColorStop(0, '#ffffff'); // Trắng sáng
+                skullGrad.addColorStop(0.6, '#a3a3a3');
+                skullGrad.addColorStop(1, 'rgba(0,0,0,0)'); // Hòa vào nền
+                
+                ctx.fillStyle = skullGrad;
+                ctx.beginPath();
+                ctx.ellipse(256, 256, 140, 180, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }, []);
+
+            // Xử lý Quantization (Lượng tử hóa)
+            useEffect(() => {
+                const src = originalRef.current;
+                const dest = canvasRef.current;
+                const ctx = dest.getContext('2d');
+                
+                ctx.drawImage(src, 0, 0, 512, 512);
+                
+                if (bits < 8) {
+                    const imgData = ctx.getImageData(0, 0, 512, 512);
+                    const data = imgData.data;
+                    const levels = Math.pow(2, bits);
+                    const step = 255 / (levels - 1);
+                    
+                    for(let i=0; i < data.length; i+=4) {
+                        const val = data[i]; // Đã là ảnh xám nên R=G=B
+                        const qVal = Math.round(Math.round(val / (256/levels)) * step);
+                        data[i] = qVal;
+                        data[i+1] = qVal;
+                        data[i+2] = qVal;
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                }
+            }, [bits]);
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-amber-500/30">
+                    <h3 className="text-xl font-bold mb-4 text-amber-400">Ví dụ 2.3: Tác động của việc giảm Số mức cường độ (Bits)</h3>
+                    
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        <div className="w-full lg:w-1/2 flex flex-col items-center">
+                            <canvas ref={originalRef} width="512" height="512" className="hidden" />
+                            <div className="border-4 border-slate-700 bg-black rounded p-1 shadow-lg w-full max-w-[400px] aspect-square relative">
+                                <canvas ref={canvasRef} width="512" height="512" className="w-full h-full bg-black" />
+                                {bits <= 4 && (
+                                    <div className="absolute top-4 left-4 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded animate-pulse">
+                                        False Contouring (Đường viền giả)
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-slate-400 font-mono text-sm mt-3">Lượng tử hóa: {bits}-bit ({Math.pow(2, bits)} mức xám)</div>
+                        </div>
+
+                        <div className="w-full lg:w-1/2 space-y-6">
+                            <p className="text-slate-300 text-sm">
+                                Hình trên mô phỏng một bức ảnh có độ chuyển màu rất mượt. Hãy giảm từ 8-bit xuống các mức thấp hơn. Đặc biệt ở vùng 4-bit, 3-bit, bạn sẽ thấy hiện tượng ranh giới giả hiện lên rất rõ ràng.
+                            </p>
+
+                            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
+                                <label className="flex justify-between text-sm font-bold text-slate-200 mb-4">
+                                    <span>Độ phân giải cường độ (k)</span>
+                                    <span className="text-amber-400 text-lg">{bits} bit</span>
+                                </label>
+                                <input type="range" min="1" max="8" step="1" value={bits} onChange={e => setBits(Number(e.target.value))} />
+                                <div className="flex justify-between text-xs font-mono text-slate-500 mt-2">
+                                    <span>1 bit (Trắng/Đen)</span>
+                                    <span>8 bit (256 mức)</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 mt-4">
+                                <h4 className="text-white font-bold text-sm mb-2">Hiện tượng False Contouring:</h4>
+                                <p className="text-sm text-slate-300">
+                                    Khi không có đủ số mức cường độ (thường ≤ 16 mức, tương đương 4-bit) để biểu diễn vùng ảnh có độ dốc cường độ mượt (smooth areas), hình ảnh sẽ xuất hiện các dải màu (ridges) rõ nét giống như bản đồ địa hình.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // ISOPREFERENCE CURVES (Hình 2.26)
+        // ---------------------------------------------------------
+        const IsopreferenceCurves = () => {
+            const [activeCurve, setActiveCurve] = useState('all');
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-emerald-500/30">
+                    <h3 className="text-xl font-bold mb-4 text-emerald-400">Đường Đẳng Ưu (Isopreference Curves - Nghiên cứu của Huang)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Nghiên cứu sự tương tác giữa N (Không gian) và k (Cường độ) lên chất lượng ảnh cảm nhận. Mỗi đường cong đại diện cho một nhóm ảnh mang lại <b>cùng một chất lượng chủ quan (equal subjective quality)</b> đối với người quan sát.
+                    </p>
+
+                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                        {/* Đồ thị SVG */}
+                        <div className="w-full max-w-[400px] bg-slate-900 rounded-xl p-6 border border-slate-700 relative shadow-inner">
+                            <svg viewBox="0 0 300 250" className="w-full h-auto overflow-visible">
+                                {/* Trục O */}
+                                <polyline points="30,10 30,220 280,220" fill="none" stroke="#64748b" strokeWidth="2" />
+                                {/* Nhãn trục Y (k - bits) */}
+                                <text x="15" y="15" fill="#94a3b8" fontSize="12" fontFamily="monospace">k (bits)</text>
+                                {[1,2,3,4,5,6,7,8].map(y => (
+                                    <text key={y} x="15" y={220 - (y/8)*180} fill="#64748b" fontSize="10" alignmentBaseline="middle">{y}</text>
+                                ))}
+                                {/* Nhãn trục X (N - spatial) */}
+                                <text x="270" y="240" fill="#94a3b8" fontSize="12" fontFamily="monospace">N (Resolution)</text>
+                                {['16','32','64','128','256'].map((x, i) => (
+                                    <text key={x} x={30 + i*50} y="235" fill="#64748b" fontSize="10" textAnchor="middle">{x}</text>
+                                ))}
+
+                                {/* Đường cong: Khuôn mặt (Ít chi tiết) - Face */}
+                                <path 
+                                    d="M 130 50 Q 180 60 230 40" 
+                                    fill="none" 
+                                    stroke="#3b82f6" 
+                                    strokeWidth={activeCurve === 'all' || activeCurve === 'face' ? 4 : 1}
+                                    opacity={activeCurve === 'all' || activeCurve === 'face' ? 1 : 0.3}
+                                    className="transition-all duration-300"
+                                />
+                                <text x="140" y="45" fill="#3b82f6" fontSize="11" fontWeight="bold" opacity={activeCurve === 'all' || activeCurve === 'face' ? 1 : 0}>Face (Ít chi tiết)</text>
+
+                                {/* Đường cong: Người quay phim (Trung bình) - Cameraman */}
+                                <path 
+                                    d="M 100 120 Q 160 120 230 80" 
+                                    fill="none" 
+                                    stroke="#eab308" 
+                                    strokeWidth={activeCurve === 'all' || activeCurve === 'cam' ? 4 : 1}
+                                    opacity={activeCurve === 'all' || activeCurve === 'cam' ? 1 : 0.3}
+                                    className="transition-all duration-300"
+                                />
+                                <text x="110" y="110" fill="#eab308" fontSize="11" fontWeight="bold" opacity={activeCurve === 'all' || activeCurve === 'cam' ? 1 : 0}>Cameraman (TB)</text>
+
+                                {/* Đường cong: Đám đông (Nhiều chi tiết) - Crowd */}
+                                <path 
+                                    d="M 80 180 Q 150 180 220 180 Q 225 100 230 40" 
+                                    fill="none" 
+                                    stroke="#ef4444" 
+                                    strokeWidth={activeCurve === 'all' || activeCurve === 'crowd' ? 4 : 1}
+                                    opacity={activeCurve === 'all' || activeCurve === 'crowd' ? 1 : 0.3}
+                                    className="transition-all duration-300"
+                                />
+                                <text x="60" y="170" fill="#ef4444" fontSize="11" fontWeight="bold" opacity={activeCurve === 'all' || activeCurve === 'crowd' ? 1 : 0}>Crowd (Nhiều CT)</text>
+                                
+                                {/* Mũi tên xu hướng */}
+                                <defs>
+                                    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                                        <path d="M0,0 L0,6 L9,3 z" fill="#10b981" />
+                                    </marker>
+                                </defs>
+                                <line x1="80" y1="200" x2="250" y2="30" stroke="#10b981" strokeWidth="2" strokeDasharray="5,5" markerEnd="url(#arrow)" opacity="0.5"/>
+                                <text x="180" y="100" fill="#10b981" fontSize="10" transform="rotate(-35, 180, 100)">Chất lượng tăng</text>
+                            </svg>
+                        </div>
+
+                        {/* Control Panel & Giải thích */}
+                        <div className="flex-1 space-y-4">
+                            <div className="flex gap-2">
+                                <button onMouseEnter={() => setActiveCurve('all')} className="px-3 py-1 bg-slate-800 rounded text-sm text-white border border-slate-600">Tất cả</button>
+                                <button onMouseEnter={() => setActiveCurve('face')} className="px-3 py-1 bg-blue-900/50 rounded text-sm text-blue-300 border border-blue-500">Khuôn mặt</button>
+                                <button onMouseEnter={() => setActiveCurve('cam')} className="px-3 py-1 bg-yellow-900/50 rounded text-sm text-yellow-300 border border-yellow-500">Cameraman</button>
+                                <button onMouseEnter={() => setActiveCurve('crowd')} className="px-3 py-1 bg-red-900/50 rounded text-sm text-red-300 border border-red-500">Đám đông</button>
+                            </div>
+
+                            <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 min-h-[150px]">
+                                {activeCurve === 'all' && (
+                                    <p className="text-sm text-slate-300">
+                                        Đường cong có xu hướng dịch chuyển lên trên và sang phải (N, k đều lớn) nghĩa là hình ảnh có chất lượng ngày càng tốt.
+                                    </p>
+                                )}
+                                {activeCurve === 'face' && (
+                                    <p className="text-sm text-blue-200">
+                                        <b>Ảnh Khuôn mặt (Ít chi tiết):</b><br/>
+                                        Bề mặt nhẵn mịn nhiều. Việc giảm số lượng bit (k) sẽ lập tức gây ra false contouring thấy rõ trên mặt. Do đó, cần giữ mức k cao dù độ phân giải N có lớn.
+                                    </p>
+                                )}
+                                {activeCurve === 'cam' && (
+                                    <p className="text-sm text-yellow-200">
+                                        <b>Ảnh Cameraman (Trung bình):</b><br/>
+                                        Sự cân bằng. Nó cần cả độ sắc nét (N) cho cạnh áo/máy ảnh và số lượng màu (k) vừa đủ cho da/trời.
+                                    </p>
+                                )}
+                                {activeCurve === 'crowd' && (
+                                    <p className="text-sm text-red-200">
+                                        <b>Ảnh Đám đông (Rất nhiều chi tiết nhỏ):</b><br/>
+                                        Đường cong <b>gần như dốc đứng</b> ở độ phân giải (N) cao. Điều này chứng tỏ đối với ảnh chi tiết dày đặc, người xem chỉ cần 1 số ít mức xám (k) vì các chi tiết rối rắm đã lấn át hiện tượng vỡ màu contouring. Thậm chí giảm k có thể làm tăng độ tương phản (contrast), tạo cảm giác ảnh sắc nét hơn.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ---------------------------------------------------------
+        // MAIN APP COMPONENT
+        // ---------------------------------------------------------
+        const App = () => {
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto space-y-8">
+                    
+                    {/* Header */}
+                    <header className="text-center space-y-4 mb-10 border-b border-slate-700 pb-8">
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="gradient-text">Độ Phân Giải Không Gian & Cường Độ</span>
+                        </h1>
+                        <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                            Tài liệu Lý thuyết, Ví dụ & Mô phỏng tương tác (Phần tiếp theo của 2.4)
+                        </p>
+                    </header>
+
+                    {/* LÝ THUYẾT 1 */}
+                    <section className="space-y-4">
+                        <h2 className="text-2xl font-bold text-white border-l-4 border-blue-500 pl-3">I. Độ phân giải không gian (Spatial Resolution)</h2>
+                        <div className="theory-text glass-panel p-6">
+                            <p>
+                                <b>Khái niệm:</b> Là thước đo chi tiết nhỏ nhất có thể phân biệt được trong một bức ảnh.
+                            </p>
+                            <p>
+                                Để có ý nghĩa thực tế, độ phân giải không gian phải được gắn với <b>đơn vị không gian vật lý</b>, thay vì chỉ nói tổng số pixel. Ví dụ: nói ảnh "có độ phân giải 1024x1024" là vô nghĩa nếu không biết kích thước vật lý của nó (in trên tem thư hay biển quảng cáo?).
+                            </p>
+                            <ul className="list-disc ml-8 mb-4 space-y-2">
+                                <li><b>Số cặp đường trên một đơn vị khoảng cách (line pairs/mm):</b> Ví dụ một đường thẳng có bề dày 0.1mm, cặp đường trắng đen là 0.2mm => Có 5 line pairs/mm. Đây là định nghĩa phổ biến để đánh giá thấu kính và cảm biến.</li>
+                                <li><b>Số điểm ảnh (dots) trên một inch (dpi):</b> Đơn vị tiêu chuẩn trong ngành in ấn.
+                                    <ul className="list-circle ml-6 mt-1 text-slate-400">
+                                        <li>Báo giấy: ~75 dpi</li>
+                                        <li>Tạp chí: ~133 dpi</li>
+                                        <li>Brochure giấy bóng: ~175 dpi</li>
+                                        <li>Sách giáo khoa Xử lý ảnh này: in ở mức 2400 dpi.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        <SpatialResolutionSim />
+                    </section>
+
+                    {/* LÝ THUYẾT 2 */}
+                    <section className="space-y-4 mt-16">
+                        <h2 className="text-2xl font-bold text-white border-l-4 border-amber-500 pl-3">II. Độ phân giải cường độ (Intensity Resolution)</h2>
+                        <div className="theory-text glass-panel p-6">
+                            <p>
+                                Tương tự, độ phân giải cường độ là <b>sự thay đổi cường độ nhỏ nhất có thể phân biệt được</b>. Dựa trên hạn chế phần cứng, giá trị này thường là lũy thừa của 2, cực kỳ phổ biến ở mức <b>8 bit (256 mức xám)</b>. Các hệ thống cao cấp hơn dùng 10, 12, hoặc 16 bit.
+                            </p>
+                            <p>
+                                Không giống không gian, độ phân giải cường độ được gọi thẳng bằng số bit (ví dụ: "Ảnh này có cường độ phân giải 8-bit"). Dù vậy, khả năng nhận diện bằng mắt người còn bị chi phối lớn bởi nhiễu (noise) và bối cảnh toàn cảnh.
+                            </p>
+                        </div>
+                        <IntensityResolutionSim />
+                    </section>
+
+                    {/* LÝ THUYẾT 3 */}
+                    <section className="space-y-4 mt-16">
+                        <h2 className="text-2xl font-bold text-white border-l-4 border-emerald-500 pl-3">III. Tương tác Không gian và Cường độ (Nghiên cứu Huang)</h2>
+                        <div className="theory-text glass-panel p-6">
+                            <p>
+                                Hai ví dụ trên cô lập N (Không gian) và k (Cường độ). Nhưng thực tế chúng tương tác với nhau thế nào để tạo ra chất lượng ảnh? Nghiên cứu của Huang (1965) sử dụng 3 bức ảnh chuẩn với độ chi tiết khác nhau:
+                            </p>
+                            <ol className="list-decimal ml-8 mb-4 space-y-2">
+                                <li><b>Mặt người phụ nữ (Face):</b> Rất ít chi tiết, nhiều vùng phẳng mượt.</li>
+                                <li><b>Người quay phim (Cameraman):</b> Độ chi tiết trung bình.</li>
+                                <li><b>Đám đông (Crowd):</b> Độ chi tiết cực kì cao và phức tạp.</li>
+                            </ol>
+                            <p>
+                                Người quan sát chấm điểm chất lượng và kết quả được tóm tắt trong <b>Đường đẳng ưu (Isopreference curves)</b>. Những điểm (N, k) nằm trên cùng 1 đường cong sẽ cho người xem cảm giác ảnh đẹp bằng nhau.
+                            </p>
+                        </div>
+                        <IsopreferenceCurves />
+                    </section>
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
