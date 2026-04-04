@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô Phỏng Ma Trận Nội Suy Ảnh</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .gradient-text { background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc); -webkit-background-clip: text; color: transparent; }
+        .math-expr { font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 0.25rem; }
+        
+        .matrix-cell { transition: all 0.2s ease; }
+        .bg-heatmap { background-color: rgba(56, 189, 248, var(--alpha)); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        // Ma trận gốc 4x4 (Giả lập một bức ảnh rất nhỏ có cường độ từ 10 đến 250)
+        const SRC_MATRIX = [
+            [ 20,  60, 100,  40],
+            [ 80, 200, 160,  90],
+            [ 50, 150, 240, 120],
+            [ 30,  70,  90,  50]
+        ];
+
+        const SRC_SIZE = 4;
+        const DST_SIZE = 7; // Phóng to gấp đôi (3 khoảng gốc -> 6 khoảng đích)
+        const RATIO = (SRC_SIZE - 1) / (DST_SIZE - 1); // = 0.5
+
+        // Hàm an toàn để lấy giá trị ma trận (Kẹp biên - Clamping)
+        const getVal = (x, y) => {
+            const cx = Math.max(0, Math.min(SRC_SIZE - 1, x));
+            const cy = Math.max(0, Math.min(SRC_SIZE - 1, y));
+            return SRC_MATRIX[cy][cx];
+        };
+
+        // Hàm nội suy bậc 3 (Catmull-Rom)
+        const cubic = (p0, p1, p2, p3, x) => {
+            return p1 + 0.5 * x * (p2 - p0 + x * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + x * (3.0 * (p1 - p2) + p3 - p0)));
+        };
+
+        const MatrixInterpolationSim = () => {
+            const [method, setMethod] = useState('nearest'); // nearest, bilinear, bicubic
+            const [selectedTarget, setSelectedTarget] = useState({ x: 3, y: 2 }); // Default selection
+
+            // Tính toán Ma trận đích (7x7)
+            const targetMatrix = useMemo(() => {
+                const mat = [];
+                for (let y = 0; y < DST_SIZE; y++) {
+                    const row = [];
+                    for (let x = 0; x < DST_SIZE; x++) {
+                        const gx = x * RATIO;
+                        const gy = y * RATIO;
+
+                        let val = 0;
+                        if (method === 'nearest') {
+                            const nx = Math.min(SRC_SIZE - 1, Math.round(gx));
+                            const ny = Math.min(SRC_SIZE - 1, Math.round(gy));
+                            val = getVal(nx, ny);
+                        } 
+                        else if (method === 'bilinear') {
+                            const fx = Math.floor(gx); const fy = Math.floor(gy);
+                            const cx = Math.min(SRC_SIZE - 1, fx + 1); const cy = Math.min(SRC_SIZE - 1, fy + 1);
+                            const dx = gx - fx; const dy = gy - fy;
+
+                            const p00 = getVal(fx, fy); const p10 = getVal(cx, fy);
+                            const p01 = getVal(fx, cy); const p11 = getVal(cx, cy);
+
+                            val = p00 * (1 - dx) * (1 - dy) + p10 * dx * (1 - dy) +
+                                  p01 * (1 - dx) * dy     + p11 * dx * dy;
+                        } 
+                        else if (method === 'bicubic') {
+                            const fx = Math.floor(gx); const fy = Math.floor(gy);
+                            const dx = gx - fx; const dy = gy - fy;
+
+                            const col0 = cubic(getVal(fx-1, fy-1), getVal(fx, fy-1), getVal(fx+1, fy-1), getVal(fx+2, fy-1), dx);
+                            const col1 = cubic(getVal(fx-1, fy),   getVal(fx, fy),   getVal(fx+1, fy),   getVal(fx+2, fy), dx);
+                            const col2 = cubic(getVal(fx-1, fy+1), getVal(fx, fy+1), getVal(fx+1, fy+1), getVal(fx+2, fy+1), dx);
+                            const col3 = cubic(getVal(fx-1, fy+2), getVal(fx, fy+2), getVal(fx+1, fy+2), getVal(fx+2, fy+2), dx);
+                            
+                            val = cubic(col0, col1, col2, col3, dy);
+                        }
+                        
+                        // Kẹp giá trị 0-255 và làm tròn
+                        row.push(Math.round(Math.max(0, Math.min(255, val))));
+                    }
+                    mat.push(row);
+                }
+                return mat;
+            }, [method]);
+
+            // Hàm kiểm tra xem 1 pixel ở Source có đang được highlight không
+            const isSourceHighlighted = (sx, sy) => {
+                if (!selectedTarget) return false;
+                const gx = selectedTarget.x * RATIO;
+                const gy = selectedTarget.y * RATIO;
+
+                if (method === 'nearest') {
+                    const nx = Math.min(SRC_SIZE - 1, Math.round(gx));
+                    const ny = Math.min(SRC_SIZE - 1, Math.round(gy));
+                    return sx === nx && sy === ny;
+                } 
+                if (method === 'bilinear') {
+                    const fx = Math.floor(gx); const fy = Math.floor(gy);
+                    const cx = Math.min(SRC_SIZE - 1, fx + 1); const cy = Math.min(SRC_SIZE - 1, fy + 1);
+                    return (sx === fx || sx === cx) && (sy === fy || sy === cy);
+                }
+                if (method === 'bicubic') {
+                    const fx = Math.floor(gx); const fy = Math.floor(gy);
+                    return (sx >= fx - 1 && sx <= fx + 2) && (sy >= fy - 1 && sy <= fy + 2);
+                }
+                return false;
+            };
+
+            // Hàm render chi tiết phép tính toán học
+            const renderMathDetails = () => {
+                if (!selectedTarget) return null;
+                const tx = selectedTarget.x;
+                const ty = selectedTarget.y;
+                const gx = tx * RATIO;
+                const gy = ty * RATIO;
+
+                if (method === 'nearest') {
+                    const nx = Math.min(SRC_SIZE - 1, Math.round(gx));
+                    const ny = Math.min(SRC_SIZE - 1, Math.round(gy));
+                    return (
+                        <div className="bg-red-900/20 border border-red-500/30 p-5 rounded-xl text-red-100">
+                            <h4 className="font-bold text-red-400 mb-2 border-b border-red-500/30 pb-2">Giải tích Nearest Neighbor</h4>
+                            <ul className="space-y-2 font-mono text-sm">
+                                <li>1. Tọa độ đích: <span className="text-white">(tx, ty) = ({tx}, {ty})</span></li>
+                                <li>2. Chiếu về tọa độ thực (Tỉ lệ {RATIO}): <span className="text-white">(gx, gy) = ({gx.toFixed(2)}, {gy.toFixed(2)})</span></li>
+                                <li>3. Làm tròn (Round): <span className="text-red-300">nx = {nx}, ny = {ny}</span></li>
+                                <li className="text-lg font-bold mt-4">
+                                    => Giá trị = Gốc({nx}, {ny}) = <span className="text-white">{getVal(nx, ny)}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    );
+                }
+
+                if (method === 'bilinear') {
+                    const fx = Math.floor(gx); const fy = Math.floor(gy);
+                    const cx = Math.min(SRC_SIZE - 1, fx + 1); const cy = Math.min(SRC_SIZE - 1, fy + 1);
+                    const dx = gx - fx; const dy = gy - fy;
+
+                    const p00 = getVal(fx, fy); const p10 = getVal(cx, fy);
+                    const p01 = getVal(fx, cy); const p11 = getVal(cx, cy);
+
+                    const eq1 = p00 * (1 - dx) * (1 - dy);
+                    const eq2 = p10 * dx * (1 - dy);
+                    const eq3 = p01 * (1 - dx) * dy;
+                    const eq4 = p11 * dx * dy;
+                    const finalVal = eq1 + eq2 + eq3 + eq4;
+
+                    return (
+                        <div className="bg-blue-900/20 border border-blue-500/30 p-5 rounded-xl text-blue-100">
+                            <h4 className="font-bold text-blue-400 mb-2 border-b border-blue-500/30 pb-2">Giải tích Bilinear Interpolation</h4>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-sm">
+                                <div>
+                                    <ul className="space-y-2">
+                                        <li>1. Tọa độ chiếu: <span className="text-white">(gx, gy) = ({gx.toFixed(2)}, {gy.toFixed(2)})</span></li>
+                                        <li>2. Tọa độ nguyên xung quanh:</li>
+                                        <li className="pl-4 text-blue-300">Trên-trái: ({fx},{fy}) = {p00}</li>
+                                        <li className="pl-4 text-blue-300">Trên-phải: ({cx},{fy}) = {p10}</li>
+                                        <li className="pl-4 text-blue-300">Dưới-trái: ({fx},{cy}) = {p01}</li>
+                                        <li className="pl-4 text-blue-300">Dưới-phải: ({cx},{cy}) = {p11}</li>
+                                        <li>3. Khoảng cách thập phân (Trọng số):</li>
+                                        <li className="pl-4 text-amber-300">dx = {dx.toFixed(2)}, dy = {dy.toFixed(2)}</li>
+                                    </ul>
+                                </div>
+                                <div className="bg-black/30 p-3 rounded border border-blue-500/30 flex flex-col justify-center">
+                                    <div className="mb-2">v = P₀₀(1-dx)(1-dy) + P₁₀(dx)(1-dy) <br/>&nbsp;&nbsp;&nbsp;+ P₀₁(1-dx)dy + P₁₁(dx)dy</div>
+                                    <div className="text-slate-400 mb-2">
+                                        v = {p00}*{(1-dx)*(1-dy)} + {p10}*{dx*(1-dy)} <br/>
+                                        &nbsp;&nbsp;&nbsp;+ {p01}*{(1-dx)*dy} + {p11}*{dx*dy}
+                                    </div>
+                                    <div className="text-slate-400 mb-2">
+                                        v = {eq1.toFixed(1)} + {eq2.toFixed(1)} + {eq3.toFixed(1)} + {eq4.toFixed(1)}
+                                    </div>
+                                    <div className="text-lg font-bold text-blue-400 mt-2 border-t border-blue-500/30 pt-2">
+                                        => Result: <span className="text-white">{finalVal.toFixed(1)}</span> 
+                                        <span className="text-sm text-slate-400 ml-2">(Làm tròn: {Math.round(finalVal)})</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (method === 'bicubic') {
+                    const fx = Math.floor(gx); const fy = Math.floor(gy);
+                    const dx = gx - fx; const dy = gy - fy;
+
+                    const c0 = cubic(getVal(fx-1, fy-1), getVal(fx, fy-1), getVal(fx+1, fy-1), getVal(fx+2, fy-1), dx);
+                    const c1 = cubic(getVal(fx-1, fy),   getVal(fx, fy),   getVal(fx+1, fy),   getVal(fx+2, fy), dx);
+                    const c2 = cubic(getVal(fx-1, fy+1), getVal(fx, fy+1), getVal(fx+1, fy+1), getVal(fx+2, fy+1), dx);
+                    const c3 = cubic(getVal(fx-1, fy+2), getVal(fx, fy+2), getVal(fx+1, fy+2), getVal(fx+2, fy+2), dx);
+                    const finalVal = cubic(c0, c1, c2, c3, dy);
+
+                    return (
+                        <div className="bg-emerald-900/20 border border-emerald-500/30 p-5 rounded-xl text-emerald-100">
+                            <h4 className="font-bold text-emerald-400 mb-2 border-b border-emerald-500/30 pb-2">Giải tích Bicubic (Sử dụng hàm Spline C(x))</h4>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 font-mono text-sm">
+                                <div>
+                                    <ul className="space-y-2">
+                                        <li>1. Tọa độ chiếu: <span className="text-white">({gx.toFixed(2)}, {gy.toFixed(2)})</span></li>
+                                        <li>2. Nội suy theo trục X (Hàng ngang) với trọng số dx = {dx.toFixed(2)}:</li>
+                                        <li className="pl-4 text-emerald-300">Hàng y-1: C({getVal(fx-1, fy-1)}, {getVal(fx, fy-1)}, {getVal(fx+1, fy-1)}, {getVal(fx+2, fy-1)}) = {c0.toFixed(2)}</li>
+                                        <li className="pl-4 text-emerald-300">Hàng y₀ : C({getVal(fx-1, fy)}, {getVal(fx, fy)}, {getVal(fx+1, fy)}, {getVal(fx+2, fy)}) = {c1.toFixed(2)}</li>
+                                        <li className="pl-4 text-emerald-300">Hàng y₁ : C({getVal(fx-1, fy+1)}, {getVal(fx, fy+1)}, {getVal(fx+1, fy+1)}, {getVal(fx+2, fy+1)}) = {c2.toFixed(2)}</li>
+                                        <li className="pl-4 text-emerald-300">Hàng y+2: C({getVal(fx-1, fy+2)}, {getVal(fx, fy+2)}, {getVal(fx+1, fy+2)}, {getVal(fx+2, fy+2)}) = {c3.toFixed(2)}</li>
+                                    </ul>
+                                </div>
+                                <div className="bg-black/30 p-3 rounded border border-emerald-500/30 flex flex-col justify-center">
+                                    <div>3. Nội suy theo trục Y (Cột dọc) bằng 4 kết quả trên với trọng số dy = {dy.toFixed(2)}:</div>
+                                    <div className="text-slate-300 my-2">
+                                        v = C({c0.toFixed(1)}, {c1.toFixed(1)}, {c2.toFixed(1)}, {c3.toFixed(1)}, dy)
+                                    </div>
+                                    <div className="text-lg font-bold text-emerald-400 mt-2 border-t border-emerald-500/30 pt-2">
+                                        => Result: <span className="text-white">{finalVal.toFixed(2)}</span>
+                                        <span className="text-sm text-slate-400 ml-2">(Kẹp 0-255, Làm tròn: {Math.round(Math.max(0, Math.min(255, finalVal)))})</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+            };
+
+            const getHighlightStyle = () => {
+                if (method === 'nearest') return 'border-4 border-red-500 shadow-[0_0_20px_#ef4444] z-20 scale-110';
+                if (method === 'bilinear') return 'border-4 border-blue-500 shadow-[0_0_20px_#3b82f6] z-20 scale-105';
+                return 'border-4 border-emerald-500 shadow-[0_0_20px_#10b981] z-20';
+            };
+
+            return (
+                <div className="flex flex-col gap-6">
+                    {/* Control Panel */}
+                    <div className="flex flex-col md:flex-row gap-4 bg-slate-900 p-2 rounded-xl border border-slate-700">
+                        <button onClick={() => setMethod('nearest')} className={`flex-1 p-4 rounded-lg font-bold transition-all ${method === 'nearest' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>Nearest Neighbor (1 điểm)</button>
+                        <button onClick={() => setMethod('bilinear')} className={`flex-1 p-4 rounded-lg font-bold transition-all ${method === 'bilinear' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>Bilinear Interpolation (4 điểm)</button>
+                        <button onClick={() => setMethod('bicubic')} className={`flex-1 p-4 rounded-lg font-bold transition-all ${method === 'bicubic' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>Bicubic Interpolation (16 điểm)</button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* SOURCE MATRIX */}
+                        <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 flex flex-col items-center shadow-xl">
+                            <h4 className="text-white font-bold text-lg mb-4 text-center">Ma trận Nguồn (4x4)</h4>
+                            <div className="grid grid-cols-4 gap-2 bg-slate-900 p-3 rounded-lg w-full max-w-[400px] aspect-square">
+                                {SRC_MATRIX.map((row, y) => row.map((val, x) => {
+                                    const isHighlighted = isSourceHighlighted(x, y);
+                                    // Map color intensity
+                                    const alpha = val / 255;
+                                    const textColor = val > 128 ? 'text-black' : 'text-white';
+                                    
+                                    return (
+                                        <div 
+                                            key={`src-${x}-${y}`} 
+                                            className={`matrix-cell flex flex-col items-center justify-center rounded-lg font-bold text-xl relative overflow-hidden
+                                                ${isHighlighted ? getHighlightStyle() : 'border border-slate-700 opacity-60'}
+                                                ${textColor}`}
+                                            style={{ backgroundColor: `rgba(56, 189, 248, ${alpha})` }}
+                                        >
+                                            {/* Tọa độ góc */}
+                                            <span className="absolute top-1 left-1 text-[10px] opacity-60 font-mono">({x},{y})</span>
+                                            {val}
+                                        </div>
+                                    )
+                                }))}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-4 text-center">Tọa độ x,y bắt đầu từ (0,0). Các ô được viền sáng là những pixel đang được lấy dữ liệu để tính toán nội suy.</p>
+                        </div>
+
+                        {/* TARGET MATRIX */}
+                        <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 flex flex-col items-center shadow-xl">
+                            <h4 className="text-white font-bold text-lg mb-4 text-center">Ma trận Đích Phóng to (7x7)</h4>
+                            <div className="grid grid-cols-7 gap-1 bg-slate-900 p-2 rounded-lg w-full max-w-[400px] aspect-square">
+                                {targetMatrix.map((row, y) => row.map((val, x) => {
+                                    const isSelected = selectedTarget?.x === x && selectedTarget?.y === y;
+                                    const alpha = val / 255;
+                                    const textColor = val > 128 ? 'text-black' : 'text-white';
+
+                                    let borderStyle = 'border border-slate-700/50';
+                                    if (isSelected) {
+                                        if (method==='nearest') borderStyle = 'border-4 border-red-500 scale-110 z-10 shadow-[0_0_15px_#ef4444]';
+                                        if (method==='bilinear') borderStyle = 'border-4 border-blue-500 scale-110 z-10 shadow-[0_0_15px_#3b82f6]';
+                                        if (method==='bicubic') borderStyle = 'border-4 border-emerald-500 scale-110 z-10 shadow-[0_0_15px_#10b981]';
+                                    }
+
+                                    return (
+                                        <div 
+                                            key={`dst-${x}-${y}`}
+                                            onClick={() => setSelectedTarget({x, y})}
+                                            className={`matrix-cell flex items-center justify-center rounded cursor-pointer font-bold text-sm hover:scale-110 hover:z-20
+                                                ${borderStyle} ${textColor}`}
+                                            style={{ backgroundColor: `rgba(168, 85, 247, ${alpha})` }}
+                                        >
+                                            {val}
+                                        </div>
+                                    )
+                                }))}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-4 text-center">Tỉ lệ phóng to Ratio = 0.5. <b>Bấm vào một ô bất kỳ</b> để xem chi tiết cách tính ra giá trị của ô đó.</p>
+                        </div>
+                    </div>
+
+                    {/* Math Details Panel */}
+                    <div className="mt-4">
+                        {renderMathDetails()}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1200px] mx-auto space-y-8">
+                    <header className="text-center space-y-4 mb-10 border-b border-slate-700 pb-8">
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="gradient-text">Ma Trận Nội Suy (Image Interpolation)</span>
+                        </h1>
+                        <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                            Mô phỏng trực tiếp thuật toán phóng to ảnh trên <b>cấp độ số học của từng điểm ảnh</b>.
+                        </p>
+                    </header>
+
+                    <section className="theory-text glass-panel p-6">
+                        <p>
+                            Ảnh kỹ thuật số thực chất chỉ là một ma trận các con số. Khi phóng to ảnh (ví dụ từ kích thước 4x4 lên 7x7), máy tính cần tạo ra các điểm ảnh mới. Bằng cách chiếu ngược tọa độ điểm ảnh mới về ma trận gốc, ta thu được tọa độ số thực (VD: x=1.5, y=0.5).
+                        </p>
+                        <p>
+                            <b>Câu hỏi đặt ra là:</b> Giá trị cường độ sáng (từ 0-255) tại tọa độ (1.5, 0.5) bằng bao nhiêu? Nội suy (Interpolation) chính là các công thức toán học để trả lời câu hỏi này.
+                        </p>
+                    </section>
+
+                    <MatrixInterpolationSim />
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
