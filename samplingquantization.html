@@ -47,19 +47,17 @@
         // 1. 1D SAMPLING & QUANTIZATION (Figure 2.16)
         // ---------------------------------------------------------
         const OneDimSignalSimulation = () => {
-            const [samples, setSamples] = useState(16); // X-axis sampling
-            const [bits, setBits] = useState(3);        // Y-axis quantization
+            const [samples, setSamples] = useState(16);
+            const [bits, setBits] = useState(3);
             const levels = Math.pow(2, bits);
             
             const canvasRef = useRef(null);
 
-            // Pre-generate a noisy sine wave function
             const continuousData = useMemo(() => {
                 const data = [];
                 for(let i = 0; i < 600; i++) {
-                    // Sine wave + smaller high freq wave (noise)
                     const val = Math.sin(i * 0.02) * 40 + Math.sin(i * 0.1) * 5 + 50; 
-                    data.push(val); // values between roughly 0 and 100
+                    data.push(val); 
                 }
                 return data;
             }, []);
@@ -72,75 +70,53 @@
 
                 ctx.clearRect(0, 0, width, height);
 
-                // Grid background for Quantization levels
                 const levelHeight = height / levels;
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
                 ctx.lineWidth = 1;
                 for(let i=0; i<=levels; i++) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, i * levelHeight);
-                    ctx.lineTo(width, i * levelHeight);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i * levelHeight); ctx.lineTo(width, i * levelHeight); ctx.stroke();
                 }
 
-                // Draw Continuous Signal (Gray)
                 ctx.beginPath();
                 ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
                 ctx.lineWidth = 3;
                 continuousData.forEach((val, x) => {
-                    // Map 0-100 to canvas height
                     const y = height - (val / 100) * height;
                     if(x === 0) ctx.moveTo(x, y);
                     else ctx.lineTo(x, y);
                 });
                 ctx.stroke();
 
-                // Draw Sampled & Quantized Points
                 const stepX = width / samples;
-                
-                ctx.fillStyle = '#10b981'; // Emerald points
+                ctx.fillStyle = '#10b981';
                 ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
                 
                 for(let i=0; i<samples; i++) {
                     const x = i * stepX + stepX/2;
                     const dataIdx = Math.min(continuousData.length - 1, Math.floor(x));
-                    const realVal = continuousData[dataIdx]; // 0-100
+                    const realVal = continuousData[dataIdx]; 
                     
-                    // Quantize the value
-                    // map to 0 -> levels-1
                     let qLevel = Math.floor((realVal / 100) * levels);
-                    if (qLevel >= levels) qLevel = levels - 1; // max bound
+                    if (qLevel >= levels) qLevel = levels - 1; 
                     
-                    // Convert back to canvas Y
                     const qY = height - (qLevel * levelHeight) - levelHeight/2;
                     
-                    // Draw stem (sampling line)
-                    ctx.beginPath();
-                    ctx.moveTo(x, height);
-                    ctx.lineTo(x, qY);
-                    ctx.stroke();
-
-                    // Draw quantized point
+                    ctx.beginPath(); ctx.moveTo(x, height); ctx.lineTo(x, qY); ctx.stroke();
                     ctx.fillRect(x - 4, qY - 4, 8, 8);
                 }
-
             }, [samples, bits, continuousData]);
 
             return (
                 <div className="glass-panel p-6 mt-6 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]">
                     <h3 className="text-xl font-bold mb-4 text-emerald-400">Mô phỏng 1D: Chuyển đổi liên tục sang rời rạc</h3>
-                    
                     <div className="flex flex-col md:flex-row gap-8">
                         <div className="w-full md:w-2/3">
                             <div className="relative border-l-2 border-b-2 border-slate-600 bg-slate-900 rounded-tr-lg">
                                 <canvas ref={canvasRef} width="600" height="300" className="w-full h-auto" />
-                                
-                                {/* Axis Labels */}
                                 <div className="absolute -left-12 top-1/2 -rotate-90 text-xs text-slate-400 font-mono">Biên độ f (Amplitude)</div>
                                 <div className="absolute bottom-[-24px] left-1/2 -translate-x-1/2 text-xs text-slate-400 font-mono">Không gian x (Spatial)</div>
                             </div>
                         </div>
-
                         <div className="w-full md:w-1/3 space-y-6">
                             <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
                                 <label className="flex justify-between text-sm font-bold text-slate-200 mb-2">
@@ -150,7 +126,6 @@
                                 <p className="text-xs text-slate-400 mb-3">Chia trục Không gian (trục x) thành các tọa độ rời rạc.</p>
                                 <input type="range" min="4" max="60" step="1" value={samples} onChange={e => setSamples(Number(e.target.value))} />
                             </div>
-
                             <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
                                 <label className="flex justify-between text-sm font-bold text-slate-200 mb-2">
                                     <span>Lượng tử hóa (Quantization)</span>
@@ -159,16 +134,11 @@
                                 <p className="text-xs text-slate-400 mb-3">Chia trục Biên độ (trục y) thành {levels} khoảng (interval) riêng biệt.</p>
                                 <input type="range" min="1" max="5" step="1" value={bits} onChange={e => setBits(Number(e.target.value))} />
                             </div>
-
-                            <div className="text-sm text-slate-300 p-3 bg-indigo-900/30 rounded-lg border border-indigo-500/30">
-                                Bạn có thể thấy đường cong liên tục (mờ) bị bẻ gãy thành cấu trúc bậc thang. Độ lấy mẫu càng cao và số bit càng lớn, các điểm xanh càng bám sát đường cong gốc (giảm sai số / noise).
-                            </div>
                         </div>
                     </div>
                 </div>
             );
         };
-
 
         // ---------------------------------------------------------
         // 2. COORDINATE SYSTEM (Figure 2.19)
@@ -186,9 +156,7 @@
                     </p>
 
                     <div className="flex flex-col md:flex-row gap-8 items-center justify-center">
-                        {/* Grid */}
                         <div className="relative p-6">
-                            {/* Axes */}
                             <div className="absolute top-0 left-6 w-full h-1 bg-white/20"></div>
                             <div className="absolute top-0 right-0 w-3 h-3 bg-white rotate-45 transform origin-bottom-left"></div>
                             <div className="absolute top-[-20px] right-0 text-slate-300 font-mono text-sm">y (Cột / Columns)</div>
@@ -199,7 +167,6 @@
 
                             <div className="absolute top-[-10px] left-[-20px] text-white font-mono font-bold">Gốc(0,0)</div>
 
-                            {/* Cells */}
                             <div className="grid grid-cols-5 gap-1 bg-slate-700 p-1 rounded border border-slate-500 mt-2 ml-2">
                                 {Array.from({length: rows}).map((_, x) => (
                                     Array.from({length: cols}).map((_, y) => (
@@ -217,7 +184,6 @@
                             </div>
                         </div>
 
-                        {/* Info Panel */}
                         <div className="w-full md:w-64 bg-slate-800 p-4 rounded-xl border border-slate-600 h-32 flex flex-col justify-center">
                             {hoverCell ? (
                                 <div>
@@ -238,92 +204,187 @@
             );
         };
 
+        // ---------------------------------------------------------
+        // 3. LINEAR VS COORDINATE INDEXING (Figure 2.22)
+        // ---------------------------------------------------------
+        const LinearIndexingSimulation = () => {
+            const [hoverAlpha, setHoverAlpha] = useState(null);
+            const M = 4; // Rows (x)
+            const N = 6; // Cols (y)
+            const total = M * N;
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+                    <h3 className="text-xl font-bold mb-4 text-amber-400">Tương tác: Ma trận 2D sang Mảng 1D (Column Scan)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Di chuột qua lại giữa Ma trận 2D và Mảng 1D để xem sự ánh xạ. Máy tính quét qua cột đầu tiên (từ trên xuống dưới), sau đó chuyển sang cột thứ hai, thứ ba... để xếp nối tiếp thành 1 chuỗi bộ nhớ liên tục.
+                    </p>
+                    
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* 2D Matrix View */}
+                        <div className="flex-1">
+                            <h4 className="text-sm font-bold text-slate-300 mb-2">1. Ma trận 2D (Tọa độ x, y)</h4>
+                            <div className="relative inline-block bg-slate-800 p-4 rounded-xl border border-slate-600 pl-10 pt-8">
+                                {/* Axis indicator */}
+                                <div className="absolute top-2 left-10 text-xs text-slate-400 font-mono border-b border-slate-600 pb-1 w-full text-center">y (Cột 0 đến {N-1}) →</div>
+                                <div className="absolute top-8 left-2 text-xs text-slate-400 font-mono border-r border-slate-600 pr-1 h-full pt-10" style={{writingMode: 'vertical-rl'}}>x (Hàng 0 đến {M-1}) →</div>
+
+                                {/* Grid container with column flow ensures natural alpha mapping */}
+                                <div className="grid grid-rows-4 grid-flow-col gap-2 relative z-10">
+                                    {Array.from({length: total}).map((_, alpha) => {
+                                        const x = alpha % M;
+                                        const y = Math.floor(alpha / M);
+                                        const isHovered = hoverAlpha === alpha;
+                                        
+                                        return (
+                                            <div 
+                                                key={`2d-${alpha}`}
+                                                onMouseEnter={() => setHoverAlpha(alpha)}
+                                                onMouseLeave={() => setHoverAlpha(null)}
+                                                className={`w-14 h-14 flex flex-col items-center justify-center rounded cursor-pointer transition-all border-2
+                                                    ${isHovered ? 'bg-amber-500 border-amber-300 scale-110 z-20 shadow-lg' : 'bg-slate-700 border-slate-600 hover:bg-slate-600'}`}
+                                            >
+                                                <span className={`text-xs font-mono ${isHovered ? 'text-amber-100' : 'text-purple-300'}`}>{x},{y}</span>
+                                                <span className={`text-base font-bold mt-1 ${isHovered ? 'text-white' : 'text-amber-500/80'}`}>α={alpha}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Scan direction hint arrow */}
+                                <div className="absolute top-8 left-6 h-20 w-4 border-l-2 border-b-2 border-dashed border-amber-500/50 rounded-bl-xl z-0 pointer-events-none"></div>
+                                <div className="absolute top-[108px] left-9 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[8px] border-l-amber-500/50 z-0 pointer-events-none"></div>
+                            </div>
+                        </div>
+
+                        {/* 1D Array View */}
+                        <div className="flex-1">
+                            <h4 className="text-sm font-bold text-slate-300 mb-2">2. Mảng 1D (Chỉ số tuyến tính α)</h4>
+                            <div className="bg-slate-800 p-4 rounded-xl border border-slate-600">
+                                <div className="flex flex-wrap gap-1">
+                                    {Array.from({length: total}).map((_, alpha) => {
+                                        const isHovered = hoverAlpha === alpha;
+                                        // Add spacing every M elements to show column chunks
+                                        const isEndOfCol = (alpha + 1) % M === 0;
+                                        
+                                        return (
+                                            <React.Fragment key={`1d-${alpha}`}>
+                                                <div 
+                                                    onMouseEnter={() => setHoverAlpha(alpha)}
+                                                    onMouseLeave={() => setHoverAlpha(null)}
+                                                    className={`w-10 h-10 flex flex-col items-center justify-center font-mono rounded cursor-pointer transition-all border
+                                                        ${isHovered ? 'bg-amber-500 border-amber-300 text-white scale-125 z-10 shadow-lg' : 'bg-slate-900 border-slate-700 text-amber-500 hover:bg-slate-800'}`}
+                                                >
+                                                    <span className="text-base font-bold">{alpha}</span>
+                                                </div>
+                                                {isEndOfCol && <div className="w-2 border-r border-dashed border-slate-600 mr-2"></div>}
+                                            </React.Fragment>
+                                        )
+                                    })}
+                                </div>
+                                <div className="mt-4 text-xs text-slate-400">
+                                    Vùng trống nét đứt minh họa cho ranh giới phân tách bộ nhớ giữa Cột 0, Cột 1... trong mảng liên tục. Mỗi điểm ảnh lúc này được định danh bởi một địa chỉ `α` duy nhất.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Math Formula Panel */}
+                    <div className="mt-8 bg-slate-900/50 p-6 rounded-xl border border-slate-700 flex flex-col md:flex-row items-center gap-8 min-h-[160px]">
+                        <div className="flex-1 text-center md:text-left">
+                            <div className="text-slate-400 text-sm mb-1">M = {M} (Hàng), N = {N} (Cột)</div>
+                            <div className="text-xl font-mono text-white mb-4">
+                                {hoverAlpha !== null ? (
+                                    <span>Đang xét điểm: <b className="text-purple-400">f({hoverAlpha % M}, {Math.floor(hoverAlpha / M)})</b> ↔ <b className="text-amber-400">α = {hoverAlpha}</b></span>
+                                ) : (
+                                    <span className="text-slate-500 italic">Rê chuột vào một ô để xem công thức chuyển đổi.</span>
+                                )}
+                            </div>
+                        </div>
+                        
+                        {hoverAlpha !== null && (
+                            <div className="flex-1 flex flex-col sm:flex-row gap-4 w-full justify-center">
+                                <div className="bg-slate-800 p-4 rounded-lg border border-slate-600 flex-1">
+                                    <div className="text-xs font-bold text-amber-400 mb-2">Tạo α từ Tọa độ (x,y)</div>
+                                    <div className="font-mono text-sm text-slate-300">
+                                        α = M × y + x <br/>
+                                        α = {M} × <span className="text-purple-400">{Math.floor(hoverAlpha / M)}</span> + <span className="text-purple-400">{hoverAlpha % M}</span> <br/>
+                                        <strong className="text-lg text-amber-400 mt-1 inline-block">α = {hoverAlpha}</strong>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-800 p-4 rounded-lg border border-slate-600 flex-1">
+                                    <div className="text-xs font-bold text-purple-400 mb-2">Trích xuất (x,y) từ α</div>
+                                    <div className="font-mono text-sm text-slate-300">
+                                        x = α mod M = {hoverAlpha} mod {M} = <strong className="text-purple-400">{hoverAlpha % M}</strong> <br/>
+                                        y = (α - x) / M = ({hoverAlpha} - {hoverAlpha % M}) / {M} = <strong className="text-purple-400">{Math.floor(hoverAlpha / M)}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )
+        }
 
         // ---------------------------------------------------------
-        // 3. 2D SAMPLING & QUANTIZATION (Figure 2.17 & 2.21)
+        // 4. 2D SAMPLING & QUANTIZATION (Figure 2.17 & 2.21)
         // ---------------------------------------------------------
         const TwoDimImageSimulation = () => {
-            const [resolution, setResolution] = useState(128); // Spatial sampling (N x N)
-            const [bits, setBits] = useState(8);               // Quantization (k-bits)
+            const [resolution, setResolution] = useState(128); 
+            const [bits, setBits] = useState(8);               
             
             const canvasRef = useRef(null);
             const hiddenCanvasRef = useRef(null);
 
-            // Draw original continuous image on hidden canvas once
             useEffect(() => {
                 const canvas = hiddenCanvasRef.current;
                 const ctx = canvas.getContext('2d');
                 
-                // Draw a grayscale continuous-looking gradient scene
-                // Sky
                 const grad = ctx.createLinearGradient(0, 0, 0, 256);
-                grad.addColorStop(0, '#EEEEEE');
-                grad.addColorStop(1, '#444444');
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, 256, 256);
+                grad.addColorStop(0, '#EEEEEE'); grad.addColorStop(1, '#444444');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
 
-                // Sun
                 const sunGrad = ctx.createRadialGradient(80, 80, 0, 80, 80, 60);
-                sunGrad.addColorStop(0, '#FFFFFF');
-                sunGrad.addColorStop(1, 'rgba(255,255,255,0)');
-                ctx.fillStyle = sunGrad;
-                ctx.beginPath(); ctx.arc(80, 80, 60, 0, Math.PI*2); ctx.fill();
+                sunGrad.addColorStop(0, '#FFFFFF'); sunGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = sunGrad; ctx.beginPath(); ctx.arc(80, 80, 60, 0, Math.PI*2); ctx.fill();
 
-                // Mountain
-                ctx.fillStyle = '#222222';
-                ctx.beginPath(); ctx.moveTo(0, 256); ctx.lineTo(128, 120); ctx.lineTo(256, 256); ctx.fill();
-                
-                ctx.fillStyle = '#666666';
-                ctx.beginPath(); ctx.moveTo(100, 256); ctx.lineTo(200, 150); ctx.lineTo(256, 256); ctx.fill();
-
+                ctx.fillStyle = '#222222'; ctx.beginPath(); ctx.moveTo(0, 256); ctx.lineTo(128, 120); ctx.lineTo(256, 256); ctx.fill();
+                ctx.fillStyle = '#666666'; ctx.beginPath(); ctx.moveTo(100, 256); ctx.lineTo(200, 150); ctx.lineTo(256, 256); ctx.fill();
             }, []);
 
-            // Apply Sampling & Quantization
             useEffect(() => {
                 const srcCanvas = hiddenCanvasRef.current;
                 const destCanvas = canvasRef.current;
                 const ctx = destCanvas.getContext('2d');
                 
-                // Step 1: Spatial Sampling (Scale down to resolution x resolution)
                 const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = resolution;
-                tempCanvas.height = resolution;
+                tempCanvas.width = resolution; tempCanvas.height = resolution;
                 const tCtx = tempCanvas.getContext('2d');
                 tCtx.drawImage(srcCanvas, 0, 0, resolution, resolution);
 
-                // Step 2: Quantization (Reduce color levels)
                 const imgData = tCtx.getImageData(0, 0, resolution, resolution);
                 const data = imgData.data;
                 const levels = Math.pow(2, bits);
-                const step = 255 / (levels - 1); // Level step
+                const step = 255 / (levels - 1); 
                 
                 for(let i=0; i < data.length; i+=4) {
-                    // Extract grayscale (r=g=b in our image)
                     const val = data[i]; 
-                    // Quantize
                     const qVal = Math.round(Math.round(val / (256/levels)) * step);
-                    
-                    data[i] = qVal;     // R
-                    data[i+1] = qVal;   // G
-                    data[i+2] = qVal;   // B
-                    // Alpha data[i+3] remains 255
+                    data[i] = qVal; data[i+1] = qVal; data[i+2] = qVal; 
                 }
                 tCtx.putImageData(imgData, 0, 0);
 
-                // Step 3: Draw back to main display canvas, disabling smoothing to show pixels
                 ctx.imageSmoothingEnabled = false;
                 ctx.clearRect(0, 0, 256, 256);
                 ctx.drawImage(tempCanvas, 0, 0, 256, 256);
 
             }, [resolution, bits]);
 
-            // Calculate Storage
             const M = resolution;
             const N = resolution;
-            const b = M * N * bits; // total bits
+            const b = M * N * bits; 
             const bytes = b / 8;
             const kb = bytes / 1024;
-            const mb = kb / 1024;
 
             return (
                 <div className="glass-panel p-6 mt-6 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
@@ -344,7 +405,7 @@
                                     <span>Độ phân giải M × N (Spatial Sampling)</span>
                                     <span className="text-emerald-400 font-mono">{resolution} × {resolution}</span>
                                 </label>
-                                <p className="text-xs text-slate-400 mb-2">Xác định độ chi tiết không gian. Mức thấp sẽ tạo ra hiện tượng "vỡ hạt" (pixelation / checkerboard pattern).</p>
+                                <p className="text-xs text-slate-400 mb-2">Xác định độ chi tiết không gian. Mức thấp sẽ tạo ra hiện tượng "vỡ hạt" (pixelation).</p>
                                 <input type="range" min="8" max="256" step="8" value={resolution} onChange={e => setResolution(Number(e.target.value))} />
                             </div>
 
@@ -353,7 +414,7 @@
                                     <span>Mức xám L = 2ᵏ (Quantization)</span>
                                     <span className="text-blue-400 font-mono">{bits}-bit ({Math.pow(2, bits)} mức)</span>
                                 </label>
-                                <p className="text-xs text-slate-400 mb-2">Xác định độ tương phản và dải động. Số bit thấp (như 1-bit, 2-bit) gây hiện tượng "chảy màu" (false contouring).</p>
+                                <p className="text-xs text-slate-400 mb-2">Xác định độ tương phản. Số bit thấp (như 1-2 bit) gây hiện tượng dải màu vỡ khối (false contouring).</p>
                                 <input type="range" min="1" max="8" step="1" value={bits} onChange={e => setBits(Number(e.target.value))} />
                             </div>
 
@@ -404,20 +465,13 @@
                         <h2 className="text-2xl font-bold text-white border-l-4 border-emerald-500 pl-3">I. Các Khái Niệm Cơ Bản</h2>
                         <div className="theory-text glass-panel p-6">
                             <p>
-                                Mục tiêu của chúng ta là tạo ra ảnh số từ dữ liệu cảm biến. Đầu ra của hầu hết các cảm biến là một dạng sóng điện áp <b>liên tục (continuous)</b> có biên độ và biểu hiện không gian liên quan đến hiện tượng vật lý đang được nhận diện.
-                            </p>
-                            <p>
-                                Để tạo ra một hình ảnh kỹ thuật số (digital image), ta cần phải chuyển đổi dữ liệu liên tục này thành định dạng số. Quá trình này đòi hỏi hai bước chính:
+                                Để tạo ra một hình ảnh kỹ thuật số (digital image) từ dữ liệu cảm biến liên tục, quá trình này đòi hỏi hai bước chính:
                             </p>
                             <ul className="list-disc ml-8 mb-4 space-y-2">
                                 <li><b>Lấy mẫu (Sampling):</b> Là quá trình số hóa các giá trị <b>Tọa độ (coordinates)</b>. Hiểu đơn giản, đó là việc băm ma trận không gian (trục x và y) thành các điểm grid cách đều nhau.</li>
-                                <li><b>Lượng tử hóa (Quantization):</b> Là quá trình số hóa các giá trị <b>Biên độ (amplitude / intensity)</b>. Nghĩa là làm tròn cường độ sáng liên tục vào các mức (level) rời rạc nhất định (ví dụ: từ đen tới trắng được chia làm 8 đoạn cố định).</li>
+                                <li><b>Lượng tử hóa (Quantization):</b> Là quá trình số hóa các giá trị <b>Biên độ (amplitude / intensity)</b>. Nghĩa là làm tròn cường độ sáng liên tục vào các mức (level) rời rạc nhất định.</li>
                             </ul>
-                            <div className="bg-slate-800/60 p-4 rounded-lg border border-slate-600">
-                                Dù cảm biến là loại quét 1 điểm (di chuyển cơ học) hay Mảng 2D (chụp tức thời), độ sắc nét của bức ảnh phần lớn được quyết định bởi <b>số lượng mẫu lấy được (resolution)</b> và <b>số mức cường độ rời rạc được phân định (bit depth)</b>. Tuy nhiên, nội dung của bức ảnh và mức độ nhiễu (noise) cũng ảnh hưởng lớn đến độ chính xác của lượng tử hóa.
-                            </div>
                         </div>
-                        
                         <OneDimSignalSimulation />
                     </section>
 
@@ -426,51 +480,58 @@
                         <h2 className="text-2xl font-bold text-white border-l-4 border-purple-500 pl-3">II. Biểu diễn Ảnh Số & Hệ Tọa Độ</h2>
                         <div className="theory-text glass-panel p-6">
                             <p>
-                                Giả sử ta lấy mẫu hàm liên tục để tạo thành một ảnh số <span className="math-expr">f(x, y)</span>, có chứa <b>M hàng (rows)</b> và <b>N cột (columns)</b>. Các tọa độ được biểu diễn bằng số nguyên: <span className="math-expr">x = 0, 1, 2, ..., M-1</span> và <span className="math-expr">y = 0, 1, 2, ..., N-1</span>.
-                            </p>
-                            <p>
-                                Có 3 cách để biểu diễn toán học <span className="math-expr">f(x, y)</span>:
-                                <ul className="list-decimal ml-8 mt-2 space-y-2">
-                                    <li>Vẽ dưới dạng mặt phẳng 3D (Surface plot).</li>
-                                    <li>Mảng Cường độ thị giác (Visual intensity array) - chính là bức ảnh ta xem trên màn hình máy tính.</li>
-                                    <li><b>Mảng số (2-D Numerical Array)</b> hoặc <b>Ma trận (Matrix)</b> - Đây là định dạng máy tính xử lý.</li>
-                                </ul>
-                            </p>
-                            <p>
-                                Phần tử của ma trận được gọi là <b>Điểm ảnh (Image element, Picture element, Pixel, hay Pel)</b>.
+                                Mảng Cường độ thị giác (Visual intensity array) được định dạng theo mảng số (Matrix) trên máy tính. Phần tử của ma trận được gọi là <b>Điểm ảnh (Image element, Picture element, Pixel, hay Pel)</b>.
                             </p>
                         </div>
-
                         <CoordinateSystem />
                     </section>
 
-                    {/* LÝ THUYẾT 3 */}
+                    {/* LÝ THUYẾT 3: NEW SECTION ADDED */}
                     <section className="space-y-4 mt-16">
-                        <h2 className="text-2xl font-bold text-white border-l-4 border-blue-500 pl-3">III. Dải Động, Độ Phân Giải & Bộ Nhớ</h2>
+                        <h2 className="text-2xl font-bold text-white border-l-4 border-amber-500 pl-3">III. Chỉ số Tọa độ vs Chỉ số Tuyến tính</h2>
                         <div className="theory-text glass-panel p-6">
                             <p>
-                                Phần cứng kỹ thuật số thường thiết kế số lượng mức cường độ <span className="math-expr">L</span> là lũy thừa của 2:
+                                Phương pháp định vị một pixel bằng cặp tọa độ không gian 2D <b>(x, y)</b> như trên gọi là <i>Chỉ số tọa độ (Coordinate indexing)</i>.
                             </p>
-                            <div className="text-center text-xl text-blue-300 font-mono my-4">
-                                L = 2<sup>k</sup>
+                            <p>
+                                Tuy nhiên, một cách chỉ mục (indexing) khác được sử dụng cực kỳ rộng rãi khi lập trình các thuật toán xử lý ảnh gọi là <b>Chỉ số tuyến tính (Linear indexing)</b>. Nó tạo ra một mảng 1D gồm các số nguyên không âm (ký hiệu là <span className="math-expr">&alpha;</span>) dựa trên việc tính độ lệch khoảng cách bắt đầu từ gốc (0, 0).
+                            </p>
+                            <p>
+                                Có 2 loại quét tuyến tính: Quét theo Hàng (Row scan) và <b>Quét theo Cột (Column scan)</b>. Ý tưởng của Column scan là quét ảnh cột này tới cột khác. Dễ dàng nhận thấy bằng công thức sau (với ma trận <span className="math-expr">M</span> hàng):
+                            </p>
+                            
+                            <div className="flex flex-col md:flex-row gap-6 mt-4">
+                                <div className="bg-slate-800/60 p-4 rounded-lg border border-slate-600 flex-1">
+                                    <h4 className="text-white font-bold text-sm mb-2 text-center border-b border-slate-700 pb-2">Từ Tọa độ 2D sang 1D tuyến tính</h4>
+                                    <div className="text-center text-xl text-amber-300 font-mono my-2">
+                                        &alpha; = M&middot;y + x
+                                    </div>
+                                </div>
+                                <div className="bg-slate-800/60 p-4 rounded-lg border border-slate-600 flex-1">
+                                    <h4 className="text-white font-bold text-sm mb-2 text-center border-b border-slate-700 pb-2">Từ 1D Tuyến tính ngược về 2D</h4>
+                                    <div className="text-center text-xl text-purple-300 font-mono my-2">
+                                        x = &alpha; mod M<br/>
+                                        <span className="text-sm block mt-1">y = (&alpha; - x) / M</span>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+                        <LinearIndexingSimulation />
+                    </section>
+
+
+                    {/* LÝ THUYẾT 4 */}
+                    <section className="space-y-4 mt-16">
+                        <h2 className="text-2xl font-bold text-white border-l-4 border-blue-500 pl-3">IV. Dải Động, Độ Phân Giải & Bộ Nhớ</h2>
+                        <div className="theory-text glass-panel p-6">
                             <p>
-                                <b>Dải động (Dynamic range):</b> Là tỷ lệ giữa mức cường độ lớn nhất đo được so với mức nhỏ nhất phát hiện được trong hệ thống. Giới hạn trên thường bị quy định bởi hiện tượng <i>Bão hòa (Saturation - vùng trắng bệt mất chi tiết)</i>, còn giới hạn dưới bị ảnh hưởng bởi <i>Nhiễu (Noise)</i>.
+                                <b>Dải động (Dynamic range):</b> Là tỷ lệ giữa mức cường độ lớn nhất đo được so với mức nhỏ nhất phát hiện được trong hệ thống. Giới hạn trên thường bị quy định bởi hiện tượng <i>Bão hòa (Saturation)</i>, còn giới hạn dưới bị ảnh hưởng bởi <i>Nhiễu (Noise)</i>.
                             </p>
                             <p>
-                                <b>Độ tương phản (Contrast):</b> Là sự chênh lệch cường độ giữa mức cao nhất và thấp nhất có trong một bức ảnh cụ thể. Ảnh có dải động cao thường có độ tương phản cao sắc nét, ngược lại ảnh dải động thấp thường nhìn xỉn màu và đục (washed-out).
-                            </p>
-                            <p>
-                                Số <b>bit</b> (ký hiệu là <span className="math-expr">b</span>) cần thiết để lưu trữ một ảnh số <span className="math-expr">M &times; N</span> được tính bằng:
-                            </p>
-                            <div className="text-center text-xl text-emerald-300 font-mono my-4">
-                                b = M &times; N &times; k
-                            </div>
-                            <p>
-                                <i>Ví dụ: Một ảnh 256 mức xám (k=8) được gọi là ảnh 8-bit. Dung lượng lưu trữ cho các bức ảnh 8-bit kích thước lớn (như 10,000 x 10,000 pixel) là không hề nhỏ.</i>
+                                Số <b>bit</b> (ký hiệu là <span className="math-expr">b</span>) cần thiết để lưu trữ một ảnh số kích thước <span className="math-expr">M &times; N</span> và có <span className="math-expr">L = 2<sup>k</sup></span> mức xám được tính bằng: 
+                                <span className="math-expr text-emerald-300 ml-2 text-lg">b = M &times; N &times; k</span>
                             </p>
                         </div>
-
                         <TwoDimImageSimulation />
                     </section>
 
