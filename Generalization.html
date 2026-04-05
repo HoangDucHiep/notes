@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khái quát hóa (Generalization) & Overfitting - Học Sâu (Bản Chi tiết)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0ea5e9', // sky-500
+                        secondary: '#334155', // slate-700
+                        accent: '#f43f5e', // rose-500
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- KaTeX cho Công thức Toán học -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        .math-block { overflow-x: auto; padding: 1rem 0; text-align: center; }
+        canvas { touch-action: none; }
+        
+        /* Custom Scrollbar cho phần đọc */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .concept-card {
+            transition: all 0.3s ease;
+        }
+        .concept-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 leading-relaxed">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-xl font-bold text-primary flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                Generalization (Bản Chi tiết)
+            </h1>
+            <div class="space-x-4 text-sm font-medium flex flex-wrap justify-center">
+                <a href="#loi-huan-luyen" class="hover:text-primary transition">Lỗi</a>
+                <a href="#do-phuc-tap" class="hover:text-primary transition">Độ phức tạp</a>
+                <a href="#overfitting" class="hover:text-primary transition">Overfitting</a>
+                <a href="#lua-chon-mo-hinh" class="hover:text-primary transition">Cross-Validation</a>
+                <a href="#mo-phong" class="bg-primary text-white px-4 py-2 rounded-full hover:bg-sky-600 transition shadow-sm ml-2">Mô phỏng</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- ================= PHẦN LÝ THUYẾT CHI TIẾT ================= -->
+        <article class="lg:col-span-7 space-y-12">
+            
+            <section>
+                <h1 class="text-4xl font-extrabold text-slate-900 mb-6 tracking-tight">3.6. Tính Khái quát hóa (Generalization)</h1>
+                
+                <p class="mb-4 text-lg">Mục tiêu tối thượng của Machine Learning không phải là tái tạo lại quá khứ, mà là dự đoán tương lai. Tính khái quát hóa chính là năng lực cốt lõi quyết định một mô hình có thực sự "học" được hay không.</p>
+
+                <div class="bg-gradient-to-r from-sky-50 to-blue-50 border-l-4 border-sky-500 p-6 mb-8 text-sm text-slate-700 rounded-r-xl shadow-sm">
+                    <h4 class="font-bold mb-3 text-lg text-sky-900">Ẩn dụ: Câu chuyện về hai sinh viên và bài thi cuối kỳ</h4>
+                    <p class="mb-3">Hãy tưởng tượng hai sinh viên chuẩn bị cho kỳ thi cuối kỳ bằng cách luyện giải các đề thi của những năm trước:</p>
+                    <ul class="list-disc pl-5 mb-3 space-y-2">
+                        <li><strong>Ellie "Trí nhớ siêu phàm" (Ghi nhớ - Memorization):</strong> Ellie có trí nhớ tuyệt đỉnh. Cô ấy học thuộc lòng từng câu hỏi và đáp án của các năm trước. Nếu đề thi lấy lại y hệt câu hỏi cũ, cô ấy đạt 100%. Nhưng nếu giáo viên ra một câu hỏi mới tinh (dù cùng chủ đề), Ellie sẽ "đứng hình" vì cô ấy chưa từng thấy nó.</li>
+                        <li><strong>Irene "Suy luận" (Khái quát hóa - Generalization):</strong> Irene có trí nhớ kém hơn. Dù làm đi làm lại đề cũ, cô ấy chỉ đạt khoảng 90% vì thỉnh thoảng nhớ nhầm. Tuy nhiên, thay vì học thuộc, cô ấy tìm cách hiểu <em>quy luật (patterns)</em> và phương pháp giải. Khi đối mặt với đề thi mới hoàn toàn, Irene vẫn áp dụng được quy luật đã học và duy trì mức điểm 90%.</li>
+                    </ul>
+                    <p class="font-medium text-slate-900">Bài học cốt lõi: Là các nhà khoa học Machine Learning, chúng ta muốn mô hình của mình giống như Irene. Chúng ta muốn mô hình <em>khám phá ra các quy luật tổng quát</em> (general patterns) chứ không phải chỉ đơn giản là <em>ghi nhớ dữ liệu huấn luyện</em>.</p>
+                    <p class="mt-2 text-slate-600 italic">Chúng ta không cần mô hình dự đoán giá cổ phiếu của ngày hôm qua, chúng ta cần nó dự đoán giá ngày mai. Chúng ta không cần nhận diện bệnh cho những bệnh nhân đã được chẩn đoán, mà là chẩn đoán cho những bệnh nhân mới.</p>
+                </div>
+                
+                <p class="mb-4">Trong thực tế, chúng ta luôn phải làm việc với một tập dữ liệu hữu hạn (từ vài nghìn ca bệnh đến vài triệu bức ảnh). Dù tập dữ liệu có lớn đến đâu (như tập ImageNet với hàng triệu ảnh), nó vẫn nhỏ bé một cách vô cùng tận so với không gian của tất cả các hình ảnh có thể có trên đời. Do đó, nguy cơ chúng ta thiết kế một mô hình chỉ giỏi "khớp" (fit) với dữ liệu huấn luyện mà thất bại trong việc tìm ra quy luật tổng quát luôn hiện hữu.</p>
+            </section>
+
+            <section id="loi-huan-luyen">
+                <h2 class="text-2xl font-bold mb-4 text-slate-900 border-b pb-2">3.6.1. Lỗi Huấn luyện & Lỗi Khái quát hóa</h2>
+                
+                <p class="mb-4">Để hiểu rõ về khả năng dự đoán, ta cần phân biệt rạch ròi hai khái niệm lỗi (error). Trong bối cảnh học có giám sát tiêu chuẩn, ta dựa vào một giả định quan trọng: <strong>Giả định IID (Independent and Identically Distributed)</strong>. Giả định này cho rằng dữ liệu huấn luyện và dữ liệu kiểm tra được lấy mẫu <em>độc lập</em> từ cùng một <em>phân phối xác suất giống hệt nhau</em>. (Dù thực tế giả định này khá mạnh, nhưng nếu không có nó, ta không có cơ sở nào để tin rằng học từ dữ liệu quá khứ có thể áp dụng cho tương lai).</p>
+                
+                <div class="space-y-6 mb-6">
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm concept-card">
+                        <h4 class="font-bold text-lg text-primary mb-2">1. Lỗi huấn luyện (Training error - $R_{\text{emp}}$)</h4>
+                        <p class="mb-2">Đây là một <strong>đại lượng thống kê (statistic)</strong>. Nó được tính toán trực tiếp bằng cách đo lường sai số của mô hình ngay trên tập dữ liệu đã dùng để huấn luyện nó. Nó được tính bằng trung bình tổng các mất mát (loss):</p>
+                        <div class="math-block bg-slate-50 rounded-lg py-2 my-2">
+                            $$R_{\text{emp}}[\mathbf{X}, \mathbf{y}, f] = \frac{1}{n} \sum_{i=1}^n l(\mathbf{x}^{(i)}, y^{(i)}, f(\mathbf{x}^{(i)}))$$
+                        </div>
+                        <p class="text-sm text-slate-600"><em>Lưu ý:</em> Lỗi huấn luyện rất dễ đánh lừa. Một mô hình có thể đạt $R_{\text{emp}} = 0$ chỉ bằng cách tạo ra một bảng tra cứu (lookup table) lưu trữ toàn bộ dữ liệu huấn luyện.</p>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm concept-card">
+                        <h4 class="font-bold text-lg text-teal-600 mb-2">2. Lỗi khái quát hóa (Generalization error - $R$)</h4>
+                        <p class="mb-2">Đây là một <strong>giá trị kỳ vọng (expectation)</strong>. Nó đại diện cho lỗi trung bình mà mô hình sẽ mắc phải trên một luồng vô hạn các dữ liệu mới được rút ra từ cùng một phân phối $P$. Về mặt toán học, nó là một tích phân:</p>
+                        <div class="math-block bg-slate-50 rounded-lg py-2 my-2">
+                            $$R[p, f] = E_{(\mathbf{x}, y) \sim P} [l(\mathbf{x}, y, f(\mathbf{x}))] = \iint l(\mathbf{x}, y, f(\mathbf{x})) p(\mathbf{x}, y) d\mathbf{x} dy$$
+                        </div>
+                        <p class="text-sm text-slate-600"><em>Vấn đề cốt lõi:</em> Chúng ta <strong>không bao giờ có thể tính toán chính xác</strong> $R$ vì ta không biết chính xác hàm mật độ xác suất $p(\mathbf{x}, y)$ và cũng không có vô hạn dữ liệu. Giải pháp thực tế duy nhất là <strong>ước lượng (estimate)</strong> nó bằng cách áp dụng mô hình lên một tập dữ liệu kiểm tra (test set) hoàn toàn độc lập, chưa từng được mô hình nhìn thấy trong quá trình huấn luyện.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="do-phuc-tap">
+                <h3 class="text-xl font-bold mb-4 text-slate-900">3.6.1.1. Độ phức tạp của mô hình (Model Complexity)</h3>
+                
+                <p class="mb-4">Mối quan hệ giữa Lỗi huấn luyện và Lỗi khái quát hóa phụ thuộc rất lớn vào <strong>độ phức tạp</strong> của mô hình so với lượng dữ liệu.</p>
+                <ul class="list-disc pl-5 mb-4 space-y-2">
+                    <li><strong>Mô hình đơn giản + Nhiều dữ liệu:</strong> Lỗi huấn luyện và Lỗi khái quát hóa thường rất gần nhau.</li>
+                    <li><strong>Mô hình phức tạp + Ít dữ liệu:</strong> Lỗi huấn luyện sẽ giảm mạnh, nhưng <em>khoảng cách khái quát hóa (generalization gap)</em> giữa hai loại lỗi này sẽ tăng lên.</li>
+                </ul>
+
+                <div class="bg-amber-50 p-5 rounded-lg border border-amber-200 mb-6">
+                    <h4 class="font-bold text-amber-800 mb-2">Góc nhìn Triết học từ Karl Popper</h4>
+                    <p class="text-sm text-amber-900 mb-2">Karl Popper, một triết gia khoa học vĩ đại, đã định hình "tiêu chí có thể bác bỏ" (falsifiability). Theo ông: <em>"Một lý thuyết khoa học mà có thể giải thích mọi quan sát có thể xảy ra thì hoàn toàn không phải là một lý thuyết khoa học!"</em>.</p>
+                    <p class="text-sm text-amber-900">Áp dụng vào Machine Learning: Nếu một lớp mô hình (model class) có độ phức tạp quá lớn, đến mức nó có khả năng khớp hoàn hảo với bất kỳ tập dữ liệu nào (thậm chí khi nhãn $y$ bị xáo trộn ngẫu nhiên), thì việc nó đạt Lỗi huấn luyện = 0 chẳng chứng minh được điều gì. Nó không nói cho ta biết nó đã tìm ra quy luật, hay chỉ đơn giản là nó có quá nhiều tham số nên đã "học thuộc lòng" dữ liệu.</p>
+                </div>
+
+                <p class="mb-4">Việc định nghĩa chính xác "độ phức tạp" khá gian nan. Thông thường, mô hình có nhiều tham số (parameters) hơn hoặc các tham số được phép lấy giá trị lớn bất kỳ sẽ phức tạp hơn. (Tuy nhiên, Deep Learning hiện đại lại là một ngoại lệ thú vị: các mạng nơ-ron sâu cực kỳ phức tạp, có thể khớp nhãn ngẫu nhiên, nhưng trong thực tế chúng vẫn khái quát hóa rất tốt. Đây vẫn là một bí ẩn đang được nghiên cứu tích cực).</p>
+            </section>
+
+            <section id="overfitting">
+                <h2 class="text-2xl font-bold mt-12 mb-4 text-slate-900 border-b pb-2">3.6.2. Underfitting hay Overfitting?</h2>
+                
+                <p class="mb-6">Khi phân tích biểu đồ sai số trong quá trình huấn luyện, chúng ta đối mặt với hai thái cực, được xác định qua việc so sánh Lỗi huấn luyện và Lỗi xác thực (Validation error).</p>
+
+                <div class="grid md:grid-cols-2 gap-6 mb-8">
+                    <div class="border-2 border-orange-200 bg-orange-50/50 p-5 rounded-2xl">
+                        <h4 class="text-lg font-bold text-orange-700 flex items-center gap-2 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                            Underfitting (Chưa khớp)
+                        </h4>
+                        <ul class="text-sm space-y-2 text-slate-700">
+                            <li><strong>Dấu hiệu:</strong> Lỗi huấn luyện và Lỗi xác thực <strong>đều rất cao</strong>, nhưng khoảng cách giữa chúng nhỏ.</li>
+                            <li><strong>Bản chất:</strong> Mô hình quá đơn giản (quá ít tham số, hoặc tính biểu diễn quá kém) để nắm bắt được các quy luật phức tạp ẩn trong dữ liệu.</li>
+                            <li><strong>Giải pháp:</strong> Sử dụng mô hình phức tạp hơn (tăng số lớp mạng, tăng bậc đa thức, thêm đặc trưng mới).</li>
+                        </ul>
+                    </div>
+                    <div class="border-2 border-red-200 bg-red-50/50 p-5 rounded-2xl">
+                        <h4 class="text-lg font-bold text-red-700 flex items-center gap-2 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            Overfitting (Quá khớp)
+                        </h4>
+                        <ul class="text-sm space-y-2 text-slate-700">
+                            <li><strong>Dấu hiệu:</strong> Lỗi huấn luyện <strong>rất thấp</strong> (tiến về 0), nhưng Lỗi xác thực lại <strong>cao</strong>. Khoảng cách khái quát hóa ($R_{\text{emp}} - R$) rất lớn.</li>
+                            <li><strong>Bản chất:</strong> Mô hình quá nhạy cảm. Nó không chỉ học quy luật mà còn học luôn cả những "nhiễu" (noise), sai số ngẫu nhiên của tập dữ liệu huấn luyện hiện tại.</li>
+                            <li><strong>Giải pháp:</strong> Các kỹ thuật Regularization (Điều chuẩn), tăng thêm dữ liệu, hoặc giảm độ phức tạp mô hình.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold mb-3 text-slate-800">3.6.2.1. Khớp Đường cong Đa thức (Polynomial Curve Fitting)</h3>
+                <p class="mb-4">Để trực quan hóa, hãy xem xét bài toán hồi quy sử dụng đa thức bậc $d$ để dự đoán nhãn $y$ từ đặc trưng $x$:</p>
+                <div class="math-block">$$\hat{y} = \sum_{i=0}^d x^i w_i$$</div>
+                <p class="mb-4">Nếu ta cố định tập dữ liệu: Đa thức bậc cao (nhiều tham số $w_i$) sẽ luôn linh hoạt hơn. Bậc $d$ càng tăng, nó càng uốn lượn dễ dàng đi qua từng điểm dữ liệu $\rightarrow$ Lỗi huấn luyện giảm liên tục.</p>
+                
+                <!-- Biểu đồ SVG được thêm vào đây -->
+                <figure class="my-8 mx-auto max-w-2xl bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <svg viewBox="0 0 600 350" class="w-full h-auto text-slate-800">
+                        <defs>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+                            </marker>
+                            <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
+                            </marker>
+                            <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#e11d48" />
+                            </marker>
+                        </defs>
+                        
+                        <!-- Trục tung và Trục hoành -->
+                        <line x1="80" y1="300" x2="550" y2="300" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+                        <line x1="80" y1="300" x2="80" y2="50" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+                        
+                        <!-- Nhãn Trục -->
+                        <text x="35" y="60" class="text-sm font-semibold fill-slate-700">Loss</text>
+                        <text x="420" y="335" class="text-sm font-semibold fill-slate-700">Model complexity</text>
+                        
+                        <!-- Đường đứt nét Optimum -->
+                        <line x1="300" y1="50" x2="300" y2="300" stroke="currentColor" stroke-dasharray="5,5" stroke-width="1.5" />
+                        
+                        <!-- Chú thích phía trên đỉnh -->
+                        <text x="300" y="35" text-anchor="middle" class="text-sm font-bold fill-slate-800">Optimum</text>
+                        
+                        <text x="170" y="35" text-anchor="middle" class="text-sm font-medium fill-slate-600">Underfitting</text>
+                        <line x1="170" y1="15" x2="130" y2="15" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+                        
+                        <text x="430" y="35" text-anchor="middle" class="text-sm font-medium fill-slate-600">Overfitting</text>
+                        <line x1="430" y1="15" x2="470" y2="15" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" />
+                        
+                        <!-- Đường Lỗi Khái quát hóa (Generalization loss) - Màu đỏ/hồng -->
+                        <path d="M 90 70 C 150 220, 240 210, 300 210 C 380 210, 450 180, 530 110" fill="none" stroke="#e11d48" stroke-width="2.5" />
+                        <text x="390" y="195" class="text-sm font-semibold fill-rose-600">Generalization loss</text>
+                        
+                        <!-- Đường Lỗi Huấn luyện (Training loss) - Màu xanh -->
+                        <path d="M 100 90 C 150 250, 300 280, 530 280" fill="none" stroke="#3b82f6" stroke-width="2.5" />
+                        <text x="420" y="265" class="text-sm font-semibold fill-blue-600">Training loss</text>
+                    </svg>
+                    <figcaption class="text-center text-sm text-slate-500 mt-4 italic">Fig. 3.6.1: Ảnh hưởng của độ phức tạp mô hình lên việc underfitting và overfitting.</figcaption>
+                </figure>
+
+                <p class="mb-4">Tuy nhiên, biểu đồ Lỗi khái quát hóa so với Độ phức tạp mô hình sẽ tạo thành một <strong>đường cong hình chữ U</strong> (như Fig 3.6.1 phía trên):
+                    <br>- Mức độ phức tạp thấp: Lỗi cao do Underfitting.
+                    <br>- Mức độ phức tạp "vừa đủ": Đạt điểm tối ưu, lỗi thấp nhất.
+                    <br>- Mức độ phức tạp quá cao: Lỗi vọt lên do Overfitting.
+                    <br><br><em>(Mời bạn tương tác trực tiếp với Trình mô phỏng ở phần bên cạnh để tận mắt chứng kiến chữ U này).</em>
+                </p>
+
+                <h3 class="text-xl font-bold mt-8 mb-3 text-slate-800">3.6.2.2. Kích thước dữ liệu (Dataset Size)</h3>
+                <p class="mb-6">Bên cạnh độ phức tạp mô hình, lượng dữ liệu là nhân tố quyết định. Nếu giữ nguyên độ phức tạp mô hình, dữ liệu càng ít, Overfitting càng dễ xảy ra và càng nghiêm trọng. Ngược lại, <strong>có nhiều dữ liệu hơn không bao giờ là điều xấu</strong>. Khả năng thành công của Deep Learning hiện nay phần lớn nhờ vào sự bùng nổ của kỷ nguyên Big Data (Internet, IoT, lưu trữ rẻ), cung cấp hàng triệu mẫu dữ liệu để nuôi các mạng nơ-ron khổng lồ mà không bị overfit nghiêm trọng.</p>
+            </section>
+
+            <section id="lua-chon-mo-hinh">
+                <h2 class="text-2xl font-bold mt-12 mb-4 text-slate-900 border-b pb-2">3.6.3. Lựa chọn Mô hình (Model Selection) & Cross-Validation</h2>
+                
+                <p class="mb-4">Trong thực tế, ta không huấn luyện chỉ một mô hình. Ta sẽ thử nghiệm hàng chục mô hình với các kiến trúc, tốc độ học (learning rates), và siêu tham số khác nhau. Quá trình chọn ra cái tốt nhất gọi là Model Selection.</p>
+
+                <div class="bg-red-50 border-l-4 border-red-500 p-5 mb-6 text-sm text-slate-800">
+                    <strong class="text-red-700 uppercase block mb-1">Quy tắc Vàng không thể vi phạm:</strong>
+                    <p>Bạn <strong>KHÔNG BAO GIỜ</strong> được chạm vào tập Test (Test Set) trong suốt quá trình lựa chọn mô hình và tinh chỉnh siêu tham số.</p>
+                    <p class="mt-2">Nếu bạn dùng Test Set để xem mô hình nào tốt hơn rồi chọn, bạn đã vô tình để thông tin của tập Test "rò rỉ" vào mô hình. Khi đó, kết quả trên tập Test không còn là đánh giá khách quan về hiệu suất trên dữ liệu chưa từng thấy nữa. Bạn đang "Overfit trên chính tập Test"!</p>
+                </div>
+
+                <p class="mb-4">Vì không được dùng Test Set, và cũng không thể tin tưởng Lỗi huấn luyện (Train error), chúng ta giải quyết bằng cách chia dữ liệu ban đầu thành 3 phần:</p>
+                <ol class="list-decimal pl-6 mb-6 space-y-2 font-medium text-slate-700">
+                    <li><strong>Training Set (Tập huấn luyện):</strong> Dùng để cập nhật tham số (trọng số $w, b$).</li>
+                    <li><strong>Validation Set (Tập xác thực):</strong> Dùng để theo dõi Lỗi khái quát hóa dự kiến trong quá trình huấn luyện, từ đó quyết định dừng sớm (early stopping) hoặc chọn siêu tham số tốt nhất.</li>
+                    <li><strong>Test Set (Tập kiểm tra):</strong> Giấu đi đến phút chót, chỉ chạy ĐÚNG MỘT LẦN duy nhất để báo cáo hiệu suất cuối cùng.</li>
+                </ol>
+
+                <h3 class="text-xl font-bold mt-8 mb-3 text-slate-800">3.6.3.1. K-Fold Cross-Validation (Xác thực chéo K-lần)</h3>
+                <p class="mb-4">Có những bài toán y tế hoặc dữ liệu hiếm, ta có quá ít dữ liệu. Việc cắt bỏ 20% làm Validation Set là một sự lãng phí tài nguyên huấn luyện quá lớn. Giải pháp là <strong>K-fold Cross-validation</strong>:</p>
+                <ul class="list-disc pl-6 mb-6 space-y-2">
+                    <li>Chia tập dữ liệu ban đầu thành $K$ phần (folds) không chồng chéo.</li>
+                    <li>Lặp lại quá trình huấn luyện $K$ lần. Ở lần lặp thứ $i$, ta lấy phần thứ $i$ làm Validation Set, và gộp $K-1$ phần còn lại làm Training Set.</li>
+                    <li>Lỗi xác thực cuối cùng là mức <strong>trung bình cộng</strong> của Lỗi xác thực trên $K$ lần thử nghiệm.</li>
+                    <li>Cách này giúp tận dụng 100% dữ liệu cho cả việc huấn luyện và đánh giá.</li>
+                </ul>
+            </section>
+
+        </article>
+
+        <!-- ================= PHẦN MÔ PHỎNG TƯƠNG TÁC ================= -->
+        <aside class="lg:col-span-5" id="mo-phong">
+            <div class="sticky top-24 bg-white p-6 rounded-2xl shadow-2xl border-t-4 border-primary">
+                
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2 text-slate-800">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                    Lab: Trực quan hóa Hồi quy Đa thức
+                </h3>
+                <p class="text-sm text-slate-500 mb-6">Trải nghiệm trực tiếp Lý thuyết 3.6.2.1. Thay đổi Bậc đa thức (Degree) để quan sát sự cân bằng giữa Underfitting và Overfitting trên tập dữ liệu bị nhiễu.</p>
+                
+                <!-- Khu vực Canvas -->
+                <div class="relative w-full aspect-video bg-slate-50 border border-slate-200 rounded-xl overflow-hidden mb-6 shadow-inner">
+                    <canvas id="polyCanvas" class="w-full h-full"></canvas>
+                    
+                    <!-- Chú thích Canvas -->
+                    <div class="absolute top-2 right-2 bg-white/95 backdrop-blur-sm text-[10px] p-2 rounded shadow-sm border border-slate-200 flex flex-col gap-1.5 font-medium">
+                        <div class="flex items-center gap-2"><div class="w-3 h-[2px] bg-slate-400 border-t border-dashed border-slate-400"></div> <span>Hàm gốc ẩn (Sóng Sin)</span></div>
+                        <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div> <span>Điểm dữ liệu (Train)</span></div>
+                        <div class="flex items-center gap-2"><div class="w-3 h-[2px] bg-red-500"></div> <span class="text-red-700">Mô hình Đa thức (Dự đoán)</span></div>
+                    </div>
+                </div>
+
+                <!-- Bảng điều khiển -->
+                <div class="space-y-6">
+                    
+                    <!-- Slider Bậc đa thức -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-end mb-2">
+                            <label class="font-semibold text-slate-700">Độ phức tạp (Bậc <span id="degree-display" class="text-primary text-xl font-bold">3</span>)</label>
+                            <span id="status-badge" class="text-xs font-bold px-2 py-1 rounded bg-green-100 text-green-700 uppercase tracking-wide">Good Fit</span>
+                        </div>
+                        <input type="range" id="degree-slider" min="1" max="15" step="1" value="3" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                        <div class="flex justify-between text-xs text-slate-500 mt-2 font-medium">
+                            <span>Bậc 1 (Quá đơn giản)</span>
+                            <span>Bậc 15 (Rất phức tạp)</span>
+                        </div>
+                    </div>
+
+                    <!-- Chỉ số Lỗi -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-blue-50/50 border border-blue-200 p-4 rounded-xl text-center flex flex-col justify-center transition-all" id="card-train">
+                            <div class="text-xs text-blue-700 font-bold mb-1 uppercase tracking-wider">MSE Huấn luyện</div>
+                            <div id="train-err" class="text-2xl font-mono font-bold text-slate-800">0.0000</div>
+                            <div class="text-[10px] text-slate-500 mt-1">Sai số trên điểm xanh</div>
+                        </div>
+                        <div class="bg-rose-50/50 border border-rose-200 p-4 rounded-xl text-center flex flex-col justify-center transition-all" id="card-val">
+                            <div class="text-xs text-rose-700 font-bold mb-1 uppercase tracking-wider">MSE Xác thực</div>
+                            <div id="val-err" class="text-2xl font-mono font-bold text-slate-800">0.0000</div>
+                            <div class="text-[10px] text-slate-500 mt-1">Sai số trên dữ liệu ẩn</div>
+                        </div>
+                    </div>
+
+                    <button id="btn-regen" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl text-sm font-semibold transition-colors flex justify-center items-center gap-2 shadow-md">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Tạo tập dữ liệu mới
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-6 p-5 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-900 shadow-sm leading-relaxed">
+                <h4 class="font-bold flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                    Hướng dẫn thực hành quan sát:
+                </h4>
+                <ol class="list-decimal pl-5 space-y-2">
+                    <li>Kéo thanh trượt về <strong>bậc 1 hoặc 2</strong>. Bạn sẽ thấy mô hình (đường đỏ) quá "cứng", không uốn theo được sóng Sin. <strong class="text-orange-600">MSE Train và Val đều to</strong>. Đây là <span class="bg-orange-200 px-1 rounded">Underfitting</span>.</li>
+                    <li>Tăng dần lên <strong>bậc 3, 4, 5</strong>. Đường đỏ uốn lượn mượt mà, bám sát đường nét đứt (hàm gốc). <strong class="text-green-600">MSE Val đạt mức thấp nhất</strong>. Đây là vùng <span class="bg-green-200 px-1 rounded">Khái quát hóa tốt (Good Fit)</span>.</li>
+                    <li>Tiếp tục kéo mạnh lên <strong>bậc 10-15</strong>. Đường đỏ đâm xuyên qua hầu hết các điểm xanh, làm <strong class="text-blue-600">MSE Train tiến về gần 0</strong>. Tuy nhiên, nó uốn éo điên cuồng ở những vùng trống, khiến <strong class="text-red-600">MSE Val bùng nổ (cao gấp hàng nghìn lần)</strong>. Đây là sự tàn phá của <span class="bg-red-200 px-1 rounded">Overfitting</span>.</li>
+                </ol>
+            </div>
+        </aside>
+
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 py-8 text-center text-sm mt-12 border-t-4 border-slate-800">
+        <div class="max-w-6xl mx-auto px-4">
+            <p class="font-semibold text-slate-300 mb-2">Tài liệu học tập Trực quan hóa - Tính Khái Quát Hóa & Overfitting</p>
+            <p>Dựa trên nội dung chi tiết từ chương 3.6 - "Dive into Deep Learning"</p>
+        </div>
+    </footer>
+
+    <!-- Script Logic Mô phỏng JS (Đã nâng cấp thuật toán ổn định hơn) -->
+    <script>
+        // Khởi tạo MathJax/KaTeX cho phần lý thuyết
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false}
+                ],
+                throwOnError : false
+            });
+            initSimulation();
+        });
+
+        function initSimulation() {
+            const canvas = document.getElementById('polyCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            const slider = document.getElementById('degree-slider');
+            const displayDeg = document.getElementById('degree-display');
+            const trainErrTxt = document.getElementById('train-err');
+            const valErrTxt = document.getElementById('val-err');
+            const btnRegen = document.getElementById('btn-regen');
+            const statusBadge = document.getElementById('status-badge');
+            const cardTrain = document.getElementById('card-train');
+            const cardVal = document.getElementById('card-val');
+
+            let trainData = [];
+            let valData = [];
+            let w = []; 
+            const N_TRAIN = 15; 
+            const N_VAL = 200; // Tăng điểm Validation để đo lỗi chính xác hơn (đánh giá kỳ vọng R tốt hơn)
+            const NOISE_LEVEL = 0.3;
+
+            function resizeCanvas() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                canvas.width = rect.width * window.devicePixelRatio;
+                canvas.height = rect.height * window.devicePixelRatio;
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                draw();
+            }
+            window.addEventListener('resize', resizeCanvas);
+
+            // True function: y = sin(1.5 * pi * x)
+            function trueFunc(x) {
+                return Math.sin(1.5 * Math.PI * x);
+            }
+
+            function generateData() {
+                trainData = [];
+                valData = [];
+                
+                // Sinh dữ liệu Train (phân bố ngẫu nhiên để tạo khoảng hở dễ bị overfit)
+                for (let i = 0; i < N_TRAIN; i++) {
+                    let x = Math.random(); 
+                    let y = trueFunc(x) + (Math.random() - 0.5) * 2 * NOISE_LEVEL;
+                    trainData.push({x, y});
+                }
+                
+                // Sinh dữ liệu Validation phủ đều không gian để tính Lỗi chính xác
+                for (let i = 0; i < N_VAL; i++) {
+                    let x = Math.random();
+                    let y = trueFunc(x) + (Math.random() - 0.5) * 2 * NOISE_LEVEL;
+                    valData.push({x, y});
+                }
+                
+                trainData.sort((a,b) => a.x - b.x);
+                fitPolynomial();
+            }
+
+            function toPxX(x) { return x * (canvas.width / window.devicePixelRatio); }
+            function toPxY(y) { 
+                const H = canvas.height / window.devicePixelRatio;
+                // Ánh xạ y từ [-2.5, 2.5] để có không gian quan sát nét uốn
+                return H - ((y + 2.5) / 5) * H; 
+            }
+
+            // Giải hệ phương trình A*w = B bằng Gauss-Jordan với Partial Pivoting
+            function solveLinearSystem(A, B) {
+                let n = A.length;
+                let M = [];
+                for(let i=0; i<n; i++) M.push([...A[i], B[i]]);
+
+                for(let i=0; i<n; i++) {
+                    let maxEl = Math.abs(M[i][i]);
+                    let maxRow = i;
+                    for(let k=i+1; k<n; k++) {
+                        if(Math.abs(M[k][i]) > maxEl) { maxEl = Math.abs(M[k][i]); maxRow = k; }
+                    }
+                    let tmp = M[maxRow]; M[maxRow] = M[i]; M[i] = tmp;
+
+                    for(let k=i+1; k<n; k++) {
+                        let c = -M[k][i] / M[i][i];
+                        for(let j=i; j<n+1; j++) {
+                            if(i==j) M[k][j] = 0;
+                            else M[k][j] += c * M[i][j];
+                        }
+                    }
+                }
+                
+                let x = new Array(n).fill(0);
+                for(let i=n-1; i>=0; i--) {
+                    x[i] = M[i][n] / M[i][i];
+                    for(let k=i-1; k>=0; k--) M[k][n] -= M[k][i] * x[i];
+                }
+                return x;
+            }
+
+            function fitPolynomial() {
+                const degree = parseInt(slider.value);
+                displayDeg.textContent = degree;
+
+                let X = [];
+                let Y = [];
+                for (let p of trainData) {
+                    let row = [];
+                    for(let d=0; d<=degree; d++) row.push(Math.pow(p.x, d));
+                    X.push(row);
+                    Y.push(p.y);
+                }
+
+                // Tính X^T * X
+                let XT_X = [];
+                for(let i=0; i<=degree; i++) {
+                    let row = [];
+                    for(let j=0; j<=degree; j++) {
+                        let sum = 0;
+                        for(let k=0; k<N_TRAIN; k++) sum += X[k][i] * X[k][j];
+                        // Ridge regularization rất nhẹ chống singular matrix ở bậc cao
+                        row.push(sum + (i===j ? 1e-5 : 0)); 
+                    }
+                    XT_X.push(row);
+                }
+
+                // Tính X^T * Y
+                let XT_Y = [];
+                for(let i=0; i<=degree; i++) {
+                    let sum = 0;
+                    for(let k=0; k<N_TRAIN; k++) sum += X[k][i] * Y[k];
+                    XT_Y.push(sum);
+                }
+
+                try {
+                    w = solveLinearSystem(XT_X, XT_Y);
+                } catch(e) {
+                    console.log("Matrix suy biến", e);
+                }
+
+                calculateMetrics();
+                draw();
+            }
+
+            function predict(x) {
+                let yHat = 0;
+                for(let i=0; i<w.length; i++) yHat += w[i] * Math.pow(x, i);
+                return yHat;
+            }
+
+            function calculateMetrics() {
+                let mseTrain = 0;
+                for(let p of trainData) mseTrain += Math.pow(predict(p.x) - p.y, 2);
+                mseTrain /= N_TRAIN;
+
+                let mseVal = 0;
+                for(let p of valData) mseVal += Math.pow(predict(p.x) - p.y, 2);
+                mseVal /= N_VAL;
+
+                trainErrTxt.textContent = mseTrain.toFixed(4);
+                
+                // Nếu lỗi vượt quá giới hạn hiển thị, ghi là rất lớn
+                if(mseVal > 100) valErrTxt.textContent = "> 100.0";
+                else valErrTxt.textContent = mseVal.toFixed(4);
+
+                const deg = parseInt(slider.value);
+                
+                // Reset styling
+                cardTrain.className = "bg-blue-50/50 border border-blue-200 p-4 rounded-xl text-center flex flex-col justify-center transition-all";
+                cardVal.className = "bg-rose-50/50 border border-rose-200 p-4 rounded-xl text-center flex flex-col justify-center transition-all";
+
+                if (deg <= 2) {
+                    statusBadge.textContent = "Underfitting";
+                    statusBadge.className = "text-xs font-bold px-2 py-1 rounded bg-orange-100 text-orange-800 uppercase tracking-wide border border-orange-200";
+                } else if (deg >= 3 && deg <= 6) {
+                    statusBadge.textContent = "Good Fit";
+                    statusBadge.className = "text-xs font-bold px-2 py-1 rounded bg-green-100 text-green-800 uppercase tracking-wide border border-green-200";
+                } else {
+                    statusBadge.textContent = "Overfitting";
+                    statusBadge.className = "text-xs font-bold px-2 py-1 rounded bg-red-100 text-red-800 uppercase tracking-wide border border-red-200 animate-pulse";
+                    // Nhấn mạnh Overfitting
+                    cardVal.classList.add("bg-red-100", "border-red-400");
+                    cardTrain.classList.add("bg-blue-100", "border-blue-400");
+                }
+            }
+
+            function draw() {
+                const W = canvas.width / window.devicePixelRatio;
+                const H = canvas.height / window.devicePixelRatio;
+                
+                ctx.clearRect(0, 0, W, H);
+
+                // Grid background nhẹ
+                ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+                for(let i=0; i<=10; i++) {
+                    ctx.beginPath(); ctx.moveTo(0, H*i/10); ctx.lineTo(W, H*i/10); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(W*i/10, 0); ctx.lineTo(W*i/10, H); ctx.stroke();
+                }
+
+                // Trục X = 0
+                ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0, toPxY(0)); ctx.lineTo(W, toPxY(0)); ctx.stroke();
+
+                // Hàm gốc (True function)
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                for (let px = 0; px <= W; px += 2) {
+                    let x = px / W;
+                    let y = trueFunc(x);
+                    if (px === 0) ctx.moveTo(px, toPxY(y));
+                    else ctx.lineTo(px, toPxY(y));
+                }
+                ctx.stroke();
+                ctx.setLineDash([]); 
+
+                // Mô hình dự đoán (Fitted Polynomial)
+                ctx.strokeStyle = '#ef4444'; // red-500
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                let isDrawing = false;
+                for (let px = 0; px <= W; px += 2) {
+                    let x = px / W;
+                    let y = predict(x);
+                    let py = toPxY(y);
+                    
+                    // Xử lý cắt nhánh khi văng quá xa ngoài màn hình (để vẽ đẹp hơn khi Overfit)
+                    if (py < -H || py > H*2) {
+                        isDrawing = false;
+                        continue; 
+                    }
+                    
+                    if (!isDrawing) {
+                        ctx.moveTo(px, py);
+                        isDrawing = true;
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+
+                // Điểm Train Data
+                ctx.fillStyle = '#3b82f6'; // blue-500
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                for (let p of trainData) {
+                    ctx.beginPath();
+                    ctx.arc(toPxX(p.x), toPxY(p.y), 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            slider.addEventListener('input', fitPolynomial);
+            btnRegen.addEventListener('click', generateData);
+
+            setTimeout(() => {
+                resizeCanvas();
+                generateData();
+            }, 100);
+        }
+    </script>
+</body>
+</html>
