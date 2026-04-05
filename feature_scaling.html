@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Normalization vs Standardization</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- MathJax -->
+    <script>
+        MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        .math-block { overflow-x: auto; padding: 1.5rem 0; text-align: center; font-size: 1.1rem; }
+        .content-section p { margin-bottom: 1rem; line-height: 1.75; }
+        .comparison-table th, .comparison-table td { border: 1px solid #e2e8f0; padding: 1rem; text-align: left; }
+        .comparison-table th { background-color: #f1f5f9; font-weight: 600; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header -->
+    <header class="bg-teal-600 text-white py-16 px-4 shadow-lg text-center">
+        <h1 class="text-4xl font-bold mb-4">Feature Scaling trong Machine Learning</h1>
+        <p class="text-xl text-teal-100 max-w-3xl mx-auto">Hiểu sâu về Normalization (Min-Max) và Standardization (Z-score). Khi nào dùng cái nào?</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8 content-section bg-white shadow-xl rounded-xl -mt-8 relative z-10">
+        
+        <!-- Giới thiệu -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-slate-800 border-b-2 border-slate-100 pb-2 mb-4">1. Tại sao phải Scaling dữ liệu?</h2>
+            <p>Trong một tập dữ liệu, các đặc trưng (features) thường có thang đo hoàn toàn khác nhau. Ví dụ: dự đoán giá nhà dựa trên <em>Số phòng ngủ</em> (giá trị từ 1 đến 5) và <em>Diện tích</em> (giá trị từ 50 đến 2000 m²).</p>
+            
+            <div class="mt-6 space-y-6">
+                <!-- Giải thích KNN/SVM -->
+                <div class="bg-amber-50 p-6 rounded-xl border border-amber-200 shadow-sm">
+                    <h3 class="font-bold text-amber-900 mb-3 text-lg">🔥 Vấn đề 1: Với thuật toán dựa trên Khoảng cách (KNN, K-Means, SVM)</h3>
+                    <p class="text-slate-700">Các thuật toán này đánh giá sự tương đồng bằng cách tính khoảng cách toán học (như khoảng cách Euclidean) giữa các điểm. Hãy tính khoảng cách Euclidean $\sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2}$ giữa các ngôi nhà:</p>
+                    <ul class="list-disc pl-5 mt-3 space-y-2 text-slate-700">
+                        <li>Khoảng cách giữa <strong>Nhà A</strong> (2 phòng ngủ, 100 m²) và <strong>Nhà B</strong> (4 phòng ngủ, 100 m²) là $\sqrt{(2-4)^2 + 0} = \mathbf{2}$.</li>
+                        <li>Khoảng cách giữa <strong>Nhà A</strong> (2 phòng ngủ, 100 m²) và <strong>Nhà C</strong> (2 phòng ngủ, 120 m²) là $\sqrt{0 + (100-120)^2} = \mathbf{20}$.</li>
+                    </ul>
+                    <p class="text-slate-700 mt-3 font-medium">👉 Hậu quả: Dù chênh lệch tận 2 phòng ngủ (yếu tố thay đổi cấu trúc nhà), khoảng cách chỉ là 2. Trong khi chênh 20m² (thay đổi nhỏ) lại tạo ra khoảng cách 20. Đặc trưng "Diện tích" do có các số quá lớn đã hoàn toàn "nuốt chửng" đặc trưng "Phòng ngủ". Mô hình sẽ bị mù trước số phòng ngủ!</p>
+                </div>
+
+                <!-- Giải thích Gradient Descent -->
+                <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-200 shadow-sm">
+                    <h3 class="font-bold text-indigo-900 mb-3 text-lg">🔥 Vấn đề 2: Với thuật toán dùng Gradient Descent (Neural Networks, Linear Regression)</h3>
+                    <p class="text-slate-700">Thuật toán này giống như một người mù đang dò đường xuống đáy một thung lũng (đáy là nơi mô hình đạt độ chính xác cao nhất). Khi các đặc trưng bị lệch thang đo:</p>
+                    <ul class="list-disc pl-5 mt-3 space-y-2 text-slate-700">
+                        <li>Thung lũng (hàm mất mát) sẽ bị kéo dãn thành <strong>hình elip/bầu dục rất dẹt và dài</strong>.</li>
+                        <li>Độ dốc (Gradient) ở trục nhỏ sẽ rất thoải, trong khi trục lớn lại dốc đứng. Người mù sẽ bước những bước dao động lắc lư (zig-zag) cực mạnh giữa hai vách đá thay vì đi thẳng xuống đáy.</li>
+                    </ul>
+                    <p class="text-slate-700 mt-3 font-medium">👉 Cách giải quyết: Feature Scaling ép thung lũng lại thành một cái bát <strong>hình tròn đồng tâm (spherical)</strong> hoàn hảo. Lúc này, độ dốc ở mọi hướng là như nhau, thuật toán phi thẳng một mạch xuống đáy, hội tụ cực kỳ nhanh và không bị trượt (sai lệch).</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            <!-- Normalization -->
+            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                <h3 class="text-xl font-bold text-blue-800 mb-4">2. Normalization (Min-Max Scaling)</h3>
+                <p>Kỹ thuật này co giãn dữ liệu sao cho tất cả các giá trị nằm gọn trong một khoảng nhất định, phổ biến nhất là <strong>từ 0 đến 1</strong>.</p>
+                <div class="math-block bg-white rounded-lg my-4 shadow-sm">
+                    $$X_{norm} = \frac{X - X_{min}}{X_{max} - X_{min}}$$
+                </div>
+                <ul class="list-disc pl-5 space-y-2 text-slate-700">
+                    <li><strong>Điểm mạnh:</strong> Đảm bảo 100% dữ liệu nằm trong khoảng cố định (vd: [0, 1]). Rất tốt cho xử lý ảnh (pixel 0-255) hoặc khi thuật toán không yêu cầu giả định phân phối dữ liệu (như KNN, Neural Networks).</li>
+                    <li><strong>Điểm yếu:</strong> Vô cùng nhạy cảm với <strong>Điểm dị biệt (Outliers)</strong>. Nếu có một giá trị $X_{max}$ lớn bất thường, toàn bộ các điểm dữ liệu bình thường sẽ bị ép chặt lại sát mức 0.</li>
+                </ul>
+            </div>
+
+            <!-- Standardization -->
+            <div class="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
+                <h3 class="text-xl font-bold text-emerald-800 mb-4">3. Standardization (Z-score)</h3>
+                <p>Kỹ thuật này dời trọng tâm của dữ liệu về <strong>giá trị trung bình $\mu = 0$</strong> và chia cho <strong>độ lệch chuẩn $\sigma = 1$</strong>. Dữ liệu sau biến đổi sẽ có dạng phân phối chuẩn chuẩn hóa.</p>
+                <div class="math-block bg-white rounded-lg my-4 shadow-sm">
+                    $$X_{std} = \frac{X - \mu}{\sigma}$$
+                </div>
+                <ul class="list-disc pl-5 space-y-2 text-slate-700">
+                    <li><strong>Điểm mạnh:</strong> Ít bị ảnh hưởng bởi điểm dị biệt hơn (vì outliers không thể xác định giới hạn cho toàn tập dữ liệu giống như cách Min-Max làm). Hoạt động cực tốt với Logistic Regression, SVM, PCA.</li>
+                    <li><strong>Điểm yếu:</strong> Không đưa dữ liệu về một khoảng giới hạn cố định (có thể ra số âm, số dương vượt qua 3, 4). Không giữ nguyên được giới hạn nếu thuật toán yêu cầu đầu vào nghiêm ngặt (như khoảng 0-1).</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Interactive Simulation -->
+        <section class="mb-8 pt-8 border-t-2 border-dashed border-slate-300">
+            <h2 class="text-3xl font-bold text-teal-700 mb-2 text-center">🔬 Mô phỏng: Trận chiến với Outliers</h2>
+            <p class="text-center text-slate-600 mb-8 max-w-3xl mx-auto">Dưới đây là biểu đồ của 2 đặc trưng có thang đo khác nhau (Tuổi: 20-60, Thu nhập: 10M-100M). Hãy bật <strong>"Thêm Outlier"</strong> và quan sát cách Normalization bị "phá hủy" so với Standardization.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Controls -->
+                <div class="lg:col-span-1 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                    <h3 class="font-bold text-slate-800 mb-4 border-b pb-2">Bảng Điều Khiển</h3>
+                    
+                    <div class="space-y-4">
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 bg-white rounded shadow-sm border border-slate-100 hover:bg-teal-50 transition">
+                            <input type="radio" name="scaleMethod" value="raw" checked class="form-radio text-teal-600 w-5 h-5">
+                            <span class="font-medium text-slate-700">Dữ liệu gốc</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 bg-white rounded shadow-sm border border-slate-100 hover:bg-blue-50 transition">
+                            <input type="radio" name="scaleMethod" value="norm" class="form-radio text-blue-600 w-5 h-5">
+                            <span class="font-medium text-slate-700">Normalization</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 bg-white rounded shadow-sm border border-slate-100 hover:bg-emerald-50 transition">
+                            <input type="radio" name="scaleMethod" value="std" class="form-radio text-emerald-600 w-5 h-5">
+                            <span class="font-medium text-slate-700">Standardization</span>
+                        </label>
+                    </div>
+
+                    <div class="mt-8 pt-6 border-t border-slate-200">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="toggleOutlier" class="form-checkbox text-red-600 w-5 h-5 rounded">
+                            <span class="font-bold text-red-600">Thêm điểm dị biệt (Outlier)</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mt-2">Thêm một người 120 tuổi, thu nhập 1 Tỷ.</p>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="lg:col-span-3 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="relative w-full" style="height: 400px;">
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                    
+                    <!-- Stats panel -->
+                    <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div class="font-bold text-slate-700 mb-1">Trục X (Tuổi)</div>
+                            <div id="statsX" class="text-slate-600 font-mono"></div>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div class="font-bold text-slate-700 mb-1">Trục Y (Thu nhập)</div>
+                            <div id="statsY" class="text-slate-600 font-mono"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script điều khiển -->
+    <script>
+        // Sinh dữ liệu nhân tạo (Synthetic Data)
+        function generateData() {
+            let data = [];
+            // Sinh 50 điểm bình thường
+            for(let i=0; i<50; i++) {
+                // Tuổi từ 20 đến 60
+                let age = 20 + Math.random() * 40;
+                // Thu nhập liên quan đến tuổi + nhiễu (Từ 10tr đến 100tr)
+                let income = (age * 1.2 + (Math.random()-0.5)*20) * 1000000;
+                // Clamp
+                income = Math.max(10000000, income);
+                
+                data.push({x: age, y: income, isOutlier: false});
+            }
+            return data;
+        }
+
+        const baseData = generateData();
+        const outlierPoint = {x: 120, y: 1000000000, isOutlier: true}; // Tuổi 120, Thu nhập 1 tỷ
+
+        let chart;
+
+        // Các hàm Toán học
+        function getMean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+        function getStd(arr, mean) { 
+            return Math.sqrt(arr.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / arr.length); 
+        }
+        function getMinMax(arr) { 
+            let min = Math.min(...arr); let max = Math.max(...arr); 
+            return {min, max}; 
+        }
+
+        function updateChart() {
+            const method = document.querySelector('input[name="scaleMethod"]:checked').value;
+            const hasOutlier = document.getElementById('toggleOutlier').checked;
+
+            // Dữ liệu ban đầu
+            let currentData = [...baseData];
+            if (hasOutlier) currentData.push(outlierPoint);
+
+            // Tách x và y
+            let xs = currentData.map(d => d.x);
+            let ys = currentData.map(d => d.y);
+
+            // Tính toán thông số
+            const xStats = { mean: getMean(xs), std: getStd(xs, getMean(xs)), ...getMinMax(xs) };
+            const yStats = { mean: getMean(ys), std: getStd(ys, getMean(ys)), ...getMinMax(ys) };
+
+            // Transform data
+            let plotData = currentData.map(d => {
+                let newX = d.x; let newY = d.y;
+                if (method === 'norm') {
+                    newX = (d.x - xStats.min) / (xStats.max - xStats.min);
+                    newY = (d.y - yStats.min) / (yStats.max - yStats.min);
+                } else if (method === 'std') {
+                    newX = (d.x - xStats.mean) / xStats.std;
+                    newY = (d.y - yStats.mean) / yStats.std;
+                }
+                return { x: newX, y: newY, isOutlier: d.isOutlier };
+            });
+
+            // Tách điểm thường và điểm dị biệt để tô màu
+            const normalPoints = plotData.filter(d => !d.isOutlier);
+            const outlierPoints = plotData.filter(d => d.isOutlier);
+
+            // Cập nhật thống kê UI (Lấy stats của dữ liệu SAU KHI transform)
+            let newXs = plotData.map(d => d.x); let newYs = plotData.map(d => d.y);
+            
+            const formatNum = (num) => {
+                if(Math.abs(num) > 1000) return (num/1000000).toFixed(1) + 'M';
+                return num.toFixed(3);
+            };
+
+            document.getElementById('statsX').innerHTML = `Min: ${formatNum(Math.min(...newXs))} | Max: ${formatNum(Math.max(...newXs))}<br>Mean: ${formatNum(getMean(newXs))} | Std: ${formatNum(getStd(newXs, getMean(newXs)))}`;
+            document.getElementById('statsY').innerHTML = `Min: ${formatNum(Math.min(...newYs))} | Max: ${formatNum(Math.max(...newYs))}<br>Mean: ${formatNum(getMean(newYs))} | Std: ${formatNum(getStd(newYs, getMean(newYs)))}`;
+
+            // Thiết lập Axis Ranges
+            let xOptions = {}; let yOptions = {};
+            if (method === 'norm') {
+                xOptions = { min: -0.1, max: 1.1, title: {display: true, text: 'Tuổi (Normalized [0,1])'} };
+                yOptions = { min: -0.1, max: 1.1, title: {display: true, text: 'Thu nhập (Normalized [0,1])'} };
+            } else if (method === 'std') {
+                // Tự động scale nhưng có nhãn rõ ràng
+                xOptions = { title: {display: true, text: 'Tuổi (Standardized - Z-scores)'} };
+                yOptions = { title: {display: true, text: 'Thu nhập (Standardized - Z-scores)'} };
+            } else {
+                xOptions = { title: {display: true, text: 'Tuổi (Năm)'} };
+                yOptions = { title: {display: true, text: 'Thu nhập (VND)'} };
+            }
+
+            // Vẽ / Cập nhật Chart
+            if (!chart) {
+                const ctx = document.getElementById('scatterChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Dữ liệu bình thường',
+                                data: normalPoints,
+                                backgroundColor: 'rgba(20, 184, 166, 0.6)', // Teal
+                                borderColor: 'rgba(13, 148, 136, 1)',
+                                borderWidth: 1,
+                                pointRadius: 5
+                            },
+                            {
+                                label: 'Điểm Dị Biệt (Outlier)',
+                                data: outlierPoints,
+                                backgroundColor: 'rgba(239, 68, 68, 0.8)', // Red
+                                borderColor: 'rgba(185, 28, 28, 1)',
+                                borderWidth: 2,
+                                pointRadius: 8,
+                                pointStyle: 'triangle'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { x: xOptions, y: yOptions },
+                        animation: { duration: 400 },
+                        plugins: { tooltip: { enabled: true } }
+                    }
+                });
+            } else {
+                chart.data.datasets[0].data = normalPoints;
+                chart.data.datasets[1].data = outlierPoints;
+                chart.options.scales.x = { ...chart.options.scales.x, ...xOptions };
+                chart.options.scales.y = { ...chart.options.scales.y, ...yOptions };
+                chart.update();
+            }
+        }
+
+        // Gắn Events
+        document.querySelectorAll('input[name="scaleMethod"]').forEach(el => {
+            el.addEventListener('change', updateChart);
+        });
+        document.getElementById('toggleOutlier').addEventListener('change', updateChart);
+
+        // Init
+        window.onload = updateChart;
+    </script>
+</body>
+</html>
