@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hồi quy tuyến tính (Linear Regression) - Chi tiết & Mô phỏng</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb', // blue-600
+                        secondary: '#475569', // slate-600
+                        math: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- KaTeX cho Công thức Toán học -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        .math-block { overflow-x: auto; padding: 1rem 0; text-align: center; }
+        .katex { font-size: 1.1em; }
+        canvas { touch-action: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 leading-relaxed">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-primary">Học Sâu Cơ Bản</h1>
+            <div class="space-x-4 text-sm font-medium">
+                <a href="#ly-thuyet" class="hover:text-primary transition">Lý thuyết</a>
+                <a href="#mo-phong" class="bg-primary text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">Mô phỏng</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Nội dung lý thuyết -->
+        <article class="lg:col-span-8 bg-white p-8 rounded-2xl shadow-sm border border-slate-100" id="ly-thuyet">
+            
+            <h1 class="text-4xl font-extrabold text-slate-900 mb-6 tracking-tight">3.1. Hồi quy tuyến tính (Linear Regression)</h1>
+            
+            <p class="mb-4">
+                Các bài toán <em>Hồi quy (Regression)</em> xuất hiện bất cứ khi nào chúng ta muốn dự đoán một giá trị số. Các ví dụ phổ biến bao gồm dự đoán giá cả (nhà cửa, cổ phiếu, v.v.), dự đoán thời gian nằm viện (đối với bệnh nhân), dự báo nhu cầu (bán lẻ), và vô số ví dụ khác. Không phải bài toán dự đoán nào cũng là hồi quy cổ điển. Sau này, chúng ta sẽ làm quen với bài toán phân loại (classification), nơi mục tiêu là dự đoán một phần tử thuộc về danh mục nào.
+            </p>
+
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 text-sm">
+                <h4 class="font-bold mb-1">Ví dụ chạy xuyên suốt:</h4>
+                <p>Giả sử chúng ta muốn ước tính giá nhà (tính bằng đô la) dựa trên diện tích (feet vuông) và tuổi đời của ngôi nhà (năm). Để phát triển mô hình, chúng ta cần dữ liệu bao gồm giá bán, diện tích và tuổi cho mỗi ngôi nhà.</p>
+            </div>
+
+            <h3 class="text-xl font-semibold mt-8 mb-4 border-b pb-2 text-slate-800">Thuật ngữ Machine Learning</h3>
+            <ul class="list-disc pl-6 mb-6 space-y-2">
+                <li><strong>Tập dữ liệu huấn luyện (Training dataset/set):</strong> Toàn bộ dữ liệu được sử dụng để xây dựng mô hình.</li>
+                <li><strong>Ví dụ (Example / Data point / Instance / Sample):</strong> Mỗi hàng dữ liệu tương ứng với một lần bán nhà.</li>
+                <li><strong>Nhãn (Label / Target):</strong> Thứ chúng ta đang cố gắng dự đoán (giá nhà).</li>
+                <li><strong>Đặc trưng (Features / Covariates):</strong> Các biến số mà dựa vào đó để đưa ra dự đoán (diện tích và tuổi).</li>
+            </ul>
+
+            <h2 class="text-3xl font-bold mt-12 mb-6 text-slate-900">3.1.1. Khái niệm Cơ bản (Basics)</h2>
+            <p class="mb-4">
+                <em>Hồi quy tuyến tính</em> là công cụ đơn giản nhất và phổ biến nhất trong các công cụ tiêu chuẩn để giải quyết bài toán hồi quy. Bắt nguồn từ đầu thế kỷ 19 (Gauss, 1809; Legendre, 1805), nó bắt nguồn từ một vài giả định đơn giản:
+            </p>
+            <ol class="list-decimal pl-6 mb-6 space-y-2">
+                <li>Mối quan hệ giữa các đặc trưng $\mathbf{x}$ và mục tiêu $y$ xấp xỉ tuyến tính. Nghĩa là giá trị kỳ vọng của $y$ có thể được biểu diễn dưới dạng tổng có trọng số của các đặc trưng $\mathbf{x}$.</li>
+                <li>Nhiễu quan sát (observation noise) có hành vi tốt, tuân theo phân phối Gaussian (chuẩn).</li>
+            </ol>
+            <p class="mb-6">
+                Thông thường, $n$ biểu thị số lượng ví dụ trong tập dữ liệu. Chỉ số trên (superscripts) đánh số mẫu, chỉ số dưới (subscripts) đánh số tọa độ. Cụ thể, $\mathbf{x}^{(i)}$ là mẫu thứ $i$ và $x_j^{(i)}$ là tọa độ thứ $j$ của nó.
+            </p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4">3.1.1.1. Mô hình (Model)</h3>
+            <p class="mb-4">
+                Trung tâm của mọi giải pháp là một mô hình mô tả cách các đặc trưng biến đổi thành ước tính của mục tiêu. Giả định tuyến tính có nghĩa là:
+            </p>
+            <div class="math-block text-lg">
+                $$\text{price} = w_{\text{area}} \cdot \text{area} + w_{\text{age}} \cdot \text{age} + b$$
+            </div>
+            <p class="mb-4">
+                Ở đây, $w_{\text{area}}$ và $w_{\text{age}}$ được gọi là <strong>trọng số (weights)</strong>, và $b$ được gọi là <strong>độ lệch (bias / offset / intercept)</strong>.
+            </p>
+            <ul class="list-disc pl-6 mb-6 space-y-2">
+                <li><strong>Trọng số ($w$):</strong> Xác định mức độ ảnh hưởng của mỗi đặc trưng lên dự đoán.</li>
+                <li><strong>Độ lệch ($b$):</strong> Xác định giá trị ước tính khi tất cả đặc trưng bằng 0. (Rất cần thiết để đường thẳng không bắt buộc phải đi qua gốc tọa độ).</li>
+            </ul>
+            <p class="mb-4">
+                Nói một cách chính xác, đây là một <em>phép biến đổi affine (affine transformation)</em> của các đặc trưng đầu vào, đặc trưng bởi phép biến đổi tuyến tính qua tổng có trọng số, kết hợp với phép tịnh tiến qua độ lệch cộng thêm.
+            </p>
+            <p class="mb-4">
+                Trong học máy, với tập dữ liệu chiều cao có $d$ đặc trưng, ta sử dụng ký hiệu đại số tuyến tính gọn gàng hơn. Dự đoán $\hat{y}$ ("y mũ") được viết là:
+            </p>
+            <div class="math-block">
+                $$\hat{y} = w_1 x_1 + \dots + w_d x_d + b$$
+            </div>
+            <p class="mb-4">
+                Gom các đặc trưng thành vector $\mathbf{x} \in \mathbb{R}^d$ và trọng số thành vector $\mathbf{w} \in \mathbb{R}^d$, mô hình được biểu diễn qua tích vô hướng:
+            </p>
+            <div class="math-block">
+                $$\hat{y} = \mathbf{w}^\top \mathbf{x} + b$$
+            </div>
+            <p class="mb-6">
+                Đối với toàn bộ tập dữ liệu gồm $n$ ví dụ, ta dùng <em>ma trận thiết kế (design matrix)</em> $\mathbf{X} \in \mathbb{R}^{n \times d}$. Các dự đoán $\mathbf{\hat{y}} \in \mathbb{R}^n$ được biểu diễn bằng tích ma trận - vector:
+            </p>
+            <div class="math-block">
+                $$\mathbf{\hat{y}} = \mathbf{X}\mathbf{w} + b$$
+            </div>
+            <p class="text-sm text-slate-500 mb-6 italic">(Lưu ý: cơ chế broadcasting được áp dụng khi cộng thêm $b$).</p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4">3.1.1.2. Hàm mất mát (Loss Function)</h3>
+            <p class="mb-4">
+                Độ phù hợp của mô hình được đo lường bằng <em>hàm mất mát</em>, định lượng khoảng cách giữa giá trị thực tế và giá trị dự đoán. Đối với bài toán hồi quy, phổ biến nhất là <strong>Bình phương sai số (Squared Error)</strong>.
+            </p>
+            <p class="mb-4">
+                Với ví dụ $i$, sai số bình phương là:
+            </p>
+            <div class="math-block">
+                $$l^{(i)}(\mathbf{w}, b) = \frac{1}{2} \left(\hat{y}^{(i)} - y^{(i)}\right)^2$$
+            </div>
+            <p class="mb-6">
+                Hằng số $\frac{1}{2}$ không tạo ra sự khác biệt thực tế nào nhưng lại thuận tiện về mặt ký hiệu, vì nó sẽ triệt tiêu khi ta lấy đạo hàm. Để đánh giá mô hình trên toàn bộ tập dữ liệu $n$ ví dụ, ta tính trung bình các tổn thất:
+            </p>
+            <div class="math-block bg-slate-100 p-4 rounded-lg">
+                $$L(\mathbf{w}, b) = \frac{1}{n} \sum_{i=1}^n l^{(i)}(\mathbf{w}, b) = \frac{1}{n} \sum_{i=1}^n \frac{1}{2} \left(\mathbf{w}^\top \mathbf{x}^{(i)} + b - y^{(i)}\right)^2$$
+            </div>
+            <p class="mt-4 mb-6 font-semibold">
+                Mục tiêu khi huấn luyện: Tìm tham số $\mathbf{w}^*, b^*$ sao cho giảm thiểu hàm mất mát tổng:
+                <br>
+                $$\mathbf{w}^*, b^* = \underset{\mathbf{w}, b}{\text{argmin}} \ L(\mathbf{w}, b)$$
+            </p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4">3.1.1.3. Nghiệm phân tích (Analytic Solution)</h3>
+            <p class="mb-4">
+                Hồi quy tuyến tính có một bài toán tối ưu hóa rất dễ dàng và có thể tìm được nghiệm tối ưu bằng công thức phân tích (analytic solution). Bằng cách gộp $b$ vào $\mathbf{w}$ và thêm cột toàn số 1 vào ma trận $\mathbf{X}$, bài toán trở thành tối thiểu hóa $\|\mathbf{y} - \mathbf{X}\mathbf{w}\|^2$.
+            </p>
+            <p class="mb-4">Lấy đạo hàm của hàm mất mát theo $\mathbf{w}$ và đặt nó bằng 0:</p>
+            <div class="math-block">
+                $$\partial_{\mathbf{w}} \|\mathbf{y} - \mathbf{X}\mathbf{w}\|^2 = 2\mathbf{X}^\top (\mathbf{X}\mathbf{w} - \mathbf{y}) = 0 \implies \mathbf{X}^\top \mathbf{y} = \mathbf{X}^\top \mathbf{X} \mathbf{w}$$
+            </div>
+            <p class="mb-6">Giải tìm $\mathbf{w}$ ta được công thức tối ưu (với điều kiện $\mathbf{X}^\top \mathbf{X}$ khả nghịch):</p>
+            <div class="math-block bg-green-50 p-4 rounded-lg border border-green-200">
+                $$\mathbf{w}^* = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{y}$$
+            </div>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4">3.1.1.4. Hạ Gradient Ngẫu Nhiên Theo Lô Nhỏ (Minibatch Stochastic Gradient Descent - SGD)</h3>
+            <p class="mb-4">
+                Không phải bài toán học sâu nào cũng có nghiệm phân tích. Kỹ thuật cốt lõi để tối ưu hóa hầu hết các mô hình là <em>gradient descent</em>: giảm lặp đi lặp lại sai số bằng cách cập nhật tham số theo hướng làm giảm hàm mất mát.
+            </p>
+            <ul class="list-disc pl-6 mb-6 space-y-2">
+                <li><strong>Gradient Descent cơ bản:</strong> Tính toán trên toàn bộ dữ liệu -> Rất chậm.</li>
+                <li><strong>Stochastic Gradient Descent (SGD):</strong> Tính trên từng mẫu một -> Nhanh nhưng không tận dụng được sức mạnh tính toán song song của phần cứng (vector hóa ma trận).</li>
+                <li><strong>Minibatch SGD (Giải pháp hoàn hảo):</strong> Lấy một lô nhỏ (minibatch) $\mathcal{B}$ ngẫu nhiên. Kích thước thường từ 32 đến 256.</li>
+            </ul>
+            <p class="mb-4">Công thức cập nhật tại bước lặp $t$ với tốc độ học (learning rate) $\eta$:</p>
+            <div class="math-block">
+                $$(\mathbf{w}, b) \leftarrow (\mathbf{w}, b) - \frac{\eta}{|\mathcal{B}|} \sum_{i \in \mathcal{B}_t} \partial_{(\mathbf{w},b)} l^{(i)}(\mathbf{w}, b)$$
+            </div>
+            <p class="mb-6">Khai triển cụ thể:</p>
+            <div class="math-block">
+                $$\mathbf{w} \leftarrow \mathbf{w} - \frac{\eta}{|\mathcal{B}|} \sum_{i \in \mathcal{B}_t} \mathbf{x}^{(i)} \left(\mathbf{w}^\top \mathbf{x}^{(i)} + b - y^{(i)}\right)$$
+                $$b \leftarrow b - \frac{\eta}{|\mathcal{B}|} \sum_{i \in \mathcal{B}_t} \left(\mathbf{w}^\top \mathbf{x}^{(i)} + b - y^{(i)}\right)$$
+            </div>
+            <p class="mb-6 text-sm bg-slate-100 p-3 rounded">
+                *Kích thước lô (batch size) và Tốc độ học ($\eta$) là do người dùng định nghĩa, gọi là <strong>Siêu tham số (Hyperparameters)</strong>.
+            </p>
+
+            <h3 class="text-2xl font-semibold mt-8 mb-4">3.1.1.5. Dự đoán (Predictions)</h3>
+            <p class="mb-4">
+                Với mô hình đã được huấn luyện $\hat{\mathbf{w}}^\top \mathbf{x} + \hat{b}$, ta có thể đưa ra <em>dự đoán</em> cho các ví dụ mới. Những người thực hành Deep Learning thường gọi pha này là <strong>suy diễn (inference)</strong>, nhưng trong thống kê, nó thường mang nghĩa hẹp hơn. Để tránh nhầm lẫn, chúng ta sẽ gọi chung là <em>dự đoán (prediction)</em>.
+            </p>
+
+        </article>
+
+        <!-- Trình mô phỏng tương tác bên cạnh -->
+        <aside class="lg:col-span-4" id="mo-phong">
+            <div class="sticky top-24 bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    Mô phỏng Trực quan
+                </h3>
+                <p class="text-sm text-slate-500 mb-4">Nhấp vào không gian trắng bên dưới để thêm điểm dữ liệu giả lập. Quan sát đường hồi quy thay đổi.</p>
+                
+                <div class="relative w-full aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg overflow-hidden cursor-crosshair group" id="canvas-container">
+                    <canvas id="regCanvas" class="w-full h-full"></canvas>
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50 group-hover:opacity-0 transition-opacity" id="canvas-placeholder">
+                        <span class="text-sm font-medium">Click để thêm điểm</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 space-y-3">
+                    <div class="flex justify-between text-sm font-mono bg-slate-100 p-2 rounded">
+                        <span>Trọng số $w$: <span id="val-w" class="font-bold text-blue-600">0.00</span></span>
+                        <span>Độ lệch $b$: <span id="val-b" class="font-bold text-blue-600">0.00</span></span>
+                    </div>
+                    <div class="text-sm font-mono bg-slate-100 p-2 rounded">
+                        <span>Mất mát (MSE): <span id="val-loss" class="font-bold text-red-500">0.00</span></span>
+                    </div>
+
+                    <div class="pt-4 border-t">
+                        <h4 class="text-sm font-semibold mb-2">Huấn luyện bằng Gradient Descent:</h4>
+                        
+                        <div class="flex items-center gap-2 mb-2 text-sm">
+                            <label class="w-24">Learning Rate:</label>
+                            <input type="range" id="lr-slider" min="0.01" max="0.5" step="0.01" value="0.1" class="flex-1 accent-primary">
+                            <span id="lr-val" class="w-10 text-right">0.1</span>
+                        </div>
+
+                        <div class="flex gap-2 mt-4">
+                            <button id="btn-train" class="flex-1 bg-green-600 text-white py-2 rounded font-medium hover:bg-green-700 transition shadow-sm">
+                                Bắt đầu Học (SGD)
+                            </button>
+                            <button id="btn-clear" class="flex-1 bg-slate-200 text-slate-700 py-2 rounded font-medium hover:bg-slate-300 transition shadow-sm">
+                                Xóa dữ liệu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <footer class="bg-slate-900 text-slate-400 py-8 text-center text-sm">
+        <p>Mô phỏng Hồi quy Tuyến tính &bull; Dựa trên tài liệu "Dive into Deep Learning"</p>
+    </footer>
+
+    <!-- Script Logic Mô phỏng Hồi quy tuyến tính -->
+    <script>
+        // Render MathJax/KaTeX
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false}
+                ],
+                throwOnError : false
+            });
+            
+            initSimulation();
+        });
+
+        function initSimulation() {
+            const canvas = document.getElementById('regCanvas');
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById('canvas-container');
+            const placeholder = document.getElementById('canvas-placeholder');
+            
+            // UI Elements
+            const valW = document.getElementById('val-w');
+            const valB = document.getElementById('val-b');
+            const valLoss = document.getElementById('val-loss');
+            const lrSlider = document.getElementById('lr-slider');
+            const lrVal = document.getElementById('lr-val');
+            const btnTrain = document.getElementById('btn-train');
+            const btnClear = document.getElementById('btn-clear');
+
+            // Cập nhật kích thước canvas cho sắc nét
+            function resize() {
+                canvas.width = container.clientWidth * window.devicePixelRatio;
+                canvas.height = container.clientHeight * window.devicePixelRatio;
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                draw();
+            }
+            window.addEventListener('resize', resize);
+
+            // State
+            let points = []; // Mảng chứa {x, y} đã được chuẩn hóa [0, 1]
+            let w = 0;
+            let b = 0.5; // Bắt đầu đường ngang ở giữa
+            let trainingInterval = null;
+            let isTraining = false;
+
+            // Chuyển đổi tọa độ
+            function getW() { return canvas.clientWidth; }
+            function getH() { return canvas.clientHeight; }
+            
+            // X pixel -> X chuẩn hóa [0, 1]
+            function toNormX(px) { return px / getW(); }
+            function toNormY(py) { return 1 - (py / getH()); } // Y lật ngược vì canvas y hướng xuống
+
+            // Chuẩn hóa -> Pixel
+            function toPxX(nx) { return nx * getW(); }
+            function toPxY(ny) { return (1 - ny) * getH(); }
+
+            // Thêm điểm khi click
+            canvas.addEventListener('mousedown', (e) => {
+                if (isTraining) return; // Khóa thêm điểm khi đang học
+                const rect = canvas.getBoundingClientRect();
+                const x = toNormX(e.clientX - rect.left);
+                const y = toNormY(e.clientY - rect.top);
+                
+                points.push({x, y});
+                placeholder.style.display = 'none';
+                
+                // Cập nhật ngay lập tức với nghiệm chính xác (Analytic Solution)
+                solveAnalytically();
+                draw();
+            });
+
+            // Nghiệm phân tích (Sử dụng hiệp phương sai / phương sai cho 1D)
+            function solveAnalytically() {
+                if (points.length < 2) return;
+                
+                let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+                let n = points.length;
+                
+                for(let p of points) {
+                    sumX += p.x;
+                    sumY += p.y;
+                    sumXY += p.x * p.y;
+                    sumXX += p.x * p.x;
+                }
+                
+                let meanX = sumX / n;
+                let meanY = sumY / n;
+                
+                // w = Cov(x,y) / Var(x)
+                let num = 0, den = 0;
+                for(let p of points) {
+                    num += (p.x - meanX) * (p.y - meanY);
+                    den += (p.x - meanX) * (p.x - meanX);
+                }
+                
+                if (den === 0) { w = 0; b = meanY; }
+                else {
+                    w = num / den;
+                    b = meanY - w * meanX;
+                }
+                updateUI();
+            }
+
+            // Tính hàm mất mát MSE
+            function computeLoss() {
+                if (points.length === 0) return 0;
+                let loss = 0;
+                for(let p of points) {
+                    let yHat = w * p.x + b;
+                    loss += 0.5 * Math.pow(yHat - p.y, 2);
+                }
+                return loss / points.length;
+            }
+
+            // Gradient Descent Step
+            function sgdStep() {
+                if (points.length === 0) return;
+                
+                const lr = parseFloat(lrSlider.value);
+                let dw = 0;
+                let db = 0;
+                let n = points.length;
+                
+                // Lấy toàn bộ batch cho mượt (Batch Gradient Descent) 
+                // Do tập dữ liệu nhỏ vẽ trên canvas
+                for(let p of points) {
+                    let yHat = w * p.x + b;
+                    let error = yHat - p.y;
+                    dw += error * p.x;
+                    db += error;
+                }
+                
+                // Trung bình hóa gradient
+                dw /= n;
+                db /= n;
+                
+                // Cập nhật tham số
+                w -= lr * dw;
+                b -= lr * db;
+                
+                updateUI();
+                draw();
+            }
+
+            function updateUI() {
+                valW.textContent = w.toFixed(3);
+                valB.textContent = b.toFixed(3);
+                valLoss.textContent = computeLoss().toFixed(4);
+            }
+
+            function draw() {
+                const W = getW();
+                const H = getH();
+                ctx.clearRect(0, 0, W, H);
+                
+                // Vẽ lưới nền
+                ctx.strokeStyle = '#f1f5f9';
+                ctx.lineWidth = 1;
+                for(let i=1; i<10; i++) {
+                    ctx.beginPath(); ctx.moveTo(0, H*i/10); ctx.lineTo(W, H*i/10); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(W*i/10, 0); ctx.lineTo(W*i/10, H); ctx.stroke();
+                }
+
+                // Vẽ đường hồi quy y = wx + b
+                ctx.strokeStyle = '#2563eb'; // blue-600
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                // Điểm bắt đầu x = 0
+                let y0 = b; 
+                ctx.moveTo(0, toPxY(y0));
+                
+                // Điểm kết thúc x = 1
+                let y1 = w * 1 + b;
+                ctx.lineTo(W, toPxY(y1));
+                ctx.stroke();
+
+                // Vẽ các điểm dữ liệu
+                ctx.fillStyle = '#0f172a'; // slate-900
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                
+                for(let p of points) {
+                    let px = toPxX(p.x);
+                    let py = toPxY(p.y);
+                    
+                    // Vẽ điểm
+                    ctx.beginPath();
+                    ctx.arc(px, py, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Vẽ đường nét đứt biểu diễn Sai số (Error)
+                    let pyHat = toPxY(w * p.x + b);
+                    ctx.strokeStyle = '#ef4444'; // red-500
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px, pyHat);
+                    ctx.stroke();
+                    ctx.setLineDash([]); // Reset
+                }
+            }
+
+            // Event Listeners cho Controls
+            lrSlider.addEventListener('input', (e) => {
+                lrVal.textContent = e.target.value;
+            });
+
+            btnClear.addEventListener('click', () => {
+                points = [];
+                w = 0; b = 0.5;
+                if(isTraining) stopTraining();
+                placeholder.style.display = 'flex';
+                updateUI();
+                draw();
+            });
+
+            btnTrain.addEventListener('click', () => {
+                if (points.length === 0) return alert("Hãy thêm điểm dữ liệu trước!");
+                
+                if (isTraining) {
+                    stopTraining();
+                } else {
+                    // Cố tình làm lệch đường để xem nó học
+                    w = -1; 
+                    b = 1;
+                    isTraining = true;
+                    btnTrain.textContent = "Dừng Học";
+                    btnTrain.classList.replace('bg-green-600', 'bg-red-600');
+                    btnTrain.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+                    
+                    trainingInterval = setInterval(sgdStep, 50); // 20 FPS
+                }
+            });
+
+            function stopTraining() {
+                isTraining = false;
+                clearInterval(trainingInterval);
+                btnTrain.textContent = "Bắt đầu Học (SGD)";
+                btnTrain.classList.replace('bg-red-600', 'bg-green-600');
+                btnTrain.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
+            }
+
+            // Khởi tạo kích thước ban đầu
+            setTimeout(resize, 100);
+            updateUI();
+        }
+    </script>
+</body>
+</html>
