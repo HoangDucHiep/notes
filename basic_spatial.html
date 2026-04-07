@@ -1,0 +1,425 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+// --- CÁC COMPONENT ICON ---
+const BookIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>;
+const GridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>;
+const ActivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+
+// --- COMPONENT CHÍNH ---
+export default function App() {
+  const [activeTab, setActiveTab] = useState('theory');
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+      {/* Header */}
+      <header className="bg-blue-600 text-white shadow-md p-6">
+        <div className="max-w-5xl mx-auto">
+          <h1 className="text-3xl font-bold">Chương 3: Biến đổi Cường độ và Lọc Không gian</h1>
+          <p className="mt-2 text-blue-100">Mô phỏng tương tác dựa trên Giáo trình Xử lý Ảnh Số</p>
+        </div>
+      </header>
+
+      {/* Navigation */}
+      <div className="max-w-5xl mx-auto mt-6 px-4">
+        <div className="flex space-x-1 bg-white p-1 rounded-lg shadow">
+          <button onClick={() => setActiveTab('theory')} className={`flex-1 flex items-center justify-center py-3 text-sm font-medium rounded-md transition-colors ${activeTab === 'theory' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <BookIcon /> <span className="ml-2">1. Lý thuyết & Khái niệm</span>
+          </button>
+          <button onClick={() => setActiveTab('neighborhood')} className={`flex-1 flex items-center justify-center py-3 text-sm font-medium rounded-md transition-colors ${activeTab === 'neighborhood' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <GridIcon /> <span className="ml-2">2. Lọc Vùng lân cận (H. 3.1)</span>
+          </button>
+          <button onClick={() => setActiveTab('intensity')} className={`flex-1 flex items-center justify-center py-3 text-sm font-medium rounded-md transition-colors ${activeTab === 'intensity' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <ActivityIcon /> <span className="ml-2">3. Biến đổi Cường độ (H. 3.2)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <main className="max-w-5xl mx-auto mt-6 px-4 pb-12">
+        <div className="bg-white rounded-xl shadow-lg p-8 min-h-[600px]">
+          {activeTab === 'theory' && <TheorySection />}
+          {activeTab === 'neighborhood' && <NeighborhoodSimulation />}
+          {activeTab === 'intensity' && <IntensitySimulation />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ==========================================
+// 1. COMPONENT LÝ THUYẾT
+// ==========================================
+function TheorySection() {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-800 border-b pb-2">3.1 Bối cảnh & Khái niệm Cơ bản</h2>
+      
+      <div className="prose max-w-none text-gray-600 space-y-4 text-justify text-lg leading-relaxed">
+        <p>
+          Các kỹ thuật xử lý ảnh được thảo luận ở đây được thực hiện trong <strong>miền không gian (spatial domain)</strong>, 
+          tức là mặt phẳng chứa các điểm ảnh (pixels) của một bức ảnh. Các kỹ thuật miền không gian thao tác trực tiếp 
+          trên các pixel, trái ngược với miền tần số (frequency domain) nơi các thao tác được thực hiện trên biến đổi Fourier của ảnh.
+        </p>
+
+        <div className="bg-blue-50 p-6 rounded-lg border-l-4 border-blue-500 my-6">
+          <h3 className="text-xl font-semibold text-blue-800 mb-3">Công thức Tổng quát</h3>
+          <p className="text-center text-2xl font-math my-4">
+            <span className="italic">g(x, y)</span> = <span className="italic">T</span> [ <span className="italic">f(x, y)</span> ]
+            <span className="float-right text-sm text-gray-500 mt-2">(3-1)</span>
+          </p>
+          <ul className="list-disc pl-6 space-y-2 text-md">
+            <li><strong><span className="italic">f(x, y)</span></strong>: Ảnh đầu vào.</li>
+            <li><strong><span className="italic">g(x, y)</span></strong>: Ảnh đầu ra.</li>
+            <li><strong><span className="italic">T</span></strong>: Một toán tử (operator) tác động lên <em>f</em>, được định nghĩa trên một <em>vùng lân cận (neighborhood)</em> của điểm <em>(x, y)</em>.</li>
+          </ul>
+        </div>
+
+        <h3 className="text-xl font-bold text-gray-800 mt-8">Xử lý Vùng Lân Cận (Neighborhood Processing)</h3>
+        <p>
+          Vùng lân cận thường là hình chữ nhật, có tâm tại <em>(x, y)</em> và kích thước nhỏ hơn nhiều so với ảnh. 
+          Quá trình xử lý bao gồm việc di chuyển tâm của vùng lân cận từ pixel này sang pixel khác. 
+          Ví dụ: Dùng một bộ lọc kích thước 3x3 để tính giá trị trung bình của 9 pixel lân cận nhằm làm mờ ảnh.
+        </p>
+
+        <h3 className="text-xl font-bold text-gray-800 mt-8">Xử lý Điểm (Point Processing) & Biến đổi Cường độ</h3>
+        <p>
+          Vùng lân cận nhỏ nhất có thể là kích thước <strong>1x1</strong>. Trong trường hợp này, giá trị <em>g</em> chỉ phụ thuộc 
+          vào giá trị của <em>f</em> tại một điểm duy nhất <em>(x, y)</em>. Lúc này, phương trình (3-1) trở thành hàm 
+          chuyển đổi cường độ (intensity transformation) có dạng:
+        </p>
+        <p className="text-center text-2xl font-math my-4">
+          <span className="italic">s</span> = <span className="italic">T(r)</span>
+          <span className="float-right text-sm text-gray-500 mt-2">(3-2)</span>
+        </p>
+        <p>
+          Trong đó, <strong><span className="italic">r</span></strong> là cường độ pixel ảnh gốc, và <strong><span className="italic">s</span></strong> là cường độ pixel ảnh kết quả. 
+          Cách tiếp cận này thường được gọi là <em>kỹ thuật xử lý điểm</em> (Point processing).
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 2. COMPONENT MÔ PHỎNG VÙNG LÂN CẬN
+// ==========================================
+function NeighborhoodSimulation() {
+  const [centerPos, setCenterPos] = useState({ x: 5, y: 5 });
+  const gridRows = 12;
+  const gridCols = 15;
+
+  const handleMouseMove = (e, x, y) => {
+    if (x > 0 && x < gridCols - 1 && y > 0 && y < gridRows - 1) {
+      setCenterPos({ x, y });
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      <h2 className="text-2xl font-bold text-gray-800 mb-2 self-start w-full border-b pb-2">Mô phỏng Hình 3.1: Vùng lân cận 3x3</h2>
+      <p className="text-gray-600 mb-8 self-start text-lg">
+        Di chuột qua lưới bên dưới để di chuyển tâm của vùng lân cận (neighborhood) kích thước 3x3. 
+        Mỗi lần di chuyển, toán tử <em>T</em> sẽ tính toán dựa trên 9 ô vuông nhỏ này để tạo ra 1 pixel mới ở ảnh đích.
+      </p>
+
+      <div className="relative border-l-2 border-b-2 border-gray-800 p-2 select-none">
+        {/* Trục tọa độ */}
+        <div className="absolute -left-6 top-1/2 -translate-y-1/2 font-math italic text-lg">x</div>
+        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 font-math italic text-lg">y</div>
+        <div className="absolute -top-6 -left-6 text-sm text-gray-500">Origin</div>
+        
+        {/* Lưới Pixel */}
+        <div 
+          className="grid gap-0 border border-gray-300 bg-white" 
+          style={{ gridTemplateColumns: `repeat(${gridCols}, 30px)`, gridTemplateRows: `repeat(${gridRows}, 30px)` }}
+          onMouseLeave={() => setCenterPos({ x: 5, y: 5 })}
+        >
+          {Array.from({ length: gridRows * gridCols }).map((_, idx) => {
+            const x = idx % gridCols;
+            const y = Math.floor(idx / gridCols);
+            const isCenter = x === centerPos.x && y === centerPos.y;
+            const isNeighbor = Math.abs(x - centerPos.x) <= 1 && Math.abs(y - centerPos.y) <= 1;
+
+            return (
+              <div
+                key={idx}
+                onMouseEnter={(e) => handleMouseMove(e, x, y)}
+                className={`
+                  w-[30px] h-[30px] border border-gray-200 transition-colors duration-75
+                  ${isCenter ? 'bg-blue-600' : isNeighbor ? 'bg-blue-200' : 'hover:bg-gray-100'}
+                `}
+              />
+            );
+          })}
+        </div>
+
+        {/* Chú thích trỏ vào Center */}
+        <div className="absolute pointer-events-none" style={{ left: `${centerPos.x * 30 + 15}px`, top: `${centerPos.y * 30 - 30}px` }}>
+          <div className="w-px h-8 bg-gray-500 mx-auto"></div>
+          <div className="bg-white px-2 py-1 border border-gray-300 text-xs shadow-sm rounded-md -translate-x-1/2 whitespace-nowrap">
+            Pixel tại <span className="italic">f(x<sub>0</sub>, y<sub>0</sub>)</span>
+          </div>
+        </div>
+
+        {/* Chú thích Vùng lân cận */}
+         <div className="absolute pointer-events-none" style={{ left: `${centerPos.x * 30 + 55}px`, top: `${centerPos.y * 30 + 45}px` }}>
+          <svg className="absolute -left-10 -top-8 w-10 h-10" fill="none" stroke="currentColor">
+             <path d="M 0 30 L 30 0" strokeWidth="1.5" />
+          </svg>
+          <div className="bg-white px-2 py-1 text-xs whitespace-nowrap text-gray-700">
+            Vùng lân cận 3x3<br/>quanh điểm <span className="italic">(x<sub>0</sub>, y<sub>0</sub>)</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-12 bg-yellow-50 border border-yellow-200 p-4 rounded-lg w-full max-w-2xl text-sm text-yellow-800">
+        <strong>Lưu ý về vùng biên:</strong> Khi tâm <em>(x, y)</em> nằm sát mép ảnh, một phần của vùng lân cận 3x3 sẽ nằm ngoài ảnh. 
+        Giải pháp phổ biến (như sách đề cập) là bỏ qua các giá trị ngoài, hoặc <em>pad</em> (chèn thêm) các viền số 0 quanh ảnh gốc.
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 3. COMPONENT MÔ PHỎNG BIẾN ĐỔI CƯỜNG ĐỘ
+// ==========================================
+function IntensitySimulation() {
+  const [transformType, setTransformType] = useState('stretch'); // 'stretch' or 'threshold'
+  const [kParam, setKParam] = useState(128); // Ngưỡng k
+  const [eParam, setEParam] = useState(5);   // Độ dốc cho contrast stretching
+  
+  const canvasInRef = useRef(null);
+  const canvasOutRef = useRef(null);
+
+  // Tạo ảnh Gradient Test đầu vào
+  useEffect(() => {
+    const canvasIn = canvasInRef.current;
+    if (!canvasIn) return;
+    const ctx = canvasIn.getContext('2d');
+    const width = canvasIn.width;
+    const height = canvasIn.height;
+
+    // Vẽ dải gradient từ tối (0) đến sáng (255)
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, 'black');
+    gradient.addColorStop(1, 'white');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Vẽ thêm một hình tròn mờ ở giữa để thấy rõ hiệu ứng trên ảnh
+    const radial = ctx.createRadialGradient(width/2, height/2, 10, width/2, height/2, 60);
+    radial.addColorStop(0, 'rgba(128,128,128,1)');
+    radial.addColorStop(1, 'rgba(128,128,128,0)');
+    ctx.fillStyle = radial;
+    ctx.fillRect(0, 0, width, height);
+
+    applyTransformation();
+  }, []); // Run once on mount
+
+  // Hàm áp dụng công thức s = T(r)
+  const applyTransformation = () => {
+    const canvasIn = canvasInRef.current;
+    const canvasOut = canvasOutRef.current;
+    if (!canvasIn || !canvasOut) return;
+
+    const ctxIn = canvasIn.getContext('2d', { willReadFrequently: true });
+    const ctxOut = canvasOut.getContext('2d');
+    const width = canvasIn.width;
+    const height = canvasIn.height;
+
+    const imgDataIn = ctxIn.getImageData(0, 0, width, height);
+    const imgDataOut = ctxOut.createImageData(width, height);
+
+    for (let i = 0; i < imgDataIn.data.length; i += 4) {
+      const r_val = imgDataIn.data[i]; // Lấy kênh R (ảnh xám nên R=G=B)
+      let s_val = 0;
+
+      // Bình thường hóa r về [0, 1] để tính toán dễ hơn
+      let r_norm = r_val / 255.0;
+      let k_norm = kParam / 255.0;
+
+      if (transformType === 'threshold') {
+        // Hình 3.2 (b) Thresholding Function
+        s_val = r_val >= kParam ? 255 : 0;
+      } else {
+        // Hình 3.2 (a) Contrast Stretching Function
+        // Công thức chuẩn: s = 1 / (1 + (m/r)^E). Ở đây m = kParam
+        if (r_norm === 0) {
+            s_val = 0;
+        } else {
+            let s_norm = 1.0 / (1.0 + Math.pow(k_norm / r_norm, eParam));
+            s_val = s_norm * 255;
+        }
+      }
+
+      // Đảm bảo s_val nằm trong [0, 255]
+      s_val = Math.max(0, Math.min(255, s_val));
+
+      imgDataOut.data[i] = s_val;     // R
+      imgDataOut.data[i + 1] = s_val; // G
+      imgDataOut.data[i + 2] = s_val; // B
+      imgDataOut.data[i + 3] = 255;   // Alpha
+    }
+
+    ctxOut.putImageData(imgDataOut, 0, 0);
+  };
+
+  // Re-run transformation when parameters change
+  useEffect(() => {
+    applyTransformation();
+  }, [transformType, kParam, eParam]);
+
+
+  // Hàm vẽ đồ thị SVG cho T(r)
+  const renderGraph = () => {
+    const size = 200;
+    const padding = 20;
+    const plotSize = size - padding * 2;
+    
+    // Tạo danh sách điểm (r, s) cho đường cong
+    const points = [];
+    for(let r = 0; r <= 255; r += 2) {
+        let s = 0;
+        let r_norm = r / 255.0;
+        let k_norm = kParam / 255.0;
+
+        if (transformType === 'threshold') {
+             s = r >= kParam ? 255 : 0;
+        } else {
+            if (r_norm === 0) s = 0;
+            else s = (1.0 / (1.0 + Math.pow(k_norm / r_norm, eParam))) * 255;
+        }
+        
+        // Chuyển đổi r, s (0-255) sang tọa độ pixel trên biểu đồ SVG (0 - plotSize)
+        // O(0,0) nằm ở bottom-left
+        let x = padding + (r / 255) * plotSize;
+        let y = size - padding - (s / 255) * plotSize;
+        points.push(`${x},${y}`);
+    }
+    const polylineStr = points.join(" ");
+
+    return (
+      <div className="relative border border-gray-300 bg-white p-4 rounded-lg shadow-sm">
+        <svg width={size} height={size} className="overflow-visible">
+          {/* Trục r (Dark -> Light) */}
+          <line x1={padding} y1={size - padding} x2={size - 5} y2={size - padding} stroke="black" strokeWidth="1" markerEnd="url(#arrow)" />
+          <text x={size/2} y={size} fontSize="12" textAnchor="middle">r (Dark ⟶ Light)</text>
+          
+          {/* Trục s (Dark -> Light) */}
+          <line x1={padding} y1={size - padding} x2={padding} y2={5} stroke="black" strokeWidth="1" markerEnd="url(#arrow)" />
+          <text x={10} y={size/2} fontSize="12" textAnchor="middle" transform={`rotate(-90, 10, ${size/2})`}>s = T(r)</text>
+
+          {/* Đường gióng ngang/dọc cho mức MAX */}
+          <line x1={padding} y1={padding} x2={size-padding} y2={padding} stroke="gray" strokeDasharray="4" />
+          <line x1={size-padding} y1={padding} x2={size-padding} y2={size-padding} stroke="gray" strokeDasharray="4" />
+
+          {/* Đường gióng cho k */}
+          <line x1={padding + (kParam/255)*plotSize} y1={size - padding} x2={padding + (kParam/255)*plotSize} y2={padding} stroke="blue" strokeDasharray="2" opacity="0.5"/>
+          <text x={padding + (kParam/255)*plotSize} y={size - padding + 12} fontSize="12" textAnchor="middle" fill="blue">k</text>
+
+          {/* Đường cong hàm s=T(r) */}
+          <polyline points={polylineStr} fill="none" stroke="#2563eb" strokeWidth="3" />
+
+          {/* Markers Definition */}
+          <defs>
+            <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto-start-reverse">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="black" />
+            </marker>
+          </defs>
+        </svg>
+        <div className="absolute top-6 left-10 font-math italic text-blue-800 bg-white/80 px-1">T(r)</div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8">
+       <div>
+          <h2 className="text-2xl font-bold text-gray-800 border-b pb-2 mb-4">Mô phỏng Hình 3.2: Các hàm biến đổi Cường độ</h2>
+          <p className="text-gray-600 text-lg">
+            Kỹ thuật Xử lý Điểm (Point Processing) thay đổi giá trị của mỗi pixel độc lập với các pixel xung quanh. 
+            Hình dưới đây mô phỏng phương trình <span className="font-math italic text-xl">s = T(r)</span>.
+          </p>
+       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+        
+        {/* Bảng Điều Khiển & Biểu đồ */}
+        <div className="md:col-span-5 flex flex-col items-center bg-gray-50 p-6 rounded-xl border border-gray-200">
+          
+          <div className="w-full flex justify-center space-x-2 mb-6 bg-white p-1 rounded-md shadow-sm">
+             <button 
+                onClick={() => setTransformType('stretch')}
+                className={`flex-1 py-2 text-sm font-semibold rounded ${transformType === 'stretch' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+             >
+                Hình 3.2(a): Contrast Stretching
+             </button>
+             <button 
+                onClick={() => setTransformType('threshold')}
+                className={`flex-1 py-2 text-sm font-semibold rounded ${transformType === 'threshold' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+             >
+                Hình 3.2(b): Thresholding
+             </button>
+          </div>
+
+          {renderGraph()}
+
+          <div className="w-full mt-8 space-y-6">
+            <div>
+              <label className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                <span>Ngưỡng phân tách <span className="italic font-math text-blue-700">k</span> (mức xám):</span>
+                <span className="font-bold">{kParam}</span>
+              </label>
+              <input 
+                type="range" min="0" max="255" value={kParam} 
+                onChange={(e) => setKParam(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+              <p className="text-xs text-gray-500 mt-1">Dịch chuyển điểm uốn của đồ thị sang trái/phải.</p>
+            </div>
+
+            {transformType === 'stretch' && (
+              <div>
+                <label className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                  <span>Độ dốc đường cong <span className="italic font-math text-blue-700">E</span>:</span>
+                  <span className="font-bold">{eParam}</span>
+                </label>
+                <input 
+                  type="range" min="1" max="20" step="0.5" value={eParam} 
+                  onChange={(e) => setEParam(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <p className="text-xs text-gray-500 mt-1">Giá trị E càng lớn, đường cong càng dốc, tiến gần đến Thresholding.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Demo Ảnh Canvas */}
+        <div className="md:col-span-7 flex flex-col space-y-6">
+          <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+             <h3 className="text-lg font-bold text-gray-700 mb-2">Ảnh đầu vào <span className="italic font-math">f(x,y)</span></h3>
+             <p className="text-sm text-gray-500 mb-4">Dải gradient biểu diễn các mức cường độ gốc r (0 - 255).</p>
+             <canvas ref={canvasInRef} width={400} height={100} className="w-full border border-gray-400 rounded"></canvas>
+          </div>
+
+          <div className="flex justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </div>
+
+          <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+             <h3 className="text-lg font-bold text-gray-700 mb-2">Ảnh đầu ra <span className="italic font-math">g(x,y)</span></h3>
+             <p className="text-sm text-gray-500 mb-4">
+                {transformType === 'stretch' 
+                  ? 'Kéo dãn độ tương phản: Các vùng tối hơn k bị làm tối đi, các vùng sáng hơn k được làm sáng lên.' 
+                  : 'Phân ngưỡng (Nhị phân hóa): Pixels < k biến thành Đen (0), Pixels >= k biến thành Trắng (255).'
+                }
+             </p>
+             <canvas ref={canvasOutRef} width={400} height={100} className="w-full border border-gray-400 rounded"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
