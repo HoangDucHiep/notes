@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phép Toán Vector và Căn Chỉnh Ảnh (Phần 2.6)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .gradient-text { background: linear-gradient(to right, #f43f5e, #8b5cf6, #3b82f6); -webkit-background-clip: text; color: transparent; }
+        
+        .math-expr { font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-weight: bold; }
+        .math-block { display: block; font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 0.5rem; text-align: center; margin: 1rem 0; font-size: 1.1rem; }
+        
+        .matrix-bracket { position: relative; padding: 0 15px; display: inline-block; }
+        .matrix-bracket::before, .matrix-bracket::after { content: ''; position: absolute; top: -5px; bottom: -5px; width: 10px; border: 2px solid #94a3b8; }
+        .matrix-bracket::before { left: 0; border-right: none; }
+        .matrix-bracket::after { right: 0; border-left: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==============================================================================
+        // PHẦN 1: VECTOR REPRESENTATION (RGB to Vector) - Hình 2.43
+        // ==============================================================================
+        const RGBVectorSim = () => {
+            const [color, setColor] = useState({ r: 56, g: 189, b: 248 }); // Tailwind sky-400
+
+            const handleColorChange = (e) => {
+                const hex = e.target.value;
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                setColor({ r, g, b });
+            };
+
+            const rgbToHex = (r, g, b) => '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-blue-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-blue-400">1. Biểu diễn Điểm ảnh dưới dạng Vector (Vector Representation)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Trong ảnh đa phổ (multispectral) hay ảnh màu RGB, mỗi điểm ảnh không phải là một giá trị vô hướng (scalar) mà là một <b>Vector Cột (Column Vector)</b>. Bức ảnh màu thực chất là sự xếp chồng của 3 thành phần ảnh riêng biệt: Đỏ, Lục, Lam (Hình 2.43).
+                    </p>
+
+                    <div className="flex flex-col md:flex-row gap-8 items-center justify-center bg-slate-900 p-8 rounded-xl border border-slate-700 shadow-xl">
+                        
+                        {/* Khối màu */}
+                        <div className="flex flex-col items-center gap-4">
+                            <label className="text-white font-bold text-sm">Chọn màu Điểm ảnh:</label>
+                            <input 
+                                type="color" 
+                                value={rgbToHex(color.r, color.g, color.b)} 
+                                onChange={handleColorChange}
+                                className="w-24 h-24 rounded cursor-pointer border-4 border-slate-600"
+                            />
+                        </div>
+
+                        <div className="text-3xl font-slate-500">→</div>
+
+                        {/* Vector Cột */}
+                        <div className="flex items-center gap-4">
+                            <div className="text-2xl font-bold font-mono text-blue-300">z = </div>
+                            <div className="matrix-bracket text-xl font-mono text-center">
+                                <div className="text-red-400 font-bold p-1">z₁ = {color.r}</div>
+                                <div className="text-green-400 font-bold p-1">z₂ = {color.g}</div>
+                                <div className="text-blue-400 font-bold p-1">z₃ = {color.b}</div>
+                            </div>
+                        </div>
+
+                        <div className="text-3xl font-slate-500">→</div>
+
+                        {/* Hình ảnh các mặt phẳng (Planes) */}
+                        <div className="relative w-48 h-48 ml-4">
+                            <div className="absolute top-12 left-12 w-32 h-32 border-2 border-blue-500 bg-blue-500/20 flex items-center justify-center font-bold text-blue-300 shadow-lg" style={{ backgroundColor: `rgba(0, 0, ${color.b}, 0.8)` }}>Plane 3 (Blue)</div>
+                            <div className="absolute top-6 left-6 w-32 h-32 border-2 border-green-500 bg-green-500/20 flex items-center justify-center font-bold text-green-300 shadow-lg" style={{ backgroundColor: `rgba(0, ${color.g}, 0, 0.8)` }}>Plane 2 (Green)</div>
+                            <div className="absolute top-0 left-0 w-32 h-32 border-2 border-red-500 bg-red-500/20 flex items-center justify-center font-bold text-red-300 shadow-lg" style={{ backgroundColor: `rgba(${color.r}, 0, 0, 0.8)` }}>Plane 1 (Red)</div>
+                            
+                            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                                <svg width="100%" height="100%">
+                                    <line x1="20" y1="20" x2="80" y2="80" stroke="white" strokeWidth="2" strokeDasharray="4 4" />
+                                    <circle cx="20" cy="20" r="4" fill="white" />
+                                    <circle cx="50" cy="50" r="4" fill="white" />
+                                    <circle cx="80" cy="80" r="4" fill="white" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==============================================================================
+        // PHẦN 2: VECTOR & MATRIX OPERATIONS (Tính Khoảng cách)
+        // ==============================================================================
+        const VectorMathSim = () => {
+            const [colorA, setColorA] = useState({ r: 255, g: 0, b: 0 }); // Red
+            const [colorB, setColorB] = useState({ r: 0, g: 0, b: 255 }); // Blue
+
+            // Tính Inner Product (Tích vô hướng)
+            const dotProduct = colorA.r * colorB.r + colorA.g * colorB.g + colorA.b * colorB.b;
+            
+            // Tính Euclidean Norm (Độ dài vector)
+            const normA = Math.sqrt(colorA.r**2 + colorA.g**2 + colorA.b**2);
+            
+            // Tính Euclidean Distance (Khoảng cách giữa 2 vector màu)
+            const distance = Math.sqrt(Math.pow(colorA.r - colorB.r, 2) + Math.pow(colorA.g - colorB.g, 2) + Math.pow(colorA.b - colorB.b, 2));
+
+            const hexA = '#' + [colorA.r, colorA.g, colorA.b].map(x => x.toString(16).padStart(2, '0')).join('');
+            const hexB = '#' + [colorB.r, colorB.g, colorB.b].map(x => x.toString(16).padStart(2, '0')).join('');
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-emerald-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-emerald-400">2. Các Phép Toán Vector (Vector Operations)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Biểu diễn pixel dưới dạng Vector cho phép ta áp dụng các công cụ mạnh mẽ của Không gian Euclidean n-chiều. Khoảng cách Euclidean <span className="math-expr">D(z, a)</span> đo lường mức độ tương đồng giữa hai màu sắc.
+                    </p>
+
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* Input Vectors */}
+                        <div className="flex flex-col gap-6 bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl w-full lg:w-1/3">
+                            <div className="flex items-center gap-4">
+                                <input type="color" value={hexA} onChange={e => {
+                                    const r = parseInt(e.target.value.slice(1, 3), 16);
+                                    const g = parseInt(e.target.value.slice(3, 5), 16);
+                                    const b = parseInt(e.target.value.slice(5, 7), 16);
+                                    setColorA({ r, g, b });
+                                }} className="w-16 h-16 rounded cursor-pointer" />
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold font-mono text-xl text-white">a =</span>
+                                    <div className="matrix-bracket font-mono text-center text-sm text-slate-300">
+                                        <div>{colorA.r}</div><div>{colorA.g}</div><div>{colorA.b}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <input type="color" value={hexB} onChange={e => {
+                                    const r = parseInt(e.target.value.slice(1, 3), 16);
+                                    const g = parseInt(e.target.value.slice(3, 5), 16);
+                                    const b = parseInt(e.target.value.slice(5, 7), 16);
+                                    setColorB({ r, g, b });
+                                }} className="w-16 h-16 rounded cursor-pointer" />
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold font-mono text-xl text-white">z =</span>
+                                    <div className="matrix-bracket font-mono text-center text-sm text-slate-300">
+                                        <div>{colorB.r}</div><div>{colorB.g}</div><div>{colorB.b}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Math Results */}
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-slate-800 p-4 rounded-xl border border-slate-600">
+                                <h4 className="text-amber-400 font-bold text-sm mb-2">Tích vô hướng (Inner Product)</h4>
+                                <div className="math-expr text-xs mb-2">aᵀz = a₁z₁ + a₂z₂ + a₃z₃</div>
+                                <div className="font-mono text-slate-300 text-sm">
+                                    = ({colorA.r}×{colorB.r}) + ({colorA.g}×{colorB.g}) + ({colorA.b}×{colorB.b})
+                                </div>
+                                <div className="text-2xl font-bold text-white mt-2">{dotProduct.toLocaleString()}</div>
+                            </div>
+
+                            <div className="bg-slate-800 p-4 rounded-xl border border-slate-600">
+                                <h4 className="text-purple-400 font-bold text-sm mb-2">Chuẩn Vector (Euclidean Norm)</h4>
+                                <div className="math-expr text-xs mb-2">||a|| = √(aᵀa)</div>
+                                <div className="font-mono text-slate-300 text-sm">
+                                    = √({colorA.r}² + {colorA.g}² + {colorA.b}²)
+                                </div>
+                                <div className="text-2xl font-bold text-white mt-2">{normA.toFixed(2)}</div>
+                            </div>
+
+                            <div className="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/50 md:col-span-2">
+                                <h4 className="text-emerald-400 font-bold text-sm mb-2">Khoảng cách Euclidean (Euclidean Distance)</h4>
+                                <div className="math-expr text-xs mb-2">D(z, a) = ||z - a|| = √[ (z₁-a₁)² + (z₂-a₂)² + (z₃-a₃)² ]</div>
+                                <div className="font-mono text-emerald-200 text-sm">
+                                    = √[ ({colorB.r} - {colorA.r})² + ({colorB.g} - {colorA.g})² + ({colorB.b} - {colorA.b})² ]
+                                </div>
+                                <div className="flex items-center justify-between mt-4">
+                                    <div className="text-4xl font-black text-white">{distance.toFixed(2)}</div>
+                                    <div className="text-xs text-slate-400 max-w-[200px] text-right">
+                                        (Khoảng cách max = 441.67). Khoảng cách càng nhỏ, hai màu càng giống nhau. Thử chọn 2 màu gần giống nhau để xem khoảng cách thu hẹp lại!
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==============================================================================
+        // PHẦN 3: IMAGE REGISTRATION (Căn chỉnh ảnh - Hình 2.42)
+        // ==============================================================================
+        const ImageRegistrationSim = () => {
+            const [isRegistered, setIsRegistered] = useState(false);
+            const refCanvas = useRef(null);
+            const inputCanvas = useRef(null);
+            const diffCanvas = useRef(null);
+            const SIZE = 200;
+
+            // Hàm vẽ ảnh tham chiếu (Reference Image) mô phỏng Hình 2.42
+            const drawScene = (ctx) => {
+                ctx.fillStyle = '#e2e8f0'; // Màu nền trắng xám
+                ctx.fillRect(0, 0, SIZE, SIZE);
+
+                // Các điểm kiểm soát (Tie points / Control points) - Các hình vuông đen
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(20, 20, 15, 15);
+                ctx.fillRect(80, 20, 15, 15);
+                ctx.fillRect(140, 20, 15, 15);
+                ctx.fillRect(140, 160, 15, 15);
+
+                // Chữ 'a' siêu to ở giữa
+                ctx.fillStyle = '#1e293b';
+                ctx.font = 'bold 80px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('a', SIZE/2, SIZE/2);
+
+                // Hàng rào nét dọc
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#334155';
+                for(let i=30; i<100; i+=10) {
+                    ctx.beginPath(); ctx.moveTo(i, 140); ctx.lineTo(i, 180); ctx.stroke();
+                }
+
+                // Vùng mờ sương (Noise patches)
+                ctx.fillStyle = '#94a3b8';
+                for(let i=0; i<300; i++) {
+                    ctx.fillRect(130 + Math.random()*40, 60 + Math.random()*80, 2, 2);
+                }
+            };
+
+            const calculateDifference = (data1, data2, outputData) => {
+                for (let i = 0; i < data1.data.length; i += 4) {
+                    const diff = Math.abs(data1.data[i] - data2.data[i]);
+                    // Tăng cường độ tương phản khác biệt để dễ nhìn
+                    const val = diff > 20 ? 255 : 0; 
+                    outputData.data[i] = val;
+                    outputData.data[i+1] = val;
+                    outputData.data[i+2] = val;
+                    outputData.data[i+3] = 255;
+                }
+            };
+
+            useEffect(() => {
+                // 1. Vẽ Ảnh Tham Chiếu (Reference Image)
+                const cRef = refCanvas.current;
+                const ctxRef = cRef.getContext('2d');
+                drawScene(ctxRef);
+                const dataRef = ctxRef.getImageData(0, 0, SIZE, SIZE);
+
+                // 2. Vẽ Ảnh Đầu Vào (Input Image - Bị méo/Xoay)
+                const cInp = inputCanvas.current;
+                const ctxInp = cInp.getContext('2d');
+                ctxInp.fillStyle = '#000'; // Nền ngoài
+                ctxInp.fillRect(0, 0, SIZE, SIZE);
+                
+                ctxInp.save();
+                if (!isRegistered) {
+                    // Áp dụng phép biến đổi hình học (Làm lệch ảnh)
+                    ctxInp.translate(20, -10); // Dịch
+                    ctxInp.rotate(0.15); // Xoay khoảng 8 độ
+                    ctxInp.scale(0.9, 0.9); // Thu nhỏ
+                }
+                drawScene(ctxInp);
+                ctxInp.restore();
+                
+                // Cần lấy imageData sau khi vẽ
+                const dataInp = ctxInp.getImageData(0, 0, SIZE, SIZE);
+
+                // 3. Tính toán Ảnh Khác biệt (Difference)
+                const cDiff = diffCanvas.current;
+                const ctxDiff = cDiff.getContext('2d');
+                const dataDiff = ctxDiff.createImageData(SIZE, SIZE);
+                
+                calculateDifference(dataRef, dataInp, dataDiff);
+                ctxDiff.putImageData(dataDiff, 0, 0);
+
+            }, [isRegistered]);
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-amber-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-amber-400">3. Căn Chỉnh Ảnh (Image Registration)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Ứng dụng cực kỳ quan trọng để dóng hàng (align) các bức ảnh chụp cùng một cảnh nhưng ở góc độ, thời gian, hoặc thiết bị khác nhau (Ví dụ: Ảnh vệ tinh, Ảnh MRI ghép với PET). Thuật toán sẽ tìm các <b>Điểm mốc (Tie points / Control points)</b> tương đồng giữa hai ảnh để tính toán ra Ma trận biến đổi hình học, rồi "nắn" ảnh đầu vào cho khớp với ảnh tham chiếu.
+                    </p>
+
+                    <div className="flex flex-col items-center">
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 w-full max-w-4xl">
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-white font-bold mb-2 text-sm text-center">Ảnh Tham chiếu<br/>(Reference Image)</h4>
+                                <canvas ref={refCanvas} width={SIZE} height={SIZE} className="border-4 border-slate-600 rounded-lg shadow-xl w-full max-w-[200px]"></canvas>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-white font-bold mb-2 text-sm text-center">Ảnh Đầu vào<br/>(Input Image)</h4>
+                                <div className="relative">
+                                    <canvas ref={inputCanvas} width={SIZE} height={SIZE} className={`border-4 rounded-lg shadow-xl w-full max-w-[200px] transition-all duration-700 ${isRegistered ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]' : 'border-red-500'}`}></canvas>
+                                    {!isRegistered && (
+                                        <div className="absolute inset-0 border-2 border-red-500/50 border-dashed rounded-lg animate-pulse pointer-events-none"></div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-white font-bold mb-2 text-sm text-center">Ảnh Hiệu số<br/>(Difference)</h4>
+                                <canvas ref={diffCanvas} width={SIZE} height={SIZE} className="border-4 border-slate-600 rounded-lg shadow-xl w-full max-w-[200px] bg-black"></canvas>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 w-full max-w-2xl flex flex-col items-center">
+                            {!isRegistered ? (
+                                <>
+                                    <p className="text-slate-300 text-sm mb-4 text-center">
+                                        Hiện tại, <b>Ảnh Đầu vào</b> đang bị lệch (xoay và dịch chuyển). <br/>
+                                        Bạn có thể thấy <b>Ảnh Hiệu số</b> xuất hiện rất nhiều vệt trắng thể hiện sự sai lệch (Registration errors).
+                                    </p>
+                                    <button 
+                                        onClick={() => setIsRegistered(true)}
+                                        className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-full shadow-[0_0_15px_rgba(217,119,6,0.5)] transition-all transform hover:scale-105"
+                                    >
+                                        Thực thi thuật toán Căn chỉnh (Register)
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-emerald-300 text-sm mb-4 text-center font-bold">
+                                        Thành công! Ảnh Đầu vào đã được "nắn" lại khớp hoàn toàn với Ảnh Tham chiếu. <br/>
+                                        Ảnh Hiệu số lúc này chuyển sang màu đen (Sai số gần như bằng 0).
+                                    </p>
+                                    <button 
+                                        onClick={() => setIsRegistered(false)}
+                                        className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-6 rounded-full transition-all"
+                                    >
+                                        Làm lệch ảnh lại (Reset)
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+
+        // ==============================================================================
+        // MAIN APP COMPONENT
+        // ==============================================================================
+        const App = () => {
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1200px] mx-auto space-y-8">
+                    <header className="text-center space-y-4 mb-6 border-b border-slate-700 pb-6">
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="gradient-text">Toán Học: Vector và Căn Chỉnh Ảnh</span>
+                        </h1>
+                        <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                            Mô phỏng minh họa Giáo trình (Từ phương trình 2-48 đến 2-54): Biểu diễn Điểm ảnh dưới dạng Vector 3D, Tính toán Khoảng cách và Mô phỏng Đăng ký Ảnh.
+                        </p>
+                    </header>
+
+                    <RGBVectorSim />
+                    <VectorMathSim />
+                    <ImageRegistrationSim />
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
