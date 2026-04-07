@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Các Phép Toán Không Gian (Phần 2.6)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .gradient-text { background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc); -webkit-background-clip: text; color: transparent; }
+        
+        .math-expr { font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-weight: bold; }
+        .math-block { display: block; font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 0.5rem; text-align: center; margin: 1rem 0; font-size: 1.1rem; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; margin-top: -6px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #475569; border-radius: 3px; }
+        
+        .matrix-bracket { position: relative; padding: 0 15px; display: inline-block; }
+        .matrix-bracket::before, .matrix-bracket::after { content: ''; position: absolute; top: -5px; bottom: -5px; width: 10px; border: 2px solid #94a3b8; }
+        .matrix-bracket::before { left: 0; border-right: none; }
+        .matrix-bracket::after { right: 0; border-left: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==============================================================================
+        // PHẦN 1: SINGLE-PIXEL OPERATIONS (Hình 2.38)
+        // ==============================================================================
+        const SinglePixelSim = () => {
+            const [z, setZ] = useState(100);
+            const s = 255 - z; // Transformation function: Negative
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-blue-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-blue-400">1. Các phép toán Điểm ảnh đơn (Single-Pixel Operations)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Là phép toán đơn giản nhất, làm thay đổi cường độ của từng pixel độc lập bằng một hàm biến đổi <span className="math-expr">s = T(z)</span>. 
+                        Trong đó <span className="math-expr">z</span> là cường độ cũ, <span className="math-expr">s</span> là cường độ mới. 
+                        Ví dụ kinh điển là <b>Ảnh âm bản (Negative)</b>.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                        <div className="bg-slate-900 p-6 rounded-xl border border-slate-700">
+                            <h4 className="text-white font-bold mb-4 text-center">Mô phỏng Đồ thị T(z)</h4>
+                            <div className="relative w-full h-[250px] bg-slate-800 border-l-2 border-b-2 border-slate-500">
+                                {/* Trục */}
+                                <div className="absolute -left-6 top-0 text-xs text-slate-400">255</div>
+                                <div className="absolute -left-4 bottom-0 text-xs text-slate-400">0</div>
+                                <div className="absolute right-0 -bottom-6 text-xs text-slate-400">255</div>
+                                <div className="absolute -left-12 top-1/2 -rotate-90 text-sm font-mono text-cyan-400">s (Mới)</div>
+                                <div className="absolute bottom-[-30px] left-1/2 -translate-x-1/2 text-sm font-mono text-slate-300">z (Gốc)</div>
+
+                                {/* Đường thẳng s = 255 - z */}
+                                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 255 255" preserveAspectRatio="none">
+                                    <line x1="0" y1="0" x2="255" y2="255" stroke="#3b82f6" strokeWidth="3" />
+                                    {/* Nét đứt mapping */}
+                                    <line x1={z} y1="255" x2={z} y2={z} stroke="#10b981" strokeWidth="2" strokeDasharray="5,5" />
+                                    <line x1={z} y1={z} x2="0" y2={z} stroke="#10b981" strokeWidth="2" strokeDasharray="5,5" />
+                                    <circle cx={z} cy={z} r="4" fill="#f59e0b" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                                <label className="flex justify-between text-sm font-bold text-slate-300 mb-2">
+                                    <span>Cường độ Gốc (z)</span>
+                                    <span className="text-white font-mono">{z}</span>
+                                </label>
+                                <input type="range" min="0" max="255" value={z} onChange={(e) => setZ(Number(e.target.value))} />
+                            </div>
+
+                            <div className="flex items-center justify-between bg-black/30 p-4 rounded-lg border border-slate-600">
+                                <div className="flex flex-col items-center">
+                                    <div className="text-xs text-slate-400 mb-2">Pixel Gốc (z)</div>
+                                    <div className="w-16 h-16 rounded border border-slate-500 shadow-lg" style={{ backgroundColor: `rgb(${z},${z},${z})` }}></div>
+                                </div>
+                                <div className="text-2xl font-mono text-slate-500">→</div>
+                                <div className="flex flex-col items-center">
+                                    <div className="text-xs text-slate-400 mb-2">Pixel Mới (s = 255 - z)</div>
+                                    <div className="w-16 h-16 rounded border border-slate-500 shadow-[0_0_15px_rgba(56,189,248,0.4)]" style={{ backgroundColor: `rgb(${s},${s},${s})` }}></div>
+                                    <div className="mt-2 font-mono font-bold text-cyan-400">{s}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==============================================================================
+        // PHẦN 2: NEIGHBORHOOD OPERATIONS (Hình 2.39)
+        // ==============================================================================
+        const NeighborhoodSim = () => {
+            const [kernelSize, setKernelSize] = useState(1); // 1, 3, 5, 9, 15
+            const canvasOrigRef = useRef(null);
+            const canvasBlurRef = useRef(null);
+            
+            const SIZE = 150;
+
+            useEffect(() => {
+                // Tạo ảnh gốc (Chi tiết sắc nét như mạch máu)
+                const canvas = canvasOrigRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#111'; ctx.fillRect(0, 0, SIZE, SIZE);
+                
+                // Vẽ các đường nét đứt và chấm (Noise & Details)
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(50, 20); ctx.lineTo(100, 130); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(90, 30); ctx.lineTo(40, 120); ctx.stroke();
+                for(let i=0; i<50; i++) {
+                    ctx.fillStyle = Math.random() > 0.5 ? '#fff' : '#888';
+                    ctx.fillRect(Math.random()*SIZE, Math.random()*SIZE, 2, 2);
+                }
+                const origData = ctx.getImageData(0, 0, SIZE, SIZE);
+
+                // Nếu kernel = 1 (Không làm mờ)
+                const ctxBlur = canvasBlurRef.current.getContext('2d');
+                if (kernelSize === 1) {
+                    ctxBlur.putImageData(origData, 0, 0);
+                    return;
+                }
+
+                // Thuật toán Box Blur (Trung bình lân cận mxn)
+                const blurData = ctxBlur.createImageData(SIZE, SIZE);
+                const half = Math.floor(kernelSize / 2);
+                
+                for (let y = 0; y < SIZE; y++) {
+                    for (let x = 0; x < SIZE; x++) {
+                        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+                        
+                        // Quét vùng lân cận m x n
+                        for (let ky = -half; ky <= half; ky++) {
+                            for (let kx = -half; kx <= half; kx++) {
+                                const nx = x + kx;
+                                const ny = y + ky;
+                                // Kẹp biên
+                                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                                    const idx = (ny * SIZE + nx) * 4;
+                                    sumR += origData.data[idx];
+                                    sumG += origData.data[idx+1];
+                                    sumB += origData.data[idx+2];
+                                    count++;
+                                }
+                            }
+                        }
+                        
+                        const i = (y * SIZE + x) * 4;
+                        blurData.data[i] = sumR / count;
+                        blurData.data[i+1] = sumG / count;
+                        blurData.data[i+2] = sumB / count;
+                        blurData.data[i+3] = 255;
+                    }
+                }
+                ctxBlur.putImageData(blurData, 0, 0);
+            }, [kernelSize]);
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-emerald-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-emerald-400">2. Các phép toán Lân cận (Neighborhood Operations)</h3>
+                    <div className="bg-slate-800/60 p-5 rounded-xl border border-slate-600 mb-6 text-sm text-slate-300">
+                        <p>Giá trị của điểm ảnh mới không chỉ phụ thuộc vào điểm ảnh cũ tại đó, mà là <b>hàm của toàn bộ các điểm ảnh nằm trong vùng lân cận (S_xy)</b> xung quanh nó. Ví dụ điển hình nhất là <b>Làm mờ (Local Averaging)</b> để khử nhiễu hột (noise/blobs).</p>
+                        <div className="math-block text-emerald-300">
+                            g(x,y) = (1 / mn) ∑ f(r,c)
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row gap-8 items-center">
+                        <div className="flex gap-4">
+                            <div className="text-center">
+                                <canvas ref={canvasOrigRef} width={SIZE} height={SIZE} className="border border-slate-500 rounded bg-black"></canvas>
+                                <div className="text-xs text-slate-400 mt-2 font-mono">Ảnh Gốc f(x,y)</div>
+                            </div>
+                            <div className="flex flex-col justify-center text-2xl text-slate-500">→</div>
+                            <div className="text-center">
+                                <canvas ref={canvasBlurRef} width={SIZE} height={SIZE} className="border border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] rounded bg-black"></canvas>
+                                <div className="text-xs text-emerald-400 font-bold mt-2 font-mono">Ảnh Đích g(x,y)</div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 w-full bg-slate-900 p-6 rounded-xl border border-slate-700">
+                            <label className="flex justify-between text-sm font-bold text-white mb-4">
+                                <span>Kích thước vùng lân cận (m × n)</span>
+                                <span className="text-emerald-400">{kernelSize} × {kernelSize}</span>
+                            </label>
+                            <input type="range" min="1" max="15" step="2" value={kernelSize} onChange={(e)=>setKernelSize(Number(e.target.value))} />
+                            <div className="mt-4 text-xs text-slate-400 leading-relaxed">
+                                Khi m, n càng lớn (vùng lân cận càng to), hiệu ứng làm mờ càng mạnh, các chi tiết nhỏ biến mất hoàn toàn. Trong sách, ví dụ nội soi động mạch chủ (Hình 2.39) dùng vùng lân cận cực lớn lên tới <span className="text-white">41 × 41</span>.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==============================================================================
+        // PHẦN 3: GEOMETRIC TRANSFORMATIONS (AFFINE) - THE CORE
+        // ==============================================================================
+        const GeometricSim = () => {
+            const [transformType, setTransformType] = useState('Identity');
+            
+            // Tham số Affine
+            const [cx, setCx] = useState(1.5); // Scale X
+            const [cy, setCy] = useState(0.8); // Scale Y
+            const [angle, setAngle] = useState(-21); // Rotation (degrees)
+            const [tx, setTx] = useState(30);  // Translate X
+            const [ty, setTy] = useState(20);  // Translate Y
+            const [sv, setSv] = useState(0.5); // Shear Vertical
+            const [sh, setSh] = useState(0.5); // Shear Horizontal
+
+            const canvasRef = useRef(null);
+            const W = 300, H = 300;
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                
+                // Clear và vẽ lưới tọa độ
+                ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+                ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, W, H);
+                
+                // Lưới (Grid)
+                ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+                for(let i=0; i<W; i+=25) {
+                    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,H); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(W,i); ctx.stroke();
+                }
+
+                // Tâm hệ tọa độ (Origin) ở chính giữa
+                const originX = W/2, originY = H/2;
+                ctx.strokeStyle = '#475569'; ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, H); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(W, originY); ctx.stroke();
+
+                // Lấy ma trận Affine dựa trên lựa chọn
+                let a=1, b=0, c=0, d=1, e=0, f=0;
+
+                if (transformType === 'Scaling') {
+                    a = cx; d = cy;
+                } else if (transformType === 'Rotation') {
+                    const rad = angle * Math.PI / 180;
+                    a = Math.cos(rad); c = -Math.sin(rad);
+                    b = Math.sin(rad); d = Math.cos(rad);
+                } else if (transformType === 'Translation') {
+                    e = tx; f = ty;
+                } else if (transformType === 'ShearV') {
+                    b = sv;
+                } else if (transformType === 'ShearH') {
+                    c = sh;
+                }
+
+                // Để biến đổi quanh tâm Canvas thay vì góc trên-trái, ta tịnh tiến hệ tọa độ
+                ctx.translate(originX, originY);
+                // ÁP DỤNG MA TRẬN AFFINE
+                ctx.transform(a, b, c, d, e, f);
+                
+                // Vẽ chữ 'T' huyền thoại (Mô phỏng hình 2.40 và Table 2.3)
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                // Canh giữa chữ T quanh tâm (0,0)
+                ctx.fillRect(-40, -50, 80, 20); // Thanh ngang
+                ctx.fillRect(-10, -30, 20, 80); // Thanh dọc
+
+                // Viền cho rõ ràng
+                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+                ctx.strokeRect(-40, -50, 80, 20);
+                ctx.strokeRect(-10, -30, 20, 80);
+
+            }, [transformType, cx, cy, angle, tx, ty, sv, sh]);
+
+            // Trả về UI hiển thị Ma trận Affine 3x3 tương ứng
+            const renderMatrixMath = () => {
+                let a11=1, a12=0, a13=0;
+                let a21=0, a22=1, a23=0;
+                
+                if (transformType === 'Scaling') { a11 = cx.toFixed(1); a22 = cy.toFixed(1); }
+                if (transformType === 'Rotation') { 
+                    const rad = angle * Math.PI/180;
+                    a11 = Math.cos(rad).toFixed(2); a12 = (-Math.sin(rad)).toFixed(2);
+                    a21 = Math.sin(rad).toFixed(2); a22 = Math.cos(rad).toFixed(2);
+                }
+                if (transformType === 'Translation') { a13 = tx; a23 = ty; }
+                if (transformType === 'ShearV') { a21 = sv.toFixed(1); }
+                if (transformType === 'ShearH') { a12 = sh.toFixed(1); }
+
+                return (
+                    <div className="flex items-center justify-center gap-4 mt-6">
+                        <div className="matrix-bracket">
+                            <div className="flex flex-col gap-1 text-center font-mono text-cyan-300">
+                                <div>x'</div><div>y'</div><div>1</div>
+                            </div>
+                        </div>
+                        <div className="text-xl font-bold text-white">=</div>
+                        <div className="matrix-bracket bg-black/40 p-2 rounded">
+                            <div className="grid grid-cols-3 gap-x-6 gap-y-2 text-center font-mono text-amber-300 font-bold">
+                                <div>{a11}</div><div>{a12}</div><div className="text-pink-400">{a13}</div>
+                                <div>{a21}</div><div>{a22}</div><div className="text-pink-400">{a23}</div>
+                                <div className="text-slate-500">0</div><div className="text-slate-500">0</div><div className="text-slate-500">1</div>
+                            </div>
+                        </div>
+                        <div className="matrix-bracket">
+                            <div className="flex flex-col gap-1 text-center font-mono text-slate-300">
+                                <div>x</div><div>y</div><div>1</div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-amber-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-amber-400">3. Phép biến đổi Hình học (Geometric Affine Transforms)</h3>
+                    <div className="bg-slate-800/60 p-5 rounded-xl border border-slate-600 mb-6 text-sm text-slate-300">
+                        <p>Còn được gọi là phép biến đổi "tấm cao su" (rubber-sheet). Nó thay đổi sự sắp xếp không gian của pixel bằng một <b>Ma trận Affine 3x3</b>. Tính chất quan trọng nhất của Affine là: <b>Bảo toàn các đường thẳng và mặt phẳng (straight lines and planes)</b>.</p>
+                        <div className="math-block text-amber-200">
+                            [x', y', 1]ᵀ = A × [x, y, 1]ᵀ
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row gap-8 items-start">
+                        {/* Canvas Hiển thị */}
+                        <div className="w-full lg:w-auto flex flex-col items-center">
+                            <div className="border-4 border-slate-600 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                                <canvas ref={canvasRef} width={W} height={H} className="bg-slate-900"></canvas>
+                            </div>
+                            <div className="text-xs text-slate-400 mt-2 font-mono text-center">
+                                Gốc tọa độ (0,0) nằm ở tâm.<br/>Hình "T" được ánh xạ theo Inverse Mapping.
+                            </div>
+                        </div>
+
+                        {/* Điều khiển */}
+                        <div className="flex-1 w-full bg-slate-900 p-6 rounded-xl border border-slate-700">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+                                <button onClick={() => setTransformType('Identity')} className={`p-2 text-sm rounded border ${transformType==='Identity'?'bg-amber-600 text-white border-amber-400':'bg-slate-800 text-slate-400 border-slate-600'}`}>Identity (Gốc)</button>
+                                <button onClick={() => setTransformType('Scaling')} className={`p-2 text-sm rounded border ${transformType==='Scaling'?'bg-amber-600 text-white border-amber-400':'bg-slate-800 text-slate-400 border-slate-600'}`}>Scaling (Co giãn)</button>
+                                <button onClick={() => setTransformType('Rotation')} className={`p-2 text-sm rounded border ${transformType==='Rotation'?'bg-amber-600 text-white border-amber-400':'bg-slate-800 text-slate-400 border-slate-600'}`}>Rotation (Xoay)</button>
+                                <button onClick={() => setTransformType('Translation')} className={`p-2 text-sm rounded border ${transformType==='Translation'?'bg-amber-600 text-white border-amber-400':'bg-slate-800 text-slate-400 border-slate-600'}`}>Translation (Dịch)</button>
+                                <button onClick={() => setTransformType('ShearV')} className={`p-2 text-sm rounded border ${transformType==='ShearV'?'bg-amber-600 text-white border-amber-400':'bg-slate-800 text-slate-400 border-slate-600'}`}>Shear Vert (Trượt dọc)</button>
+                                <button onClick={() => setTransformType('ShearH')} className={`p-2 text-sm rounded border ${transformType==='ShearH'?'bg-amber-600 text-white border-amber-400':'bg-slate-800 text-slate-400 border-slate-600'}`}>Shear Horz (Trượt ngang)</button>
+                            </div>
+
+                            {/* Sliders theo từng loại */}
+                            <div className="h-[120px] flex flex-col justify-center">
+                                {transformType === 'Scaling' && (
+                                    <>
+                                        <div className="flex items-center gap-4 mb-2"><span className="w-16 text-xs font-bold text-white">cx (X):</span> <input type="range" min="-2" max="3" step="0.1" value={cx} onChange={e=>setCx(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-8">{cx.toFixed(1)}</span></div>
+                                        <div className="flex items-center gap-4"><span className="w-16 text-xs font-bold text-white">cy (Y):</span> <input type="range" min="-2" max="3" step="0.1" value={cy} onChange={e=>setCy(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-8">{cy.toFixed(1)}</span></div>
+                                        <div className="text-xs text-slate-500 mt-2 italic">Mẹo: Nếu set c=-1 sẽ tạo hiệu ứng Lật (Reflection).</div>
+                                    </>
+                                )}
+                                {transformType === 'Rotation' && (
+                                    <>
+                                        <div className="flex items-center gap-4"><span className="w-20 text-xs font-bold text-white">Góc θ:</span> <input type="range" min="-180" max="180" step="1" value={angle} onChange={e=>setAngle(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-12">{angle}°</span></div>
+                                        <div className="text-xs text-slate-500 mt-4 italic">Ví dụ 2.9 trong sách xoay -21°.</div>
+                                    </>
+                                )}
+                                {transformType === 'Translation' && (
+                                    <>
+                                        <div className="flex items-center gap-4 mb-2"><span className="w-16 text-xs font-bold text-white">tx (X):</span> <input type="range" min="-100" max="100" step="1" value={tx} onChange={e=>setTx(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-8">{tx}</span></div>
+                                        <div className="flex items-center gap-4"><span className="w-16 text-xs font-bold text-white">ty (Y):</span> <input type="range" min="-100" max="100" step="1" value={ty} onChange={e=>setTy(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-8">{ty}</span></div>
+                                    </>
+                                )}
+                                {transformType === 'ShearV' && (
+                                    <div className="flex items-center gap-4"><span className="w-20 text-xs font-bold text-white">Trượt S_v:</span> <input type="range" min="-2" max="2" step="0.1" value={sv} onChange={e=>setSv(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-8">{sv.toFixed(1)}</span></div>
+                                )}
+                                {transformType === 'ShearH' && (
+                                    <div className="flex items-center gap-4"><span className="w-20 text-xs font-bold text-white">Trượt S_h:</span> <input type="range" min="-2" max="2" step="0.1" value={sh} onChange={e=>setSh(Number(e.target.value))} /> <span className="text-amber-400 font-mono w-8">{sh.toFixed(1)}</span></div>
+                                )}
+                                {transformType === 'Identity' && (
+                                    <div className="text-center text-slate-400 italic text-sm">Ma trận gốc, giữ nguyên ảnh.</div>
+                                )}
+                            </div>
+
+                            {/* Hiển thị Ma trận */}
+                            <div className="mt-4 pt-4 border-t border-slate-700">
+                                <h4 className="text-center text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Ma Trận Affine Tương Ứng (Table 2.3)</h4>
+                                {renderMatrixMath()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==============================================================================
+        // MAIN APP COMPONENT
+        // ==============================================================================
+        const App = () => {
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1200px] mx-auto space-y-8">
+                    <header className="text-center space-y-4 mb-6 border-b border-slate-700 pb-6">
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="gradient-text">Các Phép Toán Không Gian</span>
+                        </h1>
+                        <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                            Mô phỏng tương tác: Phép biến đổi cường độ, Lọc lân cận và Biến đổi Hình học Affine (Bảng 2.3).
+                        </p>
+                    </header>
+
+                    <SinglePixelSim />
+                    <NeighborhoodSim />
+                    <GeometricSim />
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
