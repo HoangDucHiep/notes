@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phép Biến Đổi Ảnh & Thống Kê (Phần 2.6)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .gradient-text { background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc); -webkit-background-clip: text; color: transparent; }
+        
+        .math-expr { font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-weight: bold; }
+        .math-block { display: block; font-family: 'Courier New', Courier, monospace; color: #a7f3d0; background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 0.5rem; text-align: center; margin: 1rem 0; font-size: 1.1rem; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; margin-top: -6px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #475569; border-radius: 3px; }
+        
+        /* Flowchart styles */
+        .flow-box { border: 2px solid #38bdf8; background: rgba(15, 23, 42, 0.8); padding: 1rem; border-radius: 0.5rem; text-align: center; min-width: 120px; z-index: 10; position: relative; }
+        .flow-arrow { flex: 1; height: 2px; background: #38bdf8; position: relative; min-width: 40px; }
+        .flow-arrow::after { content: ''; position: absolute; right: 0; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 10px solid #38bdf8; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==============================================================================
+        // PHẦN 1: IMAGE TRANSFORMS (Hình 2.44 & 2.45)
+        // ==============================================================================
+        
+        // Sơ đồ hệ thống (Hình 2.44)
+        const TransformFlowchart = () => (
+            <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 mb-8 overflow-x-auto shadow-inner">
+                <h4 className="text-white font-bold text-center mb-6">Hình 2.44: Cách tiếp cận tổng quát trong Miền Biến đổi (Transform Domain)</h4>
+                <div className="flex items-center justify-between min-w-[700px] max-w-[900px] mx-auto mt-4 px-4 pb-8 relative">
+                    
+                    {/* Đường phân cách Miền không gian / Miền biến đổi */}
+                    <div className="absolute bottom-2 left-0 w-[20%] text-center text-sm font-bold text-emerald-400 border-t border-emerald-500/50 pt-2">Spatial domain</div>
+                    <div className="absolute bottom-2 left-[20%] w-[60%] text-center text-sm font-bold text-purple-400 border-t border-purple-500/50 pt-2">Transform domain</div>
+                    <div className="absolute bottom-2 right-0 w-[20%] text-center text-sm font-bold text-emerald-400 border-t border-emerald-500/50 pt-2">Spatial domain</div>
+
+                    <div className="text-center font-mono text-emerald-300 font-bold mr-2">f(x,y)</div>
+                    <div className="flow-arrow"></div>
+                    <div className="flow-box">
+                        <div className="text-white font-bold">Transform</div>
+                        <div className="text-xs text-slate-400">(VD: Fourier)</div>
+                    </div>
+                    <div className="flow-arrow"><div className="absolute -top-6 w-full text-center text-xs font-mono text-purple-300">T(u,v)</div></div>
+                    <div className="flow-box border-purple-500 bg-purple-900/30">
+                        <div className="text-purple-300 font-bold">Operation R</div>
+                        <div className="text-xs text-purple-400">(Bộ Lọc / Filter)</div>
+                    </div>
+                    <div className="flow-arrow"><div className="absolute -top-6 w-full text-center text-xs font-mono text-purple-300">R[T(u,v)]</div></div>
+                    <div className="flow-box">
+                        <div className="text-white font-bold">Inverse<br/>Transform</div>
+                    </div>
+                    <div className="flow-arrow"></div>
+                    <div className="text-center font-mono text-emerald-300 font-bold ml-2">g(x,y)</div>
+                </div>
+            </div>
+        );
+
+        // Mô phỏng Khử nhiễu Fourier (Ví dụ 2.11 - Hình 2.45)
+        const FourierFilterSim = () => {
+            const [noiseFreq, setNoiseFreq] = useState(30); // Tần số dải nhiễu
+            const [noiseAngle, setNoiseAngle] = useState(45); // Góc của dải nhiễu
+            const [filterOn, setFilterOn] = useState(false);
+
+            const SIZE = 256;
+            const canvasSpatialRef = useRef(null);
+            const canvasSpectrumRef = useRef(null);
+            const canvasMaskRef = useRef(null);
+            const canvasResultRef = useRef(null);
+
+            useEffect(() => {
+                // HÀM TIỆN ÍCH: Vẽ cảnh nền (Mô phỏng mặt trăng/ảnh NASA)
+                const drawBaseScene = (ctx) => {
+                    ctx.fillStyle = '#1e293b'; // Bầu trời tối
+                    ctx.fillRect(0, 0, SIZE, SIZE);
+                    
+                    // Đất mặt trăng
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.moveTo(0, SIZE/2 + 20);
+                    ctx.quadraticCurveTo(SIZE/2, SIZE/2 - 20, SIZE, SIZE/2 + 40);
+                    ctx.lineTo(SIZE, SIZE);
+                    ctx.lineTo(0, SIZE);
+                    ctx.fill();
+
+                    // Tảng đá
+                    ctx.fillStyle = '#475569';
+                    ctx.beginPath();
+                    ctx.moveTo(SIZE - 80, SIZE);
+                    ctx.lineTo(SIZE - 120, SIZE - 60);
+                    ctx.lineTo(SIZE - 40, SIZE - 90);
+                    ctx.lineTo(SIZE - 10, SIZE - 40);
+                    ctx.lineTo(SIZE, SIZE);
+                    ctx.fill();
+                    
+                    // Highlight tảng đá
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.beginPath();
+                    ctx.moveTo(SIZE - 120, SIZE - 60);
+                    ctx.lineTo(SIZE - 80, SIZE - 80);
+                    ctx.lineTo(SIZE - 40, SIZE - 90);
+                    ctx.lineTo(SIZE - 50, SIZE - 50);
+                    ctx.fill();
+                };
+
+                // TẠO ẢNH GỐC CÓ NHIỄU (f(x,y))
+                const cSpatial = canvasSpatialRef.current;
+                const ctxSpatial = cSpatial.getContext('2d');
+                drawBaseScene(ctxSpatial);
+                
+                const imgData = ctxSpatial.getImageData(0, 0, SIZE, SIZE);
+                const data = imgData.data;
+
+                // Tính toán tham số sóng sin 2D
+                const rad = noiseAngle * Math.PI / 180;
+                const u0 = noiseFreq * Math.cos(rad);
+                const v0 = noiseFreq * Math.sin(rad);
+
+                for (let y = 0; y < SIZE; y++) {
+                    for (let x = 0; x < SIZE; x++) {
+                        const i = (y * SIZE + x) * 4;
+                        
+                        // Thêm nhiễu hình sin (Sinusoidal interference)
+                        const noise = 60 * Math.sin(2 * Math.PI * (u0 * x + v0 * y) / SIZE);
+                        
+                        data[i] = Math.max(0, Math.min(255, data[i] + noise));
+                        data[i+1] = Math.max(0, Math.min(255, data[i+1] + noise));
+                        data[i+2] = Math.max(0, Math.min(255, data[i+2] + noise));
+                    }
+                }
+                ctxSpatial.putImageData(imgData, 0, 0);
+
+                // TẠO PHỔ FOURIER GIẢ LẬP (|T(u,v)|)
+                // Trong thực tế cần chạy thuật toán FFT, nhưng trên web để real-time ta sẽ mô phỏng hình ảnh phổ
+                const cSpec = canvasSpectrumRef.current;
+                const ctxSpec = cSpec.getContext('2d');
+                ctxSpec.fillStyle = '#0f172a'; // Nền đen
+                ctxSpec.fillRect(0, 0, SIZE, SIZE);
+                
+                // Thành phần DC (Ánh sáng nền) ở tâm
+                ctxSpec.fillStyle = '#ffffff';
+                ctxSpec.beginPath(); ctxSpec.arc(SIZE/2, SIZE/2, 2, 0, Math.PI*2); ctxSpec.fill();
+                // Quầng sáng quanh tâm (Năng lượng tần số thấp của cảnh)
+                const grad = ctxSpec.createRadialGradient(SIZE/2, SIZE/2, 0, SIZE/2, SIZE/2, 40);
+                grad.addColorStop(0, 'rgba(255,255,255,0.4)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctxSpec.fillStyle = grad; ctxSpec.fillRect(0, 0, SIZE, SIZE);
+
+                // 2 Đốm sáng đại diện cho Tần số nhiễu (Bursts of energy)
+                const dx = u0; const dy = v0;
+                ctxSpec.fillStyle = '#fde047'; // Màu vàng cho dễ nhìn
+                ctxSpec.beginPath(); ctxSpec.arc(SIZE/2 + dx, SIZE/2 + dy, 3, 0, Math.PI*2); ctxSpec.fill();
+                ctxSpec.beginPath(); ctxSpec.arc(SIZE/2 - dx, SIZE/2 - dy, 3, 0, Math.PI*2); ctxSpec.fill();
+                
+                // Mũi tên chỉ vào đốm nhiễu
+                ctxSpec.strokeStyle = '#38bdf8'; ctxSpec.lineWidth = 1;
+                ctxSpec.beginPath(); ctxSpec.moveTo(SIZE/2 - 40, SIZE/2 + 20); ctxSpec.lineTo(SIZE/2 - dx, SIZE/2 - dy); ctxSpec.stroke();
+                
+                // TẠO BỘ LỌC (FILTER MASK - H(u,v))
+                const cMask = canvasMaskRef.current;
+                const ctxMask = cMask.getContext('2d');
+                ctxMask.fillStyle = '#ffffff'; // Pass tất cả (1)
+                ctxMask.fillRect(0, 0, SIZE, SIZE);
+                
+                // Chấm đen để chặn tần số nhiễu (0)
+                if (filterOn) {
+                    ctxMask.fillStyle = '#000000';
+                    ctxMask.beginPath(); ctxMask.arc(SIZE/2 + dx, SIZE/2 + dy, 8, 0, Math.PI*2); ctxMask.fill();
+                    ctxMask.beginPath(); ctxMask.arc(SIZE/2 - dx, SIZE/2 - dy, 8, 0, Math.PI*2); ctxMask.fill();
+                }
+
+                // TẠO ẢNH KẾT QUẢ (g(x,y) - Inverse Transform)
+                const cRes = canvasResultRef.current;
+                const ctxRes = cRes.getContext('2d');
+                if (filterOn) {
+                    // Đã lọc nhiễu => Trả về ảnh sạch
+                    drawBaseScene(ctxRes);
+                } else {
+                    // Chưa lọc => Copy nguyên ảnh gốc có nhiễu
+                    ctxRes.putImageData(imgData, 0, 0);
+                }
+
+            }, [noiseFreq, noiseAngle, filterOn]);
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-blue-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-blue-400">1. Xử lý ảnh trong Miền Biến đổi (Image Transforms)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Ví dụ 2.11: Một số loại nhiễu (như nhiễu sóng sin do từ trường máy móc) rất khó xóa trên không gian Pixel. 
+                        Nhưng khi dùng <b>Biến đổi Fourier (Fourier Transform)</b> chuyển sang <b>Miền Tần số (Frequency Domain)</b>, nhiễu sóng sin lập tức hiện hình thành 2 "đốm sáng" (bursts of energy) tách biệt hoàn toàn khỏi tâm. 
+                        Ta chỉ cần tạo một mặt nạ (Mask) đục lỗ đen đè lên 2 đốm sáng đó, rồi dịch ngược (Inverse Transform) về ảnh ban đầu. Nhiễu sẽ bốc hơi hoàn toàn!
+                    </p>
+
+                    <TransformFlowchart />
+
+                    <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-emerald-400 font-bold mb-2 text-sm">f(x,y): Ảnh bị nhiễu</h4>
+                                <canvas ref={canvasSpatialRef} width={256} height={256} className="w-full max-w-[200px] border-2 border-slate-600 rounded bg-black aspect-square"></canvas>
+                                <div className="text-xs text-slate-400 mt-2 text-center">(a) Nhiễu dạng sóng <br/>lan tràn khắp ảnh</div>
+                            </div>
+
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-purple-400 font-bold mb-2 text-sm">|T(u,v)|: Phổ Fourier</h4>
+                                <canvas ref={canvasSpectrumRef} width={256} height={256} className="w-full max-w-[200px] border-2 border-purple-500/50 rounded bg-black aspect-square"></canvas>
+                                <div className="text-xs text-slate-400 mt-2 text-center">(b) Phổ tần số. <span className="text-yellow-400">Hai đốm</span><br/>là năng lượng của nhiễu.</div>
+                            </div>
+
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-purple-400 font-bold mb-2 text-sm">Bộ lọc H(u,v)</h4>
+                                <canvas ref={canvasMaskRef} width={256} height={256} className={`w-full max-w-[200px] border-2 rounded aspect-square transition-all ${filterOn ? 'border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'border-slate-600'}`}></canvas>
+                                <div className="text-xs text-slate-400 mt-2 text-center">(c) Trắng (1) = Giữ lại<br/>Đen (0) = Xóa bỏ</div>
+                            </div>
+
+                            <div className="flex flex-col items-center">
+                                <h4 className="text-emerald-400 font-bold mb-2 text-sm">g(x,y): Kết quả</h4>
+                                <canvas ref={canvasResultRef} width={256} height={256} className={`w-full max-w-[200px] border-2 rounded aspect-square transition-all ${filterOn ? 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'border-slate-600'}`}></canvas>
+                                <div className="text-xs text-slate-400 mt-2 text-center">(d) Đã dịch ngược<br/>về Miền Không gian</div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    {/* Bảng Điều Khiển Tương Tác */}
+                    <div className="flex flex-col md:flex-row gap-8 items-center bg-slate-800/80 p-6 rounded-xl border border-slate-600">
+                        <div className="flex-1 space-y-4 w-full">
+                            <div>
+                                <label className="flex justify-between text-sm font-bold text-white mb-2">
+                                    <span>Tần số nhiễu (Khoảng cách đốm)</span>
+                                    <span className="text-amber-400 font-mono">{noiseFreq}</span>
+                                </label>
+                                <input type="range" min="10" max="100" value={noiseFreq} onChange={e=>setNoiseFreq(Number(e.target.value))} />
+                            </div>
+                            <div>
+                                <label className="flex justify-between text-sm font-bold text-white mb-2">
+                                    <span>Góc của nhiễu (Góc xoay)</span>
+                                    <span className="text-amber-400 font-mono">{noiseAngle}°</span>
+                                </label>
+                                <input type="range" min="0" max="180" value={noiseAngle} onChange={e=>setNoiseAngle(Number(e.target.value))} />
+                            </div>
+                        </div>
+
+                        <div className="w-full md:w-auto flex flex-col items-center gap-3">
+                            <p className="text-xs text-slate-400 text-center max-w-[250px]">Kích hoạt Bộ Lọc để đục 2 lỗ đen trên Mask, đè lên phổ Fourier để triệt tiêu nhiễu.</p>
+                            <button 
+                                onClick={() => setFilterOn(!filterOn)}
+                                className={`px-8 py-4 rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-lg ${filterOn ? 'bg-emerald-500 text-white shadow-emerald-500/50' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                            >
+                                {filterOn ? 'ĐANG LỌC (FILTER ON)' : 'BẬT LỌC (FILTER OFF)'}
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        };
+
+        // ==============================================================================
+        // PHẦN 2: INTENSITIES AS RANDOM VARIABLES (Xác suất thống kê)
+        // ==============================================================================
+        const RandomVariablesSim = () => {
+            const [brightness, setBrightness] = useState(0); // Offset mean (-100 to +100)
+            const [contrast, setContrast] = useState(1); // Scale variance (0.1 to 3)
+            
+            const [stats, setStats] = useState({ mean: 0, variance: 0, stdDev: 0 });
+            const [histogram, setHistogram] = useState(new Array(256).fill(0));
+            
+            const canvasRef = useRef(null);
+            const histCanvasRef = useRef(null);
+            const SIZE = 150;
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const imgData = ctx.createImageData(SIZE, SIZE);
+                const data = imgData.data;
+
+                // Tạo mảng đếm tần suất (Histogram array)
+                const hist = new Array(256).fill(0);
+                let sum = 0;
+                let totalPixels = SIZE * SIZE;
+
+                for (let y = 0; y < SIZE; y++) {
+                    for (let x = 0; x < SIZE; x++) {
+                        const i = (y * SIZE + x) * 4;
+                        
+                        // Generative Noise + Gradient base
+                        let baseVal = 128 + (x - SIZE/2) * 0.5 + (Math.random() * 100 - 50);
+                        
+                        // Áp dụng Brightness (Mean shift) và Contrast (Variance scale)
+                        let val = 128 + (baseVal - 128) * contrast + brightness;
+                        
+                        // Kẹp biên 0-255
+                        val = Math.floor(Math.max(0, Math.min(255, val)));
+
+                        data[i] = val; data[i+1] = val; data[i+2] = val; data[i+3] = 255;
+                        
+                        hist[val]++;
+                        sum += val;
+                    }
+                }
+                ctx.putImageData(imgData, 0, 0);
+
+                // Tính toán thống kê theo công thức sách
+                const mean = sum / totalPixels;
+                let sumVariance = 0;
+                
+                // variance = Sum( (z - m)^2 * p(z) )
+                for (let k = 0; k < 256; k++) {
+                    const p_z = hist[k] / totalPixels; // Xác suất p(zk)
+                    sumVariance += Math.pow(k - mean, 2) * p_z;
+                }
+
+                setHistogram(hist);
+                setStats({ 
+                    mean: mean, 
+                    variance: sumVariance, 
+                    stdDev: Math.sqrt(sumVariance) 
+                });
+
+                // Vẽ Histogram Chart
+                const cHist = histCanvasRef.current;
+                const ctxH = cHist.getContext('2d');
+                ctxH.clearRect(0, 0, 256, 100);
+                
+                const maxCount = Math.max(...hist);
+                ctxH.fillStyle = '#f43f5e'; // Rose-500
+                for (let k = 0; k < 256; k++) {
+                    const h = (hist[k] / maxCount) * 100;
+                    ctxH.fillRect(k, 100 - h, 1, h);
+                }
+
+            }, [brightness, contrast]);
+
+            return (
+                <div className="glass-panel p-6 mt-6 border border-pink-500/30">
+                    <h3 className="text-2xl font-bold mb-4 text-pink-400">2. Cường độ Ảnh như một Biến Ngẫu Nhiên (Random Variables)</h3>
+                    <p className="text-sm text-slate-300 mb-6">
+                        Thay vì coi ảnh là một mảng tọa độ cứng nhắc, ta có thể coi giá trị cường độ (0-255) của các pixel như những <b>Biến ngẫu nhiên</b>. Khi đó, biểu đồ tần suất xuất hiện mức xám gọi là <b>Histogram</b>. Xác suất <span className="math-expr">p(zₖ) = nₖ / MN</span>.
+                    </p>
+
+                    <div className="flex flex-col lg:flex-row gap-8 items-start">
+                        
+                        {/* Khu vực tạo ảnh */}
+                        <div className="w-full lg:w-1/3 bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl flex flex-col items-center">
+                            <canvas ref={canvasRef} width={SIZE} height={SIZE} className="border border-slate-500 rounded bg-black w-full max-w-[200px] aspect-square"></canvas>
+                            
+                            <div className="w-full mt-6 space-y-4">
+                                <div>
+                                    <label className="flex justify-between text-xs font-bold text-white mb-1">
+                                        <span>Độ Sáng (Brightness)</span>
+                                        <span className="text-pink-400">{brightness > 0 ? '+'+brightness : brightness}</span>
+                                    </label>
+                                    <input type="range" min="-100" max="100" value={brightness} onChange={e=>setBrightness(Number(e.target.value))} />
+                                </div>
+                                <div>
+                                    <label className="flex justify-between text-xs font-bold text-white mb-1">
+                                        <span>Độ Tương Phản (Contrast)</span>
+                                        <span className="text-pink-400">x{contrast.toFixed(1)}</span>
+                                    </label>
+                                    <input type="range" min="0.1" max="3" step="0.1" value={contrast} onChange={e=>setContrast(Number(e.target.value))} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Khu vực Thống kê Toán học */}
+                        <div className="flex-1 w-full space-y-6">
+                            
+                            {/* Histogram Chart */}
+                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                                <h4 className="text-white font-bold text-sm mb-2">Biểu đồ Histogram (Phân phối xác suất)</h4>
+                                <div className="relative w-full h-[100px] bg-slate-800 border-l border-b border-slate-600 overflow-hidden">
+                                    <canvas ref={histCanvasRef} width={256} height={100} className="w-full h-full"></canvas>
+                                    {/* Đường Mean */}
+                                    <div 
+                                        className="absolute top-0 h-full w-[2px] bg-emerald-400 z-10" 
+                                        style={{ left: `${(stats.mean / 255) * 100}%` }}
+                                    ></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-slate-500 mt-1 font-mono">
+                                    <span>0 (Đen)</span>
+                                    <span className="text-emerald-400">Mean</span>
+                                    <span>255 (Trắng)</span>
+                                </div>
+                            </div>
+
+                            {/* Công thức và Giá trị */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-slate-800/80 p-5 rounded-xl border border-slate-600">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="text-emerald-400 font-bold text-sm">Moment Bậc 1: Trung bình (Mean)</h4>
+                                        <div className="text-3xl font-black text-white">{stats.mean.toFixed(1)}</div>
+                                    </div>
+                                    <div className="math-expr text-xs mb-3 text-center">m = ∑ zₖ p(zₖ)</div>
+                                    <p className="text-xs text-slate-400">
+                                        Đại diện cho <b>Độ sáng trung bình</b> của toàn bộ bức ảnh. Kéo thanh Độ sáng, đường Mean màu xanh trên biểu đồ sẽ dịch chuyển sang trái/phải.
+                                    </p>
+                                </div>
+
+                                <div className="bg-slate-800/80 p-5 rounded-xl border border-slate-600">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="text-rose-400 font-bold text-sm">Moment Bậc 2: Phương sai (Variance)</h4>
+                                        <div className="text-3xl font-black text-white">{stats.variance.toFixed(0)}</div>
+                                    </div>
+                                    <div className="math-expr text-xs mb-3 text-center">σ² = ∑ (zₖ - m)² p(zₖ)</div>
+                                    <p className="text-xs text-slate-400">
+                                        Đo độ phân tán của điểm ảnh quanh mức trung bình. Đây chính là thước đo <b>Độ tương phản (Contrast)</b>! Kéo thanh Tương phản, Variance sẽ tăng vọt, biểu đồ sẽ phình to ra hai bên.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-900/30 p-4 rounded-lg border border-indigo-500/50 flex justify-between items-center">
+                                <div>
+                                    <span className="text-indigo-300 font-bold text-sm block">Độ lệch chuẩn (Standard Deviation)</span>
+                                    <span className="text-xs text-slate-400 font-mono">σ = √(σ²)</span>
+                                </div>
+                                <div className="text-2xl font-bold font-mono text-indigo-400">{stats.stdDev.toFixed(1)}</div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // ==============================================================================
+        // MAIN APP COMPONENT
+        // ==============================================================================
+        const App = () => {
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1200px] mx-auto space-y-8">
+                    <header className="text-center space-y-4 mb-6 border-b border-slate-700 pb-6">
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="gradient-text">Biến Đổi & Thống Kê Ảnh</span>
+                        </h1>
+                        <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                            Tài liệu minh họa (Phương trình 2-55 đến 2-71): Khử nhiễu bằng Biến đổi Fourier và Tính toán Xác suất - Histogram.
+                        </p>
+                    </header>
+
+                    <FourierFilterSim />
+                    <RandomVariablesSim />
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
