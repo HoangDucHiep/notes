@@ -27,7 +27,13 @@
         .node-circle { fill: #f0fdf4; stroke: #10b981; stroke-width: 2; transition: all 0.3s; cursor: pointer; }
         .node-param { fill: #eff6ff; stroke: #2563eb; stroke-width: 3; }
         .node:hover > .node-rect, .node:hover > .node-circle { fill: #dbeafe; transform: scale(1.05); transform-origin: center; }
-        .edge { stroke: #94a3b8; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+        .edge { stroke: #94a3b8; stroke-width: 2; fill: none; marker-end: url(#arrowhead); transition: stroke 0.3s, stroke-width 0.3s; }
+        
+        /* Interactive Animation Classes */
+        .active-fwd { stroke: #10b981 !important; fill: #d1fae5 !important; stroke-width: 3 !important; transition: all 0.3s; }
+        .active-bwd { stroke: #ef4444 !important; fill: #fee2e2 !important; stroke-width: 3 !important; transition: all 0.3s; }
+        .edge-fwd { stroke: #10b981 !important; stroke-width: 3 !important; marker-end: url(#arrowhead-fwd) !important; }
+        .edge-bwd { stroke: #ef4444 !important; stroke-width: 3 !important; marker-end: url(#arrowhead-bwd) !important; }
     </style>
 </head>
 <body class="max-w-4xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
@@ -43,63 +49,74 @@
 
     <!-- MÔ PHỎNG ĐỒ THỊ TÍNH TOÁN -->
     <section class="mb-12">
-        <h2 class="text-3xl font-bold mb-4">1. Đồ thị tính toán (Computational Graph)</h2>
-        <p class="mb-4">Để tính toán các phương trình phức tạp, máy tính biểu diễn chúng dưới dạng một đồ thị. Biến số là các hình vuông/chữ nhật, còn các phép toán là các hình tròn. Mũi tên chỉ hướng dòng chảy của dữ liệu.</p>
+        <h2 class="text-3xl font-bold mb-4">1. Đồ thị tính toán (Computational Graph) Tương tác</h2>
+        <p class="mb-4">Dưới đây là mô phỏng tương tác. Hãy bấm các nút bên dưới để xem luồng dữ liệu (Forward) và luồng đạo hàm (Backward) chảy qua mạng như thế nào.</p>
         
+        <!-- Controls -->
+        <div class="flex justify-center gap-4 mb-4">
+            <button onclick="playForward()" class="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded shadow-md hover:bg-emerald-700 hover:shadow-lg transition">▶ Mô phỏng Forward</button>
+            <button onclick="playBackward()" class="px-5 py-2.5 bg-rose-600 text-white font-bold rounded shadow-md hover:bg-rose-700 hover:shadow-lg transition">◀ Mô phỏng Backward</button>
+            <button onclick="resetGraph()" class="px-5 py-2.5 bg-slate-500 text-white font-bold rounded shadow-md hover:bg-slate-600 hover:shadow-lg transition">↺ Reset đồ thị</button>
+        </div>
+
+        <!-- Status display -->
+        <div class="min-h-[110px] bg-indigo-50 border-2 border-indigo-200 rounded-lg p-4 mb-4 text-center shadow-inner flex flex-col justify-center">
+            <p id="status-text" class="text-slate-700 font-semibold text-lg">Nhấn nút Mô phỏng bên trên để bắt đầu.</p>
+            <div id="status-math" class="mt-2 text-xl text-indigo-800"></div>
+        </div>
+
         <div class="w-full overflow-x-auto bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex justify-center mb-6">
-            <svg width="700" height="250" viewBox="0 0 700 250">
+            <svg id="comp-graph" width="700" height="250" viewBox="0 0 700 250">
                 <defs>
                     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                         <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
                     </marker>
+                    <marker id="arrowhead-fwd" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+                    </marker>
+                    <marker id="arrowhead-bwd" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+                    </marker>
                 </defs>
                 
                 <!-- Edges (Arrows) -->
-                <!-- x -> z <- W1 -->
-                <path class="edge" d="M 50 180 L 110 180" />
-                <path class="edge" d="M 130 90 L 130 160" />
-                <!-- z -> phi -> h -> * -> o -->
-                <path class="edge" d="M 150 180 L 210 180" />
-                <path class="edge" d="M 250 180 L 310 180" />
-                <path class="edge" d="M 350 180 L 410 180" />
-                <path class="edge" d="M 450 180 L 510 180" />
-                <!-- W2 -> * -->
-                <path class="edge" d="M 430 90 L 430 160" />
-                <!-- o -> l <- y -->
-                <path class="edge" d="M 550 180 L 610 180" />
-                <path class="edge" d="M 630 110 L 630 160" />
-                <!-- L2 Regularization parts: W1->s, W2->s -->
-                <path class="edge" d="M 150 70 L 250 70" />
-                <path class="edge" d="M 410 70 L 310 70" />
-                <path class="edge" d="M 280 50 L 280 30" />
-                <path class="edge" d="M 280 90 L 280 130" /> <!-- To s -->
-                <!-- l -> J <- s -->
-                <path class="edge" d="M 630 200 L 630 230 L 530 230 L 530 80 L 550 80" />
-                <!-- s -> J -->
-                <path class="edge" d="M 280 150 L 550 80" />
+                <path id="e-x-z" class="edge" d="M 50 180 L 110 180" />
+                <path id="e-w1-z" class="edge" d="M 130 90 L 130 160" />
+                <path id="e-z-phi" class="edge" d="M 150 180 L 210 180" />
+                <path id="e-phi-h" class="edge" d="M 250 180 L 310 180" />
+                <path id="e-h-mul2" class="edge" d="M 350 180 L 410 180" />
+                <path id="e-mul2-o" class="edge" d="M 450 180 L 510 180" />
+                <path id="e-w2-mul2" class="edge" d="M 430 90 L 430 160" />
+                <path id="e-o-l" class="edge" d="M 550 180 L 610 180" />
+                <path id="e-y-l" class="edge" d="M 630 110 L 630 160" />
+                <path id="e-w1-s1" class="edge" d="M 150 70 L 250 70" />
+                <path id="e-w2-s1" class="edge" d="M 410 70 L 310 70" />
+                <path id="e-lam-s" class="edge" d="M 280 50 L 280 30" />
+                <path id="e-s-s" class="edge" d="M 280 90 L 280 130" />
+                <path id="e-l-j" class="edge" d="M 630 200 L 630 230 L 530 230 L 530 80 L 550 80" />
+                <path id="e-s-j" class="edge" d="M 280 150 L 550 80" />
 
                 <!-- Nodes -->
-                <!-- Inputs & Variables (Squares) -->
-                <g class="node" transform="translate(10, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">x</text></g>
-                <g class="node" transform="translate(110, 50)"><rect class="node-rect node-param" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">W¹</text></g>
-                <g class="node" transform="translate(410, 50)"><rect class="node-rect node-param" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">W²</text></g>
-                <g class="node" transform="translate(150, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">z</text></g>
-                <g class="node" transform="translate(310, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">h</text></g>
-                <g class="node" transform="translate(510, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">o</text></g>
-                <g class="node" transform="translate(610, 70)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">y</text></g>
-                <g class="node" transform="translate(550, 60)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">J</text></g>
-                <g class="node" transform="translate(260, 130)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">s</text></g>
-                <g class="node" transform="translate(260, 10)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">λ</text></g>
+                <g class="node"><rect id="n-x" class="node-rect" x="10" y="160" width="40" height="40" rx="5"/><text x="30" y="185" text-anchor="middle">x</text></g>
+                <g class="node"><rect id="n-w1" class="node-rect node-param" x="110" y="50" width="40" height="40" rx="5"/><text x="130" y="75" text-anchor="middle">W¹</text></g>
+                <g class="node"><rect id="n-w2" class="node-rect node-param" x="410" y="50" width="40" height="40" rx="5"/><text x="430" y="75" text-anchor="middle">W²</text></g>
+                <g class="node"><rect id="n-z" class="node-rect" x="150" y="160" width="40" height="40" rx="5"/><text x="170" y="185" text-anchor="middle">z</text></g>
+                <g class="node"><rect id="n-h" class="node-rect" x="310" y="160" width="40" height="40" rx="5"/><text x="330" y="185" text-anchor="middle">h</text></g>
+                <g class="node"><rect id="n-o" class="node-rect" x="510" y="160" width="40" height="40" rx="5"/><text x="530" y="185" text-anchor="middle">o</text></g>
+                <g class="node"><rect id="n-y" class="node-rect" x="610" y="70" width="40" height="40" rx="5"/><text x="630" y="95" text-anchor="middle">y</text></g>
+                <g class="node"><rect id="n-j" class="node-rect" x="550" y="60" width="40" height="40" rx="5"/><text x="570" y="85" text-anchor="middle">J</text></g>
+                <g class="node"><rect id="n-s" class="node-rect" x="260" y="130" width="40" height="40" rx="5"/><text x="280" y="155" text-anchor="middle">s</text></g>
+                <g class="node"><rect id="n-lam" class="node-rect" x="260" y="10" width="40" height="40" rx="5"/><text x="280" y="35" text-anchor="middle">λ</text></g>
 
-                <!-- Operations (Circles) -->
-                <g class="node" transform="translate(110, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">×</text></g>
-                <g class="node" transform="translate(210, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">φ</text></g>
-                <g class="node" transform="translate(410, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">×</text></g>
-                <g class="node" transform="translate(610, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">l</text></g>
-                <g class="node" transform="translate(260, 50)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">L2</text></g>
+                <!-- Operations -->
+                <g class="node"><circle id="op-mul1" class="node-circle" cx="130" cy="180" r="20"/><text x="130" y="185" text-anchor="middle">×</text></g>
+                <g class="node"><circle id="op-phi" class="node-circle" cx="230" cy="180" r="20"/><text x="230" y="185" text-anchor="middle">φ</text></g>
+                <g class="node"><circle id="op-mul2" class="node-circle" cx="430" cy="180" r="20"/><text x="430" y="185" text-anchor="middle">×</text></g>
+                <g class="node"><circle id="op-l" class="node-circle" cx="630" cy="180" r="20"/><text x="630" y="185" text-anchor="middle">l</text></g>
+                <g class="node"><circle id="op-l2" class="node-circle" cx="280" cy="70" r="20"/><text x="280" y="75" text-anchor="middle">L2</text></g>
             </svg>
         </div>
-        <p class="text-sm text-center text-slate-500 mb-8">Hình 1: Đồ thị tính toán. Hình vuông là biến số/tham số, hình tròn là phép toán. Chiều mũi tên từ trái sang phải là Forward Propagation.</p>
+        <p class="text-sm text-center text-slate-500 mb-8">Hình 1: Đồ thị tính toán. Hình vuông là biến số/tham số, hình tròn là phép toán.</p>
     </section>
 
     <!-- SECTION 2: FORWARD -->
@@ -180,5 +197,143 @@
         <p>Bộ nhớ cần thiết tỷ lệ thuận với: <code>Số lượng Lớp ẩn (Layers) × Kích thước Batch (Batch Size)</code>. Đó là lý do tại sao khi huấn luyện các mô hình quá sâu (Deep Networks) với Batch Size lớn trên GPU, bạn rất hay gặp phải lỗi kinh điển: <strong>Out-Of-Memory (OOM)</strong>.</p>
     </section>
 
+    <!-- Kịch bản Animation -->
+    <script>
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+        let isAnimating = false;
+
+        function resetGraph() {
+            // Xóa tất cả các hiệu ứng active
+            document.querySelectorAll('.active-fwd, .active-bwd, .edge-fwd, .edge-bwd').forEach(el => {
+                el.classList.remove('active-fwd', 'active-bwd', 'edge-fwd', 'edge-bwd');
+            });
+            updateStatus("Nhấn nút Mô phỏng bên trên để bắt đầu.", "");
+        }
+
+        async function updateStatus(text, math) {
+            document.getElementById('status-text').innerText = text;
+            const mathEl = document.getElementById('status-math');
+            mathEl.innerHTML = math;
+            if (math && window.MathJax) {
+                await MathJax.typesetPromise([mathEl]);
+            }
+        }
+
+        function activateElement(id, type) {
+            const el = document.getElementById(id);
+            if(el) {
+                if(el.tagName === 'path') {
+                    el.classList.add(`edge-${type}`);
+                } else {
+                    el.classList.add(`active-${type}`);
+                }
+            }
+        }
+
+        async function playForward() {
+            if(isAnimating) return;
+            isAnimating = true;
+            resetGraph();
+            
+            await updateStatus("Đang thiết lập Lan truyền xuôi (Forward Propagation)...", "");
+            await delay(1000);
+
+            // Bước 1: z = W1 * x
+            activateElement('n-x', 'fwd'); activateElement('n-w1', 'fwd');
+            activateElement('e-x-z', 'fwd'); activateElement('e-w1-z', 'fwd');
+            activateElement('op-mul1', 'fwd');
+            await updateStatus("Bước 1: Tính tổ hợp tuyến tính ở lớp ẩn", "\\( \\mathbf{z} = \\mathbf{W}^{(1)}\\mathbf{x} \\)");
+            await delay(1000);
+            activateElement('n-z', 'fwd');
+            await delay(1800);
+
+            // Bước 2: h = phi(z)
+            activateElement('e-z-phi', 'fwd'); activateElement('op-phi', 'fwd');
+            await updateStatus("Bước 2: Đi qua hàm kích hoạt phi tuyến tính", "\\( \\mathbf{h} = \\phi(\\mathbf{z}) \\)");
+            await delay(1000);
+            activateElement('e-phi-h', 'fwd'); activateElement('n-h', 'fwd');
+            await delay(1800);
+
+            // Bước 3: o = W2 * h
+            activateElement('n-w2', 'fwd');
+            activateElement('e-h-mul2', 'fwd'); activateElement('e-w2-mul2', 'fwd'); activateElement('op-mul2', 'fwd');
+            await updateStatus("Bước 3: Dự đoán đầu ra cuối cùng", "\\( \\mathbf{o} = \\mathbf{W}^{(2)}\\mathbf{h} \\)");
+            await delay(1000);
+            activateElement('e-mul2-o', 'fwd'); activateElement('n-o', 'fwd');
+            await delay(1800);
+
+            // Bước 4: L = l(o, y)
+            activateElement('n-y', 'fwd');
+            activateElement('e-o-l', 'fwd'); activateElement('e-y-l', 'fwd'); activateElement('op-l', 'fwd');
+            await updateStatus("Bước 4: So sánh với nhãn thực tế để tính Sai số (Loss)", "\\( L = l(\\mathbf{o}, y) \\)");
+            await delay(1000);
+            activateElement('e-l-j', 'fwd');
+            await delay(1800);
+
+            // Bước 5: L2 Regularization
+            activateElement('n-lam', 'fwd');
+            activateElement('e-w1-s1', 'fwd'); activateElement('e-w2-s1', 'fwd'); activateElement('e-lam-s', 'fwd');
+            activateElement('op-l2', 'fwd');
+            await updateStatus("Bước 5: Tính phạt Regularization (Tránh Overfitting)", "\\( s = \\frac{\\lambda}{2} (\\|\\mathbf{W}^{(1)}\\|_F^2 + \\|\\mathbf{W}^{(2)}\\|_F^2) \\)");
+            await delay(1000);
+            activateElement('e-s-s', 'fwd'); activateElement('n-s', 'fwd');
+            await delay(1800);
+
+            // Bước 6: J = L + s
+            activateElement('e-s-j', 'fwd');
+            activateElement('n-j', 'fwd');
+            await updateStatus("Hoàn tất: Tính Hàm Mục Tiêu tổng (Objective Function)", "\\( J = L + s \\)");
+            
+            isAnimating = false;
+        }
+
+        async function playBackward() {
+            if(isAnimating) return;
+            isAnimating = true;
+            resetGraph();
+            
+            await updateStatus("Bắt đầu Lan truyền ngược (Backpropagation)... Thuật toán sẽ đi lùi từ J về x", "");
+            await delay(1500);
+
+            // Bước 1: J
+            activateElement('n-j', 'bwd');
+            await updateStatus("Bước 1: Bắt đầu từ Hàm mục tiêu", "\\( \\frac{\\partial J}{\\partial J} = 1 \\)");
+            await delay(2000);
+
+            // Bước 2: Tách nhánh
+            activateElement('e-s-j', 'bwd'); activateElement('e-l-j', 'bwd');
+            activateElement('n-s', 'bwd'); activateElement('op-l', 'bwd');
+            await updateStatus("Bước 2: Tách đạo hàm truyền về Loss (L) và Phạt (s)", "\\( \\frac{\\partial J}{\\partial L} = 1, \\quad \\frac{\\partial J}{\\partial s} = 1 \\)");
+            await delay(2500);
+
+            // Bước 3: Về o
+            activateElement('e-o-l', 'bwd'); activateElement('n-o', 'bwd');
+            await updateStatus("Bước 3: Lan truyền qua hàm Loss (Áp dụng Chain Rule)", "\\( \\frac{\\partial J}{\\partial \\mathbf{o}} = \\frac{\\partial J}{\\partial L} \\cdot \\frac{\\partial L}{\\partial \\mathbf{o}} \\)");
+            await delay(2500);
+
+            // Bước 4: Về W2
+            activateElement('op-mul2', 'bwd'); activateElement('e-mul2-o', 'bwd');
+            activateElement('e-w2-mul2', 'bwd'); activateElement('n-w2', 'bwd');
+            activateElement('e-w2-s1', 'bwd'); activateElement('op-l2', 'bwd');
+            await updateStatus("Bước 4: Tính Gradient cho Trọng số Lớp 2 (Nhận từ 2 đường o và s)", "\\( \\frac{\\partial J}{\\partial \\mathbf{W}^{(2)}} = \\frac{\\partial J}{\\partial \\mathbf{o}} \\mathbf{h}^\\top + \\lambda \\mathbf{W}^{(2)} \\)");
+            await delay(3500);
+
+            // Bước 5: Về h -> z
+            activateElement('e-h-mul2', 'bwd'); activateElement('n-h', 'bwd');
+            await updateStatus("Bước 5: Tiếp tục lùi về biến trung gian ở lớp ẩn (h)", "\\( \\frac{\\partial J}{\\partial \\mathbf{h}} = {\\mathbf{W}^{(2)}}^\\top \\frac{\\partial J}{\\partial \\mathbf{o}} \\)");
+            await delay(2500);
+
+            activateElement('e-phi-h', 'bwd'); activateElement('op-phi', 'bwd'); activateElement('e-z-phi', 'bwd'); activateElement('n-z', 'bwd');
+            await updateStatus("Bước 6: Truyền ngược qua hàm kích hoạt phi tuyến tính (Tính đạo hàm hàm kích hoạt)", "\\( \\frac{\\partial J}{\\partial \\mathbf{z}} = \\frac{\\partial J}{\\partial \\mathbf{h}} \\odot \\phi'(\\mathbf{z}) \\)");
+            await delay(3000);
+
+            // Bước 6: Về W1
+            activateElement('op-mul1', 'bwd'); activateElement('e-w1-z', 'bwd'); activateElement('n-w1', 'bwd');
+            activateElement('e-w1-s1', 'bwd');
+            await updateStatus("Bước 7: Điểm đến cuối cùng. Tính Gradient cho Trọng số Lớp 1", "\\( \\frac{\\partial J}{\\partial \\mathbf{W}^{(1)}} = \\frac{\\partial J}{\\partial \\mathbf{z}} \\mathbf{x}^\\top + \\lambda \\mathbf{W}^{(1)} \\)");
+            
+            isAnimating = false;
+        }
+    </script>
 </body>
 </html>
