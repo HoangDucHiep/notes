@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 10: Lưu trữ & Sức mạnh GPU</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Highlight.js for Code Formatting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .code-block { border-radius: 0.5rem; overflow: hidden; margin: 1rem 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .concept-box { border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .warning-box { border-left: 4px solid #ef4444; background-color: #fef2f2; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        h1, h2, h3 { color: #0f172a; }
+        
+        /* Hardware Simulator Styles */
+        .hardware-container { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 2rem; border-radius: 12px; margin-top: 1.5rem; position: relative; overflow: hidden;}
+        .device { background: #334155; border: 2px solid #475569; border-radius: 8px; width: 40%; height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; z-index: 10; }
+        .device-title { font-weight: bold; font-size: 1.25rem; margin-bottom: 1rem; }
+        .cpu-title { color: #38bdf8; }
+        .gpu-title { color: #10b981; }
+        
+        .pcie-bus { position: absolute; top: 50%; left: 40%; right: 40%; height: 20px; background: repeating-linear-gradient(90deg, #475569, #475569 10px, #334155 10px, #334155 20px); transform: translateY(-50%); z-index: 5; border-top: 2px solid #64748b; border-bottom: 2px solid #64748b; }
+        
+        .data-packet { width: 50px; height: 50px; background: #f43f5e; color: white; display: flex; justify-content: center; align-items: center; font-weight: bold; border-radius: 8px; position: absolute; top: 50%; transform: translateY(-50%); left: 20%; z-index: 20; opacity: 0; }
+        
+        .data-transfer-anim { animation: moveData 3s linear forwards; opacity: 1; }
+        @keyframes moveData {
+            0% { left: 20%; }
+            10% { left: 40%; } /* Chạy ra khỏi CPU */
+            90% { left: 60%; } /* Đi rề rề qua cáp nối PCI-e */
+            100% { left: 75%; } /* Vào tới GPU */
+        }
+
+        .gpu-compute-anim { animation: flashGPU 0.2s alternate 6; }
+        @keyframes flashGPU {
+            from { background: #334155; box-shadow: none; }
+            to { background: #059669; box-shadow: 0 0 30px #10b981; }
+        }
+    </style>
+</head>
+<body class="max-w-5xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
+
+    <header class="mb-10 border-b-2 border-slate-200 pb-6">
+        <h1 class="text-4xl font-extrabold text-amber-600 mb-2">Bài 10: Lưu trữ & Sức mạnh GPU</h1>
+        <p class="text-slate-500 text-xl">Lưu "Save Game" và Mở khóa tốc độ song song</p>
+    </header>
+
+    <!-- PHẦN 1: FILE I/O (LƯU TRỮ) -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">1. Lưu trữ: Nút "Save Game" của AI</h2>
+        
+        <p class="mb-4">Huấn luyện (Training) một mô hình Deep Learning giống như chơi một tựa game nhập vai cực khó mất hàng tuần liền. Nếu bạn vô tình đá phải phích cắm điện của máy chủ mà chưa lưu lại, toàn bộ "Trí thông minh" (Weights) sẽ tan thành mây khói.</p>
+        
+        <div class="concept-box">
+            <strong>Bí quyết thực chiến:</strong> Chúng ta thường <strong>KHÔNG</strong> lưu toàn bộ mô hình (bao gồm cả code kiến trúc mạng). Lý do là vì code có thể thay đổi, và mã nguồn Python lưu dạng nhị phân rất dễ bị lỗi tương thích.<br><br>
+            Thay vào đó, ta viết code tạo ra "cái vỏ" (kiến trúc), và chỉ <strong>LƯU LẠI BỘ TRỌNG SỐ (Weights/Parameters)</strong> ra file tĩnh. Khi cần dùng, ta tải bộ trọng số đó lắp vào cái vỏ.
+        </div>
+
+        <div class="code-block">
+<pre><code class="language-python">import tensorflow as tf
+import numpy as np
+
+# --- 1. LƯU MẢNG DỮ LIỆU THƯỜNG (TENSORS) ---
+x = tf.range(4)
+np.save('x-file.npy', x)               # Lưu ra file
+x2 = np.load('x-file.npy', allow_pickle=True) # Tải lại vào RAM
+
+# --- 2. LƯU & TẢI TRỌNG SỐ CỦA MẠNG NƠ-RON ---
+net = MyCustomMLP() 
+net(tf.random.uniform((2, 20))) # Chạy mồi 1 lần để Lazy Init tạo Weights
+
+# Lưu game! (Lưu trạng thái weights hiện tại)
+net.save_weights('my_model_weights.h5')
+
+# Ở một máy tính khác, hoặc một ngày khác:
+clone_net = MyCustomMLP() # Khởi tạo lại cái vỏ
+clone_net(tf.random.uniform((2, 20))) # Chạy mồi
+
+# Tải file Save (Lắp não vào vỏ)
+clone_net.load_weights('my_model_weights.h5')
+</code></pre>
+        </div>
+    </section>
+
+    <!-- PHẦN 2: CPU vs GPU -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">2. Tại sao AI lại cuồng GPU (Card Đồ Họa)?</h2>
+        
+        <p class="mb-4">Bạn có bao giờ thắc mắc tại sao NVIDIA lại trở thành công ty nghìn tỷ đô? Bí mật nằm ở kiến trúc phần cứng:</p>
+
+        <ul class="list-disc pl-6 space-y-4 mb-4">
+            <li><strong>CPU (Giáo sư Toán học):</strong> Có khoảng 8 đến 24 nhân (cores) siêu mạnh, siêu thông minh. Nó giải quyết các bài toán logic phức tạp (if/else), chạy hệ điều hành rất tuyệt vời. Nhưng nó chỉ làm được từng việc một.</li>
+            <li><strong>GPU (Hàng ngàn học sinh cấp 1):</strong> Có hàng nghìn nhân nhỏ (VD: RTX 4090 có hơn 16,000 nhân CUDA). Mỗi nhân khá "ngốc", chỉ biết làm phép nhân cộng đơn giản. NHƯNG chúng có thể làm việc đó <strong>Cùng Một Lúc</strong> (Xử lý song song).</li>
+        </ul>
+
+        <p class="mb-4">Vì Mạng Nơ-ron về bản chất là hàng triệu phép <strong>Nhân Ma Trận</strong> (Matrix Multiplication), việc giao nó cho "Đội quân học sinh" GPU sẽ nhanh hơn hàng trăm lần so với vị Giáo sư CPU!</p>
+
+        <div class="code-block">
+<pre><code class="language-python"># Kiểm tra xem máy có GPU NVIDIA không?
+print(tf.config.list_physical_devices('GPU'))
+
+# Bắt buộc tạo Tensor trên một thiết bị cụ thể
+with tf.device('/CPU:0'):
+    X = tf.ones((10000, 10000)) # Lưu trên RAM thường
+
+with tf.device('/GPU:0'):
+    Y = tf.random.uniform((10000, 10000)) # Lưu trên VRAM của Card màn hình
+</code></pre>
+        </div>
+    </section>
+
+    <!-- PHẦN 3: NÚT THẮT CỔ CHAI (SIMULATOR) -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4 text-rose-600">3. Nghịch lý tốc độ: Nút thắt cổ chai PCI-e</h2>
+        
+        <p class="mb-4">Tài liệu của bạn ở phần <em>Side Notes (Lưu ý bên lề)</em> chỉ ra một lỗi kinh điển của người mới: <strong>Truyền dữ liệu qua lại giữa CPU và GPU quá nhiều.</strong></p>
+
+        <div class="warning-box">
+            <strong>Quy tắc thép:</strong> GPU tính toán cực kỳ nhanh, nhưng con đường vận chuyển dữ liệu từ RAM máy tính sang VRAM của GPU (qua khe cắm PCI-Express trên Mainboard) lại rất chậm!<br><br>
+            Nếu bạn liên tục tính 1 phép toán nhỏ trên GPU, rồi copy kết quả về CPU để in ra màn hình (`print(loss.numpy())`), bạn đang làm hệ thống kẹt xe cứng ngắc.
+        </div>
+
+        <div class="bg-slate-900 p-6 rounded-xl shadow-xl border border-slate-700">
+            <h3 class="text-xl font-bold text-white mb-2">🚀 Trình Mô Phỏng: Data Transfer vs Computation</h3>
+            <p class="text-slate-400 mb-6 text-sm">Hãy thử chuyển một mảng dữ liệu (Batch) từ RAM hệ thống sang Card Đồ họa, sau đó nhấn tính toán để thấy sự chênh lệch thời gian.</p>
+
+            <div class="flex gap-4 mb-4 justify-center">
+                <button onclick="startTransfer()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded">1. Chuyển Dữ liệu (CPU -> GPU)</button>
+                <button onclick="startCompute()" id="btnCompute" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded opacity-50 cursor-not-allowed" disabled>2. Tính Toán Nhân Ma Trận trên GPU</button>
+                <button onclick="resetSim()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded">↺ Reset</button>
+            </div>
+
+            <div id="simLog" class="text-center font-mono text-amber-300 h-6 mb-2">Hệ thống sẵn sàng...</div>
+
+            <div class="hardware-container">
+                <!-- Data Packet -->
+                <div id="dataPacket" class="data-packet">Data</div>
+
+                <!-- CPU -->
+                <div class="device">
+                    <div class="device-title cpu-title">🖥️ CPU (System RAM)</div>
+                    <div class="text-slate-400 text-center px-4">Chứa dữ liệu Dataset lớn tải từ ổ cứng.</div>
+                </div>
+
+                <!-- Cáp PCI-e -->
+                <div class="pcie-bus">
+                    <div class="absolute -top-6 w-full text-center text-xs text-slate-400">Cáp PCI-Express (Chậm)</div>
+                </div>
+
+                <!-- GPU -->
+                <div id="gpuDevice" class="device">
+                    <div class="device-title gpu-title">🎮 GPU (VRAM)</div>
+                    <div class="text-slate-400 text-center px-4">16,000 CUDA Cores đang chờ lệnh.</div>
+                </div>
+            </div>
+        </div>
+        <p class="mt-4 italic text-slate-600">Bài học: Đừng chuyển từng tấm ảnh qua GPU. Hãy gom chúng thành 1 Batch lớn (ví dụ 64 ảnh) chuyển qua 1 lần, rồi để GPU tính toán toàn bộ. Hạn chế dùng hàm <code>.numpy()</code> trong vòng lặp Training.</p>
+    </section>
+
+    <!-- PHẦN 4: ĐA GPU -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">4. Sức mạnh Đa GPU (Multi-GPU)</h2>
+        
+        <p class="mb-4">Khi mô hình quá lớn (như LLM), 1 card GPU là không đủ. Chúng ta cắm 4, 8 chiếc GPU vào cùng một máy. TensorFlow cung cấp <strong>Distribution Strategies</strong> để quản lý việc này một cách kỳ diệu.</p>
+
+        <div class="code-block">
+<pre><code class="language-python">import tensorflow as tf
+
+# Khai báo chiến thuật: Nhân bản mô hình ra TẤT CẢ các GPU hiện có trên máy
+strategy = tf.distribute.MirroredStrategy()
+
+print(f"Số lượng GPU đang tham gia: {strategy.num_replicas_in_sync}")
+
+# Đặt code tạo mô hình trong "Scope" của Strategy
+with strategy.scope():
+    # Mô hình này sẽ được copy (mirrored) sang GPU:0, GPU:1, v.v...
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(1)
+    ])
+    model.compile(optimizer='adam', loss='mse')
+
+# Khi gọi model.fit(), TF sẽ tự động:
+# 1. Cắt nhỏ Batch dữ liệu ra (ví dụ batch 64 ảnh -> 2 GPU mỗi card lo 32 ảnh)
+# 2. Hai card tính toán song song.
+# 3. Gom Gradient của 2 card lại, cộng vào, cập nhật bộ trọng số chung, rồi đi tiếp!
+</code></pre>
+        </div>
+    </section>
+
+    <footer class="mt-16 text-center text-slate-500 border-t border-slate-200 pt-6">
+        <p>Hiểu về bộ nhớ, ổ cứng và PCI-e chính là điều phân biệt một Coder tập sự và một Kỹ sư Hệ thống AI (AI Systems Engineer) thực thụ!</p>
+    </footer>
+
+    <script>
+        // Init Syntax Highlighting
+        hljs.highlightAll();
+
+        // Simulator Logic
+        const packet = document.getElementById('dataPacket');
+        const gpu = document.getElementById('gpuDevice');
+        const btnCompute = document.getElementById('btnCompute');
+        const log = document.getElementById('simLog');
+
+        let isDataInGpu = false;
+
+        function startTransfer() {
+            if(isDataInGpu) {
+                log.innerText = "Dữ liệu đã ở trong GPU rồi!";
+                return;
+            }
+            log.innerHTML = "Đang copy dữ liệu qua PCI-e... <span class='text-red-400'>Rất chậm (Mất 3 giây)!</span>";
+            packet.style.opacity = "1";
+            packet.classList.add('data-transfer-anim');
+            
+            // Đợi 3s animation kết thúc
+            setTimeout(() => {
+                isDataInGpu = true;
+                log.innerHTML = "<span class='text-emerald-400'>Copy hoàn tất! GPU đã sẵn sàng.</span>";
+                btnCompute.disabled = false;
+                btnCompute.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, 3000);
+        }
+
+        function startCompute() {
+            if(!isDataInGpu) return;
+            log.innerHTML = "<span class='text-emerald-400'>GPU đang tính toán hàng triệu phép nhân... Siêu nhanh (0.5 giây)!</span>";
+            gpu.classList.add('gpu-compute-anim');
+            
+            setTimeout(() => {
+                gpu.classList.remove('gpu-compute-anim');
+                log.innerHTML = "Tính toán xong Epoch! Cập nhật trọng số thành công.";
+            }, 1200);
+        }
+
+        function resetSim() {
+            packet.classList.remove('data-transfer-anim');
+            packet.style.opacity = "0";
+            gpu.classList.remove('gpu-compute-anim');
+            isDataInGpu = false;
+            btnCompute.disabled = true;
+            btnCompute.classList.add('opacity-50', 'cursor-not-allowed');
+            log.innerText = "Đã reset. Dữ liệu đang nằm ở CPU RAM.";
+            
+            // Xóa trigger animation
+            void packet.offsetWidth;
+        }
+    </script>
+</body>
+</html>
