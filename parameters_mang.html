@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 8: Quản lý & Khởi tạo Tham số</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Highlight.js for Code Formatting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .code-block { border-radius: 0.5rem; overflow: hidden; margin: 1rem 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .concept-box { border-left: 4px solid #10b981; background-color: #f0fdf4; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .warning-box { border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        h1, h2, h3 { color: #0f172a; }
+        
+        /* Styles for Simulation */
+        .matrix-box { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #334155; padding: 8px; border-radius: 8px; }
+        .cell { background: #1e293b; color: #38bdf8; text-align: center; padding: 8px 4px; border-radius: 4px; font-family: monospace; font-weight: bold; transition: background-color 0.3s; }
+        .cell.updated { background: #0ea5e9; color: white; }
+    </style>
+</head>
+<body class="max-w-5xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
+
+    <header class="mb-10 border-b-2 border-slate-200 pb-6">
+        <h1 class="text-4xl font-extrabold text-emerald-600 mb-2">Bài 8: Quản lý Tham số</h1>
+        <p class="text-slate-500 text-xl">Mổ xẻ "hộp đen", Chia sẻ não bộ & Sự lười biếng thông minh</p>
+    </header>
+
+    <!-- PHẦN 1: TRUY CẬP THAM SỐ -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">1. Mổ xẻ "Hộp đen" (Parameter Access)</h2>
+        
+        <p class="mb-4">Sau khi huấn luyện xong một mô hình, bạn không thể cứ vứt nó đó. Đôi khi bạn cần trích xuất các trọng số (weights) để phân tích, lưu vào ổ cứng, hoặc tái sử dụng cho dự án khác (Transfer Learning). Khuôn khổ Deep Learning cho phép ta "thọc tay" vào bất kỳ lớp nào để lấy số liệu.</p>
+        
+        <div class="code-block">
+<pre><code class="language-python">import tensorflow as tf
+
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(8, activation='relu'),
+    tf.keras.layers.Dense(1)
+])
+
+# Truyền một dữ liệu ảo để mô hình khởi tạo (sẽ giải thích ở Phần 3)
+X = tf.random.uniform((2, 4))
+net(X)
+
+# 1. Truy cập lớp cụ thể (Lấy lớp thứ 2, index = 1)
+layer_2 = net.layers[1]
+
+# 2. Lấy trọng số (Weights) và Biến thiên (Bias)
+weights, biases = layer_2.get_weights()
+print(weights.shape) # (8, 1) - Ma trận kết nối 8 nơ-ron lớp trước với 1 nơ-ron lớp này
+print(biases)        # (1,) - 1 giá trị Bias
+
+# 3. Lấy TẤT CẢ tham số của toàn bộ mô hình cùng lúc
+all_params = net.trainable_variables
+</code></pre>
+        </div>
+    </section>
+
+    <!-- PHẦN 2: KHỞI TẠO TÙY CHỈNH -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">2. Can thiệp Khởi tạo (Custom Initialization)</h2>
+        
+        <p class="mb-4">Ở bài trước, ta biết khởi tạo Xavier/He là rất tốt. Nhưng đôi khi bạn muốn tự định nghĩa một kiểu khởi tạo "kỳ dị" (ví dụ: gán hằng số, hoặc dùng một phân phối xác suất tự chế) cho các bài toán đặc thù.</p>
+
+        <div class="code-block">
+<pre><code class="language-python"># 1. Dùng các hàm khởi tạo có sẵn của TensorFlow
+layer_normal = tf.keras.layers.Dense(
+    units=8, 
+    kernel_initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=0.01),
+    bias_initializer='zeros' # Gán bias bằng 0
+)
+
+# 2. Tự chế initializer theo ý thích (Kế thừa class Initializer)
+class MyWeirdInitializer(tf.keras.initializers.Initializer):
+    def __call__(self, shape, dtype=None, **kwargs):
+        # Ví dụ: Gán mọi trọng số bằng con số 42 (Rất vô lý nhưng TF cho phép làm vậy)
+        return tf.fill(shape, 42.0)
+
+layer_weird = tf.keras.layers.Dense(8, kernel_initializer=MyWeirdInitializer())
+</code></pre>
+        </div>
+    </section>
+
+    <!-- PHẦN 3: LAZY INITIALIZATION -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">3. Khởi tạo "Lười biếng" (Lazy Initialization)</h2>
+        
+        <div class="concept-box">
+            <strong>Câu hỏi:</strong> Trong đoạn code tạo `Sequential` ở trên, ta KHÔNG HỀ khai báo <code>input_shape</code> (Kích thước đầu vào). Làm sao mô hình biết ma trận trọng số $\mathbf{W}$ của lớp đầu tiên phải to cỡ nào? <br><br>
+            <strong>Trả lời:</strong> Nó <em>lười biếng</em> chưa thèm tạo ra $\mathbf{W}$ vội!
+        </div>
+
+        <p class="mb-4">Trong TensorFlow, khi bạn vừa định nghĩa một mạng lưới, nó chỉ là một cái "vỏ rỗng" (Blueprint). Các tham số (Parameters) chưa hề tồn tại trong bộ nhớ RAM.</p>
+        <p class="mb-4">Chỉ khi nào bạn <strong>truyền tập dữ liệu đầu tiên đi qua mạng (Forward Pass)</strong>, khung làm việc mới nhìn vào dữ liệu đó, thốt lên: <em>"À, đầu vào có 20 chiều!"</em>. Lúc đó, nó mới bắt đầu hối hả đi cấp phát bộ nhớ và tính toán kích thước ma trận cho toàn bộ các lớp phía sau. Đây gọi là <strong>Lazy Initialization</strong>.</p>
+        
+        <p class="text-slate-600 italic">Lợi ích: Giúp bạn code cực nhanh, không cần phải tự tính toán bằng tay xem đầu ra của Lớp 1 là bao nhiêu để gán làm đầu vào cho Lớp 2. Hệ thống sẽ tự động suy ra chuỗi domino đó cho bạn!</p>
+    </section>
+
+    <!-- PHẦN 4: TIED PARAMETERS & TRÌNH GIẢ LẬP -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4 text-rose-600">4. Chia sẻ Trọng số (Tied Parameters)</h2>
+        
+        <p class="mb-4">Bình thường, mỗi lớp trong mạng có một bộ não (bộ trọng số) riêng rẽ. Tuy nhiên, trong một số cấu trúc đặc biệt (như Autoencoders, mạng Siamese, hoặc Xử lý ngôn ngữ tự nhiên RNN), ta muốn <strong>hai lớp khác nhau dùng chung một bộ não duy nhất</strong>.</p>
+
+        <div class="code-block">
+<pre><code class="language-python"># Khai báo một lớp cụ thể và đặt tên cho nó
+shared_layer = tf.keras.layers.Dense(8, activation='relu')
+
+net = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(8, activation='relu'), # Lớp 1: Độc lập
+    shared_layer,                                # Lớp 2: Dùng shared_layer
+    tf.keras.layers.Dense(8, activation='relu'), # Lớp 3: Độc lập
+    shared_layer,                                # Lớp 4: Lại dùng shared_layer !!!
+    tf.keras.layers.Dense(1)
+])
+</code></pre>
+        </div>
+
+        <div class="warning-box">
+            <strong>Hiện tượng Toán học lúc Backpropagation:</strong> Vì Lớp 2 và Lớp 4 chia sẻ cùng 1 con trỏ bộ nhớ, chúng không chỉ giống nhau về giá trị. Khi lan truyền ngược (Backward), <strong>Gradient của Lớp 2 và Lớp 4 sẽ được CỘNG GỘP lại với nhau</strong> để cập nhật cho bộ trọng số chung này.
+        </div>
+
+        <!-- SIMULATION DASHBOARD -->
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl mt-8">
+            <h3 class="text-xl font-bold text-white mb-4">🖥️ Mô phỏng Backpropagation với Tied Parameters</h3>
+            <p class="text-slate-300 mb-6 text-sm">Bấm "Huấn luyện" để sinh ra Gradient ảo. Quan sát: Lớp Độc lập tự cập nhật. Lớp Chia sẻ 2 và 4 sẽ luôn có giá trị y hệt nhau vì chúng trỏ chung vào một vùng nhớ, và Gradient của chúng được cộng gộp!</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <!-- Lớp 1 -->
+                <div>
+                    <h4 class="text-center font-bold text-slate-300 mb-2">Lớp 1 (Độc lập)</h4>
+                    <div class="matrix-box" id="matrix1"></div>
+                    <p class="text-xs text-center text-slate-400 mt-2">Gradient: <span id="grad1" class="text-rose-400">0</span></p>
+                </div>
+                <!-- Lớp 2 -->
+                <div class="relative">
+                    <h4 class="text-center font-bold text-emerald-400 mb-2">Lớp 2 (Chia sẻ)</h4>
+                    <div class="matrix-box" id="matrix2"></div>
+                    <p class="text-xs text-center text-slate-400 mt-2">Gradient 2: <span id="grad2" class="text-rose-400">0</span></p>
+                    
+                    <!-- Dấu nối -->
+                    <div class="absolute hidden md:block top-1/2 -right-4 w-8 border-b-2 border-emerald-500 border-dashed z-10"></div>
+                </div>
+                <!-- Lớp 4 -->
+                <div>
+                    <h4 class="text-center font-bold text-emerald-400 mb-2">Lớp 4 (Chia sẻ)</h4>
+                    <div class="matrix-box" id="matrix4"></div>
+                    <p class="text-xs text-center text-slate-400 mt-2">Gradient 4: <span id="grad4" class="text-rose-400">0</span></p>
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <button onclick="simulateTraining()" class="px-8 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg shadow-lg transition transform hover:scale-105">⚡ Huấn luyện (1 Epoch)</button>
+            </div>
+            
+            <p id="simStatus" class="text-center text-amber-300 mt-4 text-sm font-mono h-6"></p>
+        </div>
+    </section>
+
+    <footer class="mt-16 text-center text-slate-500 border-t border-slate-200 pt-6">
+        <p>Bằng cách nắm vững cách đóng gói và chia sẻ trọng số, bạn đã sẵn sàng thiết kế các cấu trúc siêu việt như ResNet, Inception hay Transformer.</p>
+    </footer>
+
+    <script>
+        // Init Syntax Highlighting
+        hljs.highlightAll();
+
+        // --- Tied Parameters Simulation Logic ---
+        
+        // Initial weights (Simple 3x3 matrices for visualization)
+        let w1 = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
+        
+        // Shared weight memory pointer for Layer 2 and 4
+        let w_shared = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0];
+
+        function renderMatrix(containerId, data) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            data.forEach(val => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.innerText = val.toFixed(2);
+                container.appendChild(cell);
+            });
+        }
+
+        // Initial Render
+        renderMatrix('matrix1', w1);
+        renderMatrix('matrix2', w_shared);
+        renderMatrix('matrix4', w_shared);
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        async function simulateTraining() {
+            const lr = 0.1; // Learning rate
+            
+            // 1. Generate fake gradients for this epoch
+            const g1 = (Math.random() - 0.5) * 5; // Grad for Layer 1
+            const g2 = (Math.random() - 0.5) * 5; // Grad for Layer 2
+            const g4 = (Math.random() - 0.5) * 5; // Grad for Layer 4
+
+            // Update UI Gradients
+            document.getElementById('grad1').innerText = g1.toFixed(2);
+            document.getElementById('grad2').innerText = g2.toFixed(2);
+            document.getElementById('grad4').innerText = g4.toFixed(2);
+
+            document.getElementById('simStatus').innerText = "Đang tính toán Backpropagation...";
+            
+            // Highlight cells
+            document.querySelectorAll('.cell').forEach(c => c.classList.add('updated'));
+            await delay(600);
+
+            // 2. Update Weights
+            // Layer 1 is independent
+            w1 = w1.map(val => val - lr * g1);
+            
+            // Layers 2 and 4 are TIED! Their gradients are ADDED together.
+            const combined_grad = g2 + g4;
+            w_shared = w_shared.map(val => val - lr * combined_grad);
+
+            document.getElementById('simStatus').innerText = `Lớp 2 & 4 chia sẻ bộ nhớ! Gradient tổng = ${g2.toFixed(2)} + ${g4.toFixed(2)} = ${combined_grad.toFixed(2)}`;
+
+            // 3. Re-render
+            renderMatrix('matrix1', w1);
+            renderMatrix('matrix2', w_shared);
+            renderMatrix('matrix4', w_shared); // Layer 4 reflects shared memory
+
+            await delay(400);
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('updated'));
+        }
+    </script>
+</body>
+</html>
