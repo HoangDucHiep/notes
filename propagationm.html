@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 3: Lan truyền xuôi, ngược & Đồ thị tính toán</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .math-block { overflow-x: auto; padding: 1rem; background-color: #f1f5f9; border-radius: 0.5rem; margin: 1rem 0; text-align: center; font-size: 1.1rem; border: 1px solid #e2e8f0; }
+        .math-inline { font-weight: 600; color: #2563eb; }
+        .concept-box { border-left: 4px solid #10b981; background-color: #ecfdf5; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .warning-box { border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .step-card { background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #0f172a; }
+        
+        /* SVG Styling */
+        svg text { font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 14px; }
+        .node-rect { fill: #eff6ff; stroke: #3b82f6; stroke-width: 2; transition: all 0.3s; cursor: pointer; }
+        .node-circle { fill: #f0fdf4; stroke: #10b981; stroke-width: 2; transition: all 0.3s; cursor: pointer; }
+        .node-param { fill: #eff6ff; stroke: #2563eb; stroke-width: 3; }
+        .node:hover > .node-rect, .node:hover > .node-circle { fill: #dbeafe; transform: scale(1.05); transform-origin: center; }
+        .edge { stroke: #94a3b8; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+</head>
+<body class="max-w-4xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
+
+    <header class="mb-10 border-b-2 border-slate-200 pb-6">
+        <h1 class="text-4xl font-extrabold text-indigo-700 mb-2">Bài 3: Phía sau "Tấm màn ma thuật"</h1>
+        <p class="text-slate-500 text-xl">Lan truyền xuôi (Forward), Lan truyền ngược (Backward) & Đồ thị tính toán</p>
+    </header>
+
+    <div class="concept-box mb-8">
+        <strong>Lý do phần này ra đời:</strong> Trong thực tế, các framework như PyTorch hay TensorFlow tính toán đạo hàm tự động (Automatic Differentiation). Nhưng để trở thành một chuyên gia (tránh lỗi hết bộ nhớ - OOM, giải quyết Vanishing Gradients), bạn <em>buộc phải hiểu</em> thuật toán Backpropagation dưới mui xe hoạt động ra sao.
+    </div>
+
+    <!-- MÔ PHỎNG ĐỒ THỊ TÍNH TOÁN -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">1. Đồ thị tính toán (Computational Graph)</h2>
+        <p class="mb-4">Để tính toán các phương trình phức tạp, máy tính biểu diễn chúng dưới dạng một đồ thị. Biến số là các hình vuông/chữ nhật, còn các phép toán là các hình tròn. Mũi tên chỉ hướng dòng chảy của dữ liệu.</p>
+        
+        <div class="w-full overflow-x-auto bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex justify-center mb-6">
+            <svg width="700" height="250" viewBox="0 0 700 250">
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+                    </marker>
+                </defs>
+                
+                <!-- Edges (Arrows) -->
+                <!-- x -> z <- W1 -->
+                <path class="edge" d="M 50 180 L 110 180" />
+                <path class="edge" d="M 130 90 L 130 160" />
+                <!-- z -> phi -> h -> * -> o -->
+                <path class="edge" d="M 150 180 L 210 180" />
+                <path class="edge" d="M 250 180 L 310 180" />
+                <path class="edge" d="M 350 180 L 410 180" />
+                <path class="edge" d="M 450 180 L 510 180" />
+                <!-- W2 -> * -->
+                <path class="edge" d="M 430 90 L 430 160" />
+                <!-- o -> l <- y -->
+                <path class="edge" d="M 550 180 L 610 180" />
+                <path class="edge" d="M 630 110 L 630 160" />
+                <!-- L2 Regularization parts: W1->s, W2->s -->
+                <path class="edge" d="M 150 70 L 250 70" />
+                <path class="edge" d="M 410 70 L 310 70" />
+                <path class="edge" d="M 280 50 L 280 30" />
+                <path class="edge" d="M 280 90 L 280 130" /> <!-- To s -->
+                <!-- l -> J <- s -->
+                <path class="edge" d="M 630 200 L 630 230 L 530 230 L 530 80 L 550 80" />
+                <!-- s -> J -->
+                <path class="edge" d="M 280 150 L 550 80" />
+
+                <!-- Nodes -->
+                <!-- Inputs & Variables (Squares) -->
+                <g class="node" transform="translate(10, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">x</text></g>
+                <g class="node" transform="translate(110, 50)"><rect class="node-rect node-param" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">W¹</text></g>
+                <g class="node" transform="translate(410, 50)"><rect class="node-rect node-param" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">W²</text></g>
+                <g class="node" transform="translate(150, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">z</text></g>
+                <g class="node" transform="translate(310, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">h</text></g>
+                <g class="node" transform="translate(510, 160)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">o</text></g>
+                <g class="node" transform="translate(610, 70)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">y</text></g>
+                <g class="node" transform="translate(550, 60)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">J</text></g>
+                <g class="node" transform="translate(260, 130)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">s</text></g>
+                <g class="node" transform="translate(260, 10)"><rect class="node-rect" width="40" height="40" rx="5"/><text x="20" y="25" text-anchor="middle">λ</text></g>
+
+                <!-- Operations (Circles) -->
+                <g class="node" transform="translate(110, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">×</text></g>
+                <g class="node" transform="translate(210, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">φ</text></g>
+                <g class="node" transform="translate(410, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">×</text></g>
+                <g class="node" transform="translate(610, 160)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">l</text></g>
+                <g class="node" transform="translate(260, 50)"><circle class="node-circle" cx="20" cy="20" r="20"/><text x="20" y="25" text-anchor="middle">L2</text></g>
+            </svg>
+        </div>
+        <p class="text-sm text-center text-slate-500 mb-8">Hình 1: Đồ thị tính toán. Hình vuông là biến số/tham số, hình tròn là phép toán. Chiều mũi tên từ trái sang phải là Forward Propagation.</p>
+    </section>
+
+    <!-- SECTION 2: FORWARD -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">2. Lan truyền xuôi (Forward Propagation)</h2>
+        <p class="mb-4">Đây là quá trình mạng nơ-ron nhận dữ liệu và đưa ra dự đoán. Điểm mấu chốt của Forward Propagation trong quá trình Training là: <strong>Nó phải GHI NHỚ LẠI (store) tất cả các biến trung gian</strong> để phục vụ cho Backward Propagation sau này.</p>
+        
+        <div class="step-card">
+            <h3 class="font-bold text-xl mb-2 text-slate-800">Các bước tính toán (Từ trái qua phải trên đồ thị):</h3>
+            <ol class="list-decimal pl-6 space-y-4">
+                <li>Tính giá trị lớp ẩn chưa kích hoạt: <div class="math-block">\( \mathbf{z} = \mathbf{W}^{(1)}\mathbf{x} \)</div></li>
+                <li>Áp dụng hàm kích hoạt \(\phi\) (ví dụ: ReLU, Sigmoid): <div class="math-block">\( \mathbf{h} = \phi(\mathbf{z}) \)</div></li>
+                <li>Tính kết quả đầu ra: <div class="math-block">\( \mathbf{o} = \mathbf{W}^{(2)}\mathbf{h} \)</div></li>
+                <li>Tính hàm Mất mát cơ bản (Loss): <div class="math-block">\( L = l(\mathbf{o}, y) \)</div></li>
+                <li>Thêm thành phần Chuẩn hóa L2 (L2 Regularization) để chống overfitting (Phạt các trọng số quá lớn): <div class="math-block">\( s = \frac{\lambda}{2} (\|\mathbf{W}^{(1)}\|_F^2 + \|\mathbf{W}^{(2)}\|_F^2) \)</div></li>
+                <li><strong>Hàm mục tiêu cuối cùng (Objective Function):</strong> <div class="math-block">\( J = L + s \)</div></li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- SECTION 3: BACKWARD (THE CORE) -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">3. Lan truyền ngược (Backpropagation)</h2>
+        <p class="mb-4">Mục tiêu của chúng ta là tìm xem việc thay đổi các ma trận trọng số \(\mathbf{W}^{(1)}\) và \(\mathbf{W}^{(2)}\) sẽ ảnh hưởng thế nào đến sai số cuối cùng \(J\). Tức là ta cần tìm: \(\frac{\partial J}{\partial \mathbf{W}^{(1)}}\) và \(\frac{\partial J}{\partial \mathbf{W}^{(2)}}\).</p>
+        
+        <div class="warning-box">
+            <strong>Bí kíp cốt lõi - Quy tắc chuỗi (Chain Rule):</strong><br>
+            Nếu \(Y = f(X)\) và \(Z = g(Y)\), thì sự ảnh hưởng của \(X\) lên \(Z\) được truyền qua \(Y\):
+            <div class="text-center my-2 text-lg">\( \frac{\partial Z}{\partial X} = \frac{\partial Z}{\partial Y} \cdot \frac{\partial Y}{\partial X} \)</div>
+            Thuật toán sẽ đi lùi từ Output (Hàm J) ngược về Input.
+        </div>
+
+        <div class="step-card">
+            <h3 class="font-bold text-xl mb-4 text-slate-800">Từng bước tính Đạo hàm (Từ phải sang trái):</h3>
+            
+            <p class="mb-2"><strong>Bước 1:</strong> Khởi tạo với chính hàm mục tiêu. Đạo hàm của một biến đối với chính nó luôn bằng 1.</p>
+            <div class="math-block">\( \frac{\partial J}{\partial L} = 1 \quad \text{và} \quad \frac{\partial J}{\partial s} = 1 \)</div>
+
+            <p class="mb-2"><strong>Bước 2:</strong> Đạo hàm qua hàm Loss (tùy thuộc vào hàm Loss bạn dùng là MSE hay Cross-Entropy).</p>
+            <div class="math-block">\( \frac{\partial J}{\partial \mathbf{o}} = \frac{\partial J}{\partial L} \cdot \frac{\partial L}{\partial \mathbf{o}} \)</div>
+
+            <p class="mb-2"><strong>Bước 3:</strong> Đạo hàm của thành phần L2 Regularization đối với các trọng số.</p>
+            <div class="math-block">\( \frac{\partial s}{\partial \mathbf{W}^{(1)}} = \lambda \mathbf{W}^{(1)} \quad \text{và} \quad \frac{\partial s}{\partial \mathbf{W}^{(2)}} = \lambda \mathbf{W}^{(2)} \)</div>
+
+            <p class="mb-2 text-blue-700 font-bold"><strong>Bước 4 (Quan trọng):</strong> Tính Gradient cho \(\mathbf{W}^{(2)}\) (Lớp gần cuối).<br>
+            Lưu ý: \(J\) bị ảnh hưởng bởi \(\mathbf{W}^{(2)}\) qua 2 đường: qua Loss (\(\mathbf{o}\)) và qua Regularization (\(s\)). Ta phải cộng chúng lại.</p>
+            <div class="math-block">\( \frac{\partial J}{\partial \mathbf{W}^{(2)}} = \left( \frac{\partial J}{\partial \mathbf{o}} \cdot \frac{\partial \mathbf{o}}{\partial \mathbf{W}^{(2)}} \right) + \frac{\partial J}{\partial s} \cdot \frac{\partial s}{\partial \mathbf{W}^{(2)}} = \frac{\partial J}{\partial \mathbf{o}} \mathbf{h}^\top + \lambda \mathbf{W}^{(2)} \)</div>
+            <p class="text-sm italic text-slate-600 mb-4">* Chú ý sự xuất hiện của \(\mathbf{h}\) (giá trị đã được lưu lại từ Forward pass).</p>
+
+            <p class="mb-2"><strong>Bước 5:</strong> Truyền gradient lùi về lớp ẩn \(\mathbf{h}\) và qua hàm kích hoạt để lấy gradient của \(\mathbf{z}\).</p>
+            <div class="math-block">
+                \( \frac{\partial J}{\partial \mathbf{h}} = {\mathbf{W}^{(2)}}^\top \frac{\partial J}{\partial \mathbf{o}} \)<br><br>
+                \( \frac{\partial J}{\partial \mathbf{z}} = \frac{\partial J}{\partial \mathbf{h}} \odot \phi'(\mathbf{z}) \)
+            </div>
+            <p class="text-sm italic text-slate-600 mb-4">* Phép \(\odot\) là nhân từng phần tử (Hadamard product). \(\phi'(\mathbf{z})\) là đạo hàm của hàm kích hoạt (ví dụ đạo hàm của ReLU).</p>
+
+            <p class="mb-2 text-blue-700 font-bold"><strong>Bước 6 (Đích đến):</strong> Tính Gradient cho \(\mathbf{W}^{(1)}\) (Lớp đầu tiên).</p>
+            <div class="math-block">\( \frac{\partial J}{\partial \mathbf{W}^{(1)}} = \frac{\partial J}{\partial \mathbf{z}} \mathbf{x}^\top + \lambda \mathbf{W}^{(1)} \)</div>
+        </div>
+    </section>
+
+    <!-- SECTION 4: MEMORY ISSUES -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">4. Tổng kết: Tại sao Huấn luyện (Training) lại "ngốn" RAM?</h2>
+        
+        <p class="mb-4">Hãy nhìn lại các công thức tính Gradient ở trên. Để tính được \(\frac{\partial J}{\partial \mathbf{W}^{(2)}}\), ta cần giá trị \(\mathbf{h}\). Để tính được \(\frac{\partial J}{\partial \mathbf{W}^{(1)}}\), ta cần \(\mathbf{x}\) và \(\mathbf{z}\).</p>
+        
+        <div class="concept-box">
+            <strong>Sự phụ thuộc lẫn nhau:</strong> Quá trình Forward tính toán và <em>tích lũy</em> các biến trung gian trong bộ nhớ. Quá trình Backward đi ngược lại và <em>tiêu thụ</em> các biến trung gian này để tính đạo hàm. 
+        </div>
+
+        <ul class="list-disc pl-6 space-y-2 mb-4">
+            <li><strong>Chế độ Dự đoán (Inference / Plain Prediction):</strong> Mạng chỉ cần chạy Forward. Tính xong lớp nào, nó có thể xóa bộ nhớ của lớp đó đi vì không cần dùng lại nữa. Rất tiết kiệm RAM.</li>
+            <li><strong>Chế độ Huấn luyện (Training):</strong> Mạng phải giữ <strong>toàn bộ</strong> các biến trung gian của <strong>tất cả</strong> các lớp trong suốt quá trình Forward cho đến khi vòng Backward kết thúc hoàn toàn.</li>
+        </ul>
+
+        <p class="font-bold text-red-600 mt-6">Hệ quả:</p>
+        <p>Bộ nhớ cần thiết tỷ lệ thuận với: <code>Số lượng Lớp ẩn (Layers) × Kích thước Batch (Batch Size)</code>. Đó là lý do tại sao khi huấn luyện các mô hình quá sâu (Deep Networks) với Batch Size lớn trên GPU, bạn rất hay gặp phải lỗi kinh điển: <strong>Out-Of-Memory (OOM)</strong>.</p>
+    </section>
+
+</body>
+</html>
