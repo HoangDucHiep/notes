@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 2: Multilayer Perceptrons & Hàm Kích Hoạt</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- Chart.js for interactive graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .math-block { overflow-x: auto; padding: 1rem; background-color: #f1f5f9; border-radius: 0.5rem; margin: 1rem 0; text-align: center; font-size: 1.1rem; }
+        .concept-box { border-left: 4px solid #3b82f6; background-color: #eff6ff; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .warning-box { border-left: 4px solid #ef4444; background-color: #fef2f2; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        h1, h2, h3 { color: #0f172a; }
+        .chart-container { position: relative; height: 350px; width: 100%; margin: 2rem 0; }
+    </style>
+</head>
+<body class="max-w-4xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
+
+    <header class="mb-10 border-b-2 border-slate-200 pb-6">
+        <h1 class="text-4xl font-extrabold text-blue-600 mb-2">Chương 5: Multilayer Perceptrons (MLPs)</h1>
+        <p class="text-slate-500 text-xl">Sự trỗi dậy của tính Phi tuyến tính trong Mạng Nơ-ron</p>
+    </header>
+
+    <!-- SECTION 1 -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">1. Tại sao Mô hình Tuyến tính (Linear Models) lại thất bại?</h2>
+        
+        <p class="mb-4">Ở các bài trước, bạn có thể đã quen với Hồi quy tuyến tính hoặc Softmax. Chúng hoạt động dựa trên một giả định cốt lõi rất mạnh (và thường sai trong thực tế): <strong>Tính đơn điệu (Monotonicity)</strong>.</p>
+        
+        <div class="concept-box">
+            <strong>Tính đơn điệu nghĩa là gì?</strong> Nó có nghĩa là nếu một đặc trưng (input) tăng lên, kết quả dự đoán sẽ <em>luôn luôn</em> tăng lên (nếu trọng số dương) hoặc <em>luôn luôn</em> giảm đi (nếu trọng số âm).
+        </div>
+
+        <h3 class="text-2xl font-semibold mb-3 mt-6">Các ví dụ phá vỡ tính đơn điệu:</h3>
+        <ul class="list-disc pl-6 mb-4 space-y-2">
+            <li><strong>Dự đoán sức khỏe theo thân nhiệt:</strong> Thân nhiệt lý tưởng là \(37^\circ C\). Nếu nhiệt độ giảm xuống \(35^\circ C\), rủi ro bệnh tăng. Nếu nhiệt độ tăng lên \(40^\circ C\), rủi ro bệnh <em>cũng tăng</em>. Một đường thẳng tuyến tính không thể vẽ được hình chữ "V" này. Nó chỉ có thể đi lên mãi hoặc đi xuống mãi.</li>
+            <li><strong>Nhận diện ảnh Chó và Mèo:</strong> Liệu việc tăng độ sáng của pixel ở tọa độ (13, 17) có <em>luôn luôn</em> làm tăng xác suất bức ảnh đó là con chó không? Dĩ nhiên là không! Giá trị của một pixel phụ thuộc vào hàng ngàn pixel xung quanh nó để tạo nên hình thù cái tai, cái mũi. Tuyến tính không thể hiểu được "ngữ cảnh" này.</li>
+        </ul>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">2. Thêm Lớp Ẩn (Hidden Layers) - Sinh ra Multilayer Perceptron</h2>
+        
+        <p class="mb-4">Để giải quyết các bài toán phức tạp trên, chúng ta không kết nối trực tiếp Input (Đầu vào) với Output (Đầu ra) nữa. Chúng ta chèn vào giữa các <strong>Lớp ẩn (Hidden Layers)</strong>.</p>
+        <p class="mb-4">Hãy coi mỗi nơ-ron trong lớp ẩn là một "thám tử" cấp dưới, chúng tổng hợp các pixel thô để tìm ra các đường nét, góc cạnh. Sau đó, lớp ẩn tiếp theo lại dùng các đường nét đó để tìm ra cái tai, con mắt. Cuối cùng Output mới đưa ra quyết định.</p>
+
+        <div class="math-block">
+            Mạng MLP 1 lớp ẩn (dạng ma trận):<br>
+            \( \mathbf{H} = \mathbf{X}\mathbf{W}^{(1)} + \mathbf{b}^{(1)} \)  (Tính lớp ẩn H)<br>
+            \( \mathbf{O} = \mathbf{H}\mathbf{W}^{(2)} + \mathbf{b}^{(2)} \)  (Tính đầu ra O)
+        </div>
+    </section>
+
+    <!-- SECTION 3 (CRITICAL) -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4 text-red-600">3. SỰ ĐỔ VỠ TOÁN HỌC: Nghịch lý của việc xếp chồng tuyến tính</h2>
+        
+        <p class="mb-4">Bạn có thể nghĩ: <em>"Tuyệt vời, vậy ta cứ xếp chồng 100 lớp ẩn lên nhau, mạng sẽ siêu thông minh!"</em>. Đáng tiếc, nếu ta chỉ dùng các phép nhân ma trận thông thường, công sức của ta sẽ đổ sông đổ biển.</p>
+        
+        <div class="warning-box">
+            <strong>Bởi vì hàm của một hàm tuyến tính vẫn chỉ là một hàm tuyến tính!</strong>
+        </div>
+
+        <p class="mb-4">Hãy thử gộp hai phương trình ở phần 2 lại xem chuyện gì xảy ra:</p>
+        
+        <div class="math-block text-left inline-block w-full">
+            \( \mathbf{O} = (\mathbf{X}\mathbf{W}^{(1)} + \mathbf{b}^{(1)})\mathbf{W}^{(2)} + \mathbf{b}^{(2)} \)<br><br>
+            Khai triển ra ta có:<br>
+            \( \mathbf{O} = \mathbf{X}(\mathbf{W}^{(1)}\mathbf{W}^{(2)}) + \mathbf{b}^{(1)}\mathbf{W}^{(2)} + \mathbf{b}^{(2)} \)<br><br>
+            Đặt \( \mathbf{W} = \mathbf{W}^{(1)}\mathbf{W}^{(2)} \) và \( \mathbf{b} = \mathbf{b}^{(1)}\mathbf{W}^{(2)} + \mathbf{b}^{(2)} \), ta được:<br>
+            <strong>\( \mathbf{O} = \mathbf{X}\mathbf{W} + \mathbf{b} \)</strong>
+        </div>
+
+        <p class="mt-4 font-bold">Kết luận chấn động:</p>
+        <p class="mb-4">Dù bạn có xếp 100 lớp ẩn, toán học chứng minh nó tự động "sụp đổ" thành <strong>một lớp tuyến tính duy nhất</strong>. Nó vẫn chẳng thể giải quyết bài toán thân nhiệt hay nhận diện ảnh. Để thực sự tạo ra đột phá, chúng ta cần một phép màu mang tên: <strong>Hàm phi tuyến (Nonlinear Activation Function)</strong>.</p>
+
+        <div class="math-block">
+            Dáng vẻ thực sự của mạng Nơ-ron sâu:<br>
+            \( \mathbf{H} = \sigma(\mathbf{X}\mathbf{W}^{(1)} + \mathbf{b}^{(1)}) \)<br>
+            \( \mathbf{O} = \mathbf{H}\mathbf{W}^{(2)} + \mathbf{b}^{(2)} \)
+            <br><span class="text-sm italic text-gray-500">Trong đó \(\sigma\) là hàm kích hoạt. Nhờ có nó, mạng không bị sụp đổ thành tuyến tính nữa.</span>
+        </div>
+    </section>
+
+    <!-- SECTION 4: ACTIVATION FUNCTIONS WITH INTERACTIVE CHARTS -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">4. Chi tiết các Hàm kích hoạt (Activation Functions)</h2>
+        <p class="mb-6">Chúng ta sẽ dùng biểu đồ tương tác để phân tích hình dáng của hàm và <strong>đạo hàm</strong> của nó (đạo hàm chính là độ dốc, quyết định tốc độ học của AI trong quá trình Lan truyền ngược - Backpropagation).</p>
+
+        <!-- 4.1 ReLU -->
+        <div class="mb-10 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-2xl font-bold text-blue-700 mb-2">4.1. ReLU (Rectified Linear Unit) - Kẻ thống trị hiện tại</h3>
+            <div class="math-block">\( \text{ReLU}(x) = \max(x, 0) \)</div>
+            <p><strong>Bản chất:</strong> Rất đơn giản. Nếu đầu vào âm, nó trả về 0 (nơ-ron bị tắt). Nếu đầu vào dương, nó giữ nguyên giá trị (nơ-ron được kích hoạt). Nó là một hàm tuyến tính từng phần.</p>
+            <p><strong>Tại sao nó lại phổ biến nhất?</strong> Bí mật nằm ở đạo hàm của nó. Khi \(x > 0\), đạo hàm <em>luôn luôn bằng 1</em>. Điều này giúp tín hiệu lỗi (gradient) truyền ngược qua hàng chục lớp mà không bị nhỏ đi, giải quyết dứt điểm vấn đề <strong>Vanishing Gradient (Triệt tiêu đạo hàm)</strong>.</p>
+            
+            <div class="chart-container">
+                <canvas id="reluChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 4.2 Sigmoid -->
+        <div class="mb-10 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-2xl font-bold text-blue-700 mb-2">4.2. Sigmoid Function - Kẻ tiên phong bị lãng quên (ở các lớp ẩn)</h3>
+            <div class="math-block">\( \text{sigmoid}(x) = \frac{1}{1 + \exp(-x)} \)</div>
+            <p><strong>Bản chất:</strong> Nén mọi giá trị từ \((-\infty, +\infty)\) vào khoảng \((0, 1)\). Dữ liệu càng lớn, kết quả càng gần 1; càng nhỏ càng gần 0. Nó mô phỏng cực tốt xác suất hoặc trạng thái nơ-ron sinh học (fire/not fire).</p>
+            <p><strong>Sự sụp đổ của Sigmoid (Hãy nhìn vào đường màu đỏ trên biểu đồ):</strong> Đạo hàm của Sigmoid đạt đỉnh lớn nhất chỉ là <strong>0.25</strong> (khi \(x=0\)). Khi giá trị đầu vào càng lớn hoặc càng nhỏ, đạo hàm tiến về 0 rất nhanh. Trong mạng nhiều lớp, khi bạn nhân liên tục các đạo hàm nhỏ hơn 0.25 với nhau (ví dụ: \(0.2 \times 0.1 \times 0.2...\)), kết quả sẽ nhanh chóng biến thành số 0. Lúc này, mạng <strong>ngừng học hoàn toàn</strong> (Vanishing Gradient).</p>
+            
+            <div class="chart-container">
+                <canvas id="sigmoidChart"></canvas>
+            </div>
+            <div class="math-block text-sm">
+                Đạo hàm: \( \frac{d}{dx}\text{sigmoid}(x) = \text{sigmoid}(x)(1 - \text{sigmoid}(x)) \)
+            </div>
+        </div>
+
+        <!-- 4.3 Tanh -->
+        <div class="mb-10 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-2xl font-bold text-blue-700 mb-2">4.3. Tanh (Hyperbolic Tangent) - Bản nâng cấp của Sigmoid</h3>
+            <div class="math-block">\( \text{tanh}(x) = \frac{1 - \exp(-2x)}{1 + \exp(-2x)} \)</div>
+            <p><strong>Bản chất:</strong> Giống Sigmoid nhưng nén dữ liệu vào khoảng \((-1, 1)\). Điểm ưu việt của Tanh là nó <strong>đối xứng qua tâm tọa độ (0,0)</strong>. Điều này có nghĩa là trung bình đầu ra của mạng sẽ gần với 0 hơn, giúp quá trình tối ưu hóa (Gradient Descent) hội tụ nhanh hơn, không bị thiên lệch.</p>
+            <p><strong>Lưu ý:</strong> Đỉnh đạo hàm của Tanh là 1 (tốt hơn Sigmoid là 0.25), nhưng ở hai phía rìa, đạo hàm vẫn tiến về 0, nên vẫn có thể gặp Vanishing Gradient nếu mạng quá sâu.</p>
+            
+            <div class="chart-container">
+                <canvas id="tanhChart"></canvas>
+            </div>
+            <div class="math-block text-sm">
+                Đạo hàm: \( \frac{d}{dx}\text{tanh}(x) = 1 - \text{tanh}^2(x) \)
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 5: Universal Approximators -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">5. Định lý Xấp xỉ Phổ quát (Universal Approximators)</h2>
+        <div class="concept-box">
+            Các nhà toán học đã chứng minh một sự thật đáng kinh ngạc: <strong>Chỉ cần một mạng Nơ-ron có 1 lớp ẩn duy nhất (với số lượng nơ-ron đủ lớn và hàm kích hoạt phi tuyến), nó có thể mô phỏng (xấp xỉ) BẤT KỲ hàm số tính toán nào trên thế giới.</strong>
+        </div>
+        <p>Giống như ngôn ngữ lập trình C có thể viết ra bất kỳ phần mềm nào, mạng Nơ-ron có thể học bất kỳ quy luật nào. Tuy nhiên, việc mạng <em>có khả năng</em> học không có nghĩa là chúng ta <em>dễ dàng tìm ra được bộ trọng số</em> để nó hoạt động đúng. Đó là lý do trong thực tế, thay vì dùng 1 lớp ẩn siêu to khổng lồ, người ta dùng <strong>Deep Learning (Học Sâu - Nhiều lớp ẩn xếp chồng)</strong> vì nó tối ưu và trích xuất đặc trưng hình học/ngữ nghĩa tốt hơn rất nhiều.</p>
+    </section>
+
+    <footer class="mt-16 text-center text-gray-500 border-t pt-6">
+        <p>Kết thúc Bài 2. Hãy chuẩn bị tinh thần cho phần "khoai" nhất ở Bài 3: Thuật toán Lan truyền ngược (Backpropagation) bằng giải tích ma trận!</p>
+    </footer>
+
+    <!-- JavaScript to generate Interactive Charts -->
+    <script>
+        // Generate data points for X axis (-8 to 8)
+        const xValues = [];
+        for (let x = -8; x <= 8; x += 0.2) {
+            xValues.push(x.toFixed(1));
+        }
+
+        // --- Chart Config Template ---
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { grid: { color: '#e2e8f0' } },
+                y: { grid: { color: '#e2e8f0' } }
+            },
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
+            }
+        };
+
+        // --- 1. ReLU Chart ---
+        const reluData = xValues.map(x => Math.max(0, x));
+        const reluGradData = xValues.map(x => x > 0 ? 1 : 0); // Derivative
+
+        new Chart(document.getElementById('reluChart'), {
+            type: 'line',
+            data: {
+                labels: xValues,
+                datasets: [
+                    { label: 'Hàm số: ReLU(x)', data: reluData, borderColor: '#3b82f6', tension: 0, borderWidth: 3 },
+                    { label: 'Đạo hàm: grad(ReLU)', data: reluGradData, borderColor: '#ef4444', borderDash: [5, 5], tension: 0, borderWidth: 2 }
+                ]
+            },
+            options: commonOptions
+        });
+
+        // --- 2. Sigmoid Chart ---
+        const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+        const sigmoidData = xValues.map(x => sigmoid(x));
+        const sigmoidGradData = xValues.map(x => sigmoid(x) * (1 - sigmoid(x)));
+
+        new Chart(document.getElementById('sigmoidChart'), {
+            type: 'line',
+            data: {
+                labels: xValues,
+                datasets: [
+                    { label: 'Hàm số: Sigmoid(x)', data: sigmoidData, borderColor: '#3b82f6', tension: 0.4, borderWidth: 3 },
+                    { label: 'Đạo hàm: grad(Sigmoid)', data: sigmoidGradData, borderColor: '#ef4444', borderDash: [5, 5], tension: 0.4, borderWidth: 2 }
+                ]
+            },
+            options: commonOptions
+        });
+
+        // --- 3. Tanh Chart ---
+        const tanh = (x) => Math.tanh(x);
+        const tanhData = xValues.map(x => tanh(x));
+        const tanhGradData = xValues.map(x => 1 - Math.pow(tanh(x), 2));
+
+        new Chart(document.getElementById('tanhChart'), {
+            type: 'line',
+            data: {
+                labels: xValues,
+                datasets: [
+                    { label: 'Hàm số: Tanh(x)', data: tanhData, borderColor: '#3b82f6', tension: 0.4, borderWidth: 3 },
+                    { label: 'Đạo hàm: grad(Tanh)', data: tanhGradData, borderColor: '#ef4444', borderDash: [5, 5], tension: 0.4, borderWidth: 2 }
+                ]
+            },
+            options: commonOptions
+        });
+    </script>
+</body>
+</html>
