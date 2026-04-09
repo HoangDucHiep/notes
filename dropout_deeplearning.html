@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 6: Dropout - Nghệ thuật "Bỏ cuộc"</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- MathJax -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .math-block { overflow-x: auto; padding: 1rem; background-color: #f1f5f9; border-radius: 0.5rem; margin: 1rem 0; text-align: center; font-size: 1.1rem; border: 1px solid #e2e8f0; }
+        .concept-box { border-left: 4px solid #f59e0b; background-color: #fffbeb; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .highlight-text { color: #d97706; font-weight: 600; }
+        h1, h2, h3 { color: #0f172a; }
+        
+        /* SVG Interactive Network Styles */
+        .node { transition: all 0.3s ease; fill: #60a5fa; stroke: #2563eb; stroke-width: 2; cursor: pointer; }
+        .node.dropped { fill: #cbd5e1; stroke: #94a3b8; }
+        .node.input { fill: #34d399; stroke: #059669; }
+        .node.output { fill: #f472b6; stroke: #db2777; }
+        
+        .edge { transition: all 0.3s ease; stroke: #94a3b8; stroke-width: 1.5; opacity: 0.6; }
+        .edge.dropped { opacity: 0.1; stroke: #cbd5e1; }
+        
+        .slider-wrapper { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+        input[type=range] { flex-grow: 1; accent-color: #f59e0b; }
+    </style>
+</head>
+<body class="max-w-5xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
+
+    <header class="mb-10 border-b-2 border-slate-200 pb-6">
+        <h1 class="text-4xl font-extrabold text-amber-600 mb-2">Bài 6: Dropout</h1>
+        <p class="text-slate-500 text-xl">Nghệ thuật "Tắt nguồn" Nơ-ron để Mạng lưới mạnh mẽ hơn</p>
+    </header>
+
+    <!-- PHẦN 1: TRIẾT LÝ VÀ SỰ DỰA DẪM -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">1. Vấn đề của sự "Dựa dẫm" (Co-adaptation)</h2>
+        
+        <p class="mb-4">Hãy tưởng tượng một dự án nhóm có 5 sinh viên. Thông thường, sẽ có 1 hoặc 2 người cực kỳ xuất sắc gánh vác toàn bộ công việc, trong khi những người khác chỉ ngồi chơi. Nếu ngày thuyết trình, người "gánh team" bị ốm, cả nhóm sẽ thất bại thảm hại.</p>
+        
+        <p class="mb-4">Trong Mạng nơ-ron cũng vậy. Khi huấn luyện, một số nơ-ron có thể tình cờ học được các đặc trưng quan trọng rất nhanh. Các nơ-ron lớp sau sẽ trở nên lười biếng và <strong>phụ thuộc hoàn toàn (Co-adaptation)</strong> vào tín hiệu của các nơ-ron "gánh team" này. Điều này làm mạng cực kỳ dễ bị Overfitting vì nó chỉ nhớ một vài pattern cụ thể của tập Train.</p>
+
+        <div class="concept-box">
+            <strong>Triết lý của Dropout (Srivastava et al., 2014):</strong><br>
+            Trong mỗi vòng lặp huấn luyện, chúng ta sẽ <em>ngẫu nhiên đuổi việc (zero out)</em> một tỷ lệ $p$ các nơ-ron. <br>
+            Bị mất đi chỗ dựa, mạng bắt buộc phải phân tán kiến thức ra mọi nơ-ron khác. Bất kỳ nơ-ron nào cũng có thể bị "bốc hơi" bất cứ lúc nào, nên chúng buộc phải học cách tự lập và tìm ra các đặc trưng thực sự vững chắc. Tác giả ví kỹ thuật này giống với quá trình <strong>sinh sản hữu tính</strong> trong sinh học, giúp phá vỡ các gen xấu đi chung với nhau.
+        </div>
+    </section>
+
+    <!-- PHẦN 2: MÔ PHỎNG TƯƠNG TÁC -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">2. Trực quan hóa Dropout</h2>
+        <p class="mb-6">Kéo thanh trượt để chọn tỷ lệ Dropout $p$. Bấm <strong>Huấn luyện (1 Bước)</strong> để xem các nơ-ron ngẫu nhiên bị tắt đi. Lớp Output sẽ không thể lấy thông tin từ các nơ-ron bị tắt đó.</p>
+
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl text-white">
+            <div class="slider-wrapper">
+                <label for="dropRate" class="font-bold min-w-[120px]">Xác suất Drop ($p$):</label>
+                <input type="range" id="dropRate" min="0" max="0.9" step="0.1" value="0.5" oninput="updateDropLabel(this.value)">
+                <span id="dropRateLabel" class="font-mono text-amber-400 font-bold w-12">0.5</span>
+            </div>
+
+            <div class="flex gap-4 mb-6 justify-center">
+                <button onclick="applyDropout()" class="px-6 py-2 bg-amber-600 hover:bg-amber-500 font-bold rounded shadow transition">⚡ Huấn luyện (Dropout ngẫu nhiên)</button>
+                <button onclick="resetNetwork()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 font-bold rounded shadow transition">👁️ Chế độ Test (Bật toàn bộ)</button>
+            </div>
+
+            <!-- SVG Network Area -->
+            <div class="w-full bg-slate-900 rounded-lg p-4 flex justify-center border border-slate-700 overflow-x-auto">
+                <svg id="networkSvg" width="600" height="300" viewBox="0 0 600 300">
+                    <!-- Edges and Nodes will be injected here by JS -->
+                </svg>
+            </div>
+            <p id="networkStatus" class="text-center text-slate-400 mt-4 h-6 text-sm font-mono"></p>
+        </div>
+    </section>
+
+    <!-- PHẦN 3: TOÁN HỌC VÀ INVERTED DROPOUT -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">3. Toán học đằng sau: "Inverted Dropout"</h2>
+        
+        <div class="mb-4 text-slate-700">
+            <p class="mb-2">Để hiểu Inverted Dropout, hãy tưởng tượng một nhà máy có <strong>100 công nhân</strong>. Mỗi ngày họ cùng nhau sản xuất được 100 sản phẩm.</p>
+            <ul class="list-disc pl-6 space-y-2">
+                <li><strong>Lúc Huấn luyện (Training):</strong> Hôm nay quản đốc quyết định cho 50% công nhân nghỉ phép (\( p = 0.5 \)). Nếu 50 người còn lại vẫn tà tà làm việc với tốc độ bình thường, nhà máy chỉ làm ra 50 sản phẩm. Để bù đắp và giữ nguyên tổng sản lượng là 100, 50 người ở lại bắt buộc phải <strong>làm việc với công suất gấp đôi</strong>.</li>
+                <li><strong>Lúc Dự đoán (Testing):</strong> Cả 100 người đều đi làm đầy đủ. Không ai bị nghỉ, và mọi người chỉ cần làm việc với sức lực bình thường.</li>
+            </ul>
+        </div>
+
+        <p class="mb-4">Đó chính là tư tưởng cốt lõi của <strong>Inverted Dropout</strong> (kỹ thuật mặc định mà <strong>TensorFlow</strong> và các framework hiện đại đang dùng). Mục tiêu là giữ cho <strong>"Tổng sức mạnh" (Kỳ vọng) của mạng luôn không đổi</strong> giữa lúc Train và lúc Test.</p>
+
+        <ul class="list-disc pl-6 space-y-4 mb-6">
+            <li><strong>Cách cổ điển (Kém hiệu quả):</strong> Lúc Train kệ cho sức mạnh của mạng giảm xuống. Bù lại, lúc Test (khi mà ta cần AI chạy nhanh nhất có thể), máy tính lại phải tốn công thêm phép nhân \( (1-p) \) vào toàn bộ nơ-ron để ép sức mạnh xuống cho khớp với lúc Train.</li>
+            <li><strong>Inverted Dropout (Tuyệt vời hơn):</strong> Lúc Test <strong>KHÔNG CẦN TÍNH TOÁN GÌ THÊM</strong> (giúp tăng tối đa tốc độ dự đoán). Để làm được điều này, ngay trong lúc Train, ta ép các nơ-ron còn sống sót phải hoạt động mạnh lên bằng cách <strong>chia giá trị của chúng cho tỷ lệ sống sót \( (1-p) \)</strong> (Ví dụ tỷ lệ drop \( p = 0.5 \) thì chia cho \( 0.5 \) chính là nhân 2 lần sức mạnh).</li>
+        </ul>
+
+        <div class="math-block">
+            <strong>Công thức Inverted Dropout tại lớp ẩn \( h \):</strong><br><br>
+            \[
+            h' = \begin{cases} 
+            0 & \text{nếu nơ-ron bị tắt (xác suất } p) \\ 
+            \frac{h}{1-p} & \text{nếu nơ-ron sống sót (xác suất } 1-p) 
+            \end{cases}
+            \]
+        </div>
+    </section>
+
+    <!-- PHẦN 4: KIẾN THỨC MỞ RỘNG CỰC HAY -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4 text-emerald-700">4. Mở rộng (Kiến thức ngoài giáo trình)</h2>
+        
+        <div class="grid md:grid-cols-2 gap-6 mt-6">
+            <!-- Box 1 -->
+            <div class="bg-white p-6 border border-slate-200 rounded-lg shadow-sm">
+                <h3 class="text-xl font-bold text-slate-800 mb-2">1. Góc nhìn Ensemble (Quần thể)</h3>
+                <p class="text-slate-600">Giả sử mạng có $N$ nơ-ron. Mỗi lần bạn áp dụng Dropout, bạn đang tạo ra một mạng con (sub-network) khác nhau. Tổng cộng có $2^N$ mạng con có thể được tạo ra.</p>
+                <p class="text-slate-600 mt-2">Do đó, huấn luyện với Dropout thực chất là đang <strong>huấn luyện hàng tỷ mạng nơ-ron nhỏ cùng lúc</strong> (chia sẻ chung trọng số). Khi Test, việc bật tất cả nơ-ron tương đương với việc lấy trung bình dự đoán của hàng tỷ mạng này. Ensemble luôn mạnh hơn cá nhân!</p>
+            </div>
+
+            <!-- Box 2 -->
+            <div class="bg-white p-6 border border-slate-200 rounded-lg shadow-sm">
+                <h3 class="text-xl font-bold text-slate-800 mb-2">2. Monte Carlo Dropout (Đo lường độ chắc chắn)</h3>
+                <p class="text-slate-600">Thông thường, AI luôn trả lời một cách "chắc nịch" (ví dụ: 99% đây là con mèo) kể cả khi nó sai. Làm sao để AI biết nói "Tôi không chắc"?</p>
+                <p class="text-slate-600 mt-2">Garin (2016) phát hiện ra: <strong>Hãy bật Dropout cả trong lúc Test.</strong> Cho cùng một bức ảnh chạy qua mạng 100 lần (mỗi lần tắt ngẫu nhiên nơ-ron khác nhau). Nếu 100 kết quả ra giống nhau -> AI rất chắc chắn. Nếu kết quả nhảy loạn xạ -> Ảnh này là đồ giả hoặc dữ liệu nhiễu!</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="mt-16 text-center text-slate-500 border-t border-slate-200 pt-6">
+        <p>Kết thúc Bài 6. Nghịch lý của AI: Đôi khi việc cố tình "quên" đi một vài thứ lại là cách tốt nhất để ghi nhớ những điều quan trọng.</p>
+    </footer>
+
+    <script>
+        // --- SVG NETWORK VISUALIZATION LOGIC ---
+        const svg = document.getElementById('networkSvg');
+        const layers = [
+            { id: 'input', count: 3, x: 100, type: 'input' },
+            { id: 'hidden', count: 6, x: 300, type: 'hidden' }, // The layer we apply dropout to
+            { id: 'output', count: 2, x: 500, type: 'output' }
+        ];
+        
+        let nodes = [];
+        let edges = [];
+
+        function calculateY(index, count, height) {
+            const spacing = height / (count + 1);
+            return spacing * (index + 1);
+        }
+
+        // 1. Khởi tạo cấu trúc đồ thị
+        function initNetwork() {
+            svg.innerHTML = '';
+            nodes = [];
+            edges = [];
+
+            // Tạo danh sách các Node
+            layers.forEach(layer => {
+                for (let i = 0; i < layer.count; i++) {
+                    const y = calculateY(i, layer.count, 300);
+                    nodes.push({ id: `${layer.id}-${i}`, layerId: layer.id, x: layer.x, y: y, type: layer.type });
+                }
+            });
+
+            // Tạo danh sách các Edges (Connections)
+            const inputs = nodes.filter(n => n.type === 'input');
+            const hiddens = nodes.filter(n => n.type === 'hidden');
+            const outputs = nodes.filter(n => n.type === 'output');
+
+            // Input -> Hidden
+            inputs.forEach(i => {
+                hiddens.forEach(h => {
+                    edges.push({ source: i, target: h, id: `edge-${i.id}-${h.id}` });
+                });
+            });
+
+            // Hidden -> Output
+            hiddens.forEach(h => {
+                outputs.forEach(o => {
+                    edges.push({ source: h, target: o, id: `edge-${h.id}-${o.id}` });
+                });
+            });
+
+            // Vẽ Edges trước (để nằm dưới Nodes)
+            edges.forEach(edge => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', edge.source.x);
+                line.setAttribute('y1', edge.source.y);
+                line.setAttribute('x2', edge.target.x);
+                line.setAttribute('y2', edge.target.y);
+                line.setAttribute('class', 'edge');
+                line.setAttribute('id', edge.id);
+                svg.appendChild(line);
+            });
+
+            // Vẽ Nodes sau
+            nodes.forEach(node => {
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', node.x);
+                circle.setAttribute('cy', node.y);
+                circle.setAttribute('r', 18);
+                circle.setAttribute('class', `node ${node.type}`);
+                circle.setAttribute('id', node.id);
+                
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x);
+                text.setAttribute('y', node.y + 5);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', node.type === 'hidden' ? '#fff' : '#1e293b');
+                text.setAttribute('font-size', '12px');
+                text.setAttribute('font-family', 'sans-serif');
+                text.textContent = node.type === 'hidden' ? 'h' : (node.type === 'input' ? 'x' : 'o');
+                if (node.type === 'hidden') {
+                    text.setAttribute('id', `text-${node.id}`);
+                }
+
+                g.appendChild(circle);
+                g.appendChild(text);
+                svg.appendChild(g);
+            });
+        }
+
+        // Cập nhật nhãn thanh trượt
+        function updateDropLabel(val) {
+            document.getElementById('dropRateLabel').innerText = val;
+        }
+
+        // Logic áp dụng Dropout
+        function applyDropout() {
+            const p = parseFloat(document.getElementById('dropRate').value);
+            let droppedCount = 0;
+            const hiddens = nodes.filter(n => n.type === 'hidden');
+
+            hiddens.forEach(node => {
+                const circle = document.getElementById(node.id);
+                const text = document.getElementById(`text-${node.id}`);
+                const isDropped = Math.random() < p;
+
+                if (isDropped) {
+                    circle.classList.add('dropped');
+                    text.textContent = '0';
+                    droppedCount++;
+                } else {
+                    circle.classList.remove('dropped');
+                    // Inverted dropout formula representation
+                    const scale = (1 / (1 - p)).toFixed(1);
+                    text.textContent = p === 0 ? 'h' : `x${scale}`;
+                }
+
+                // Xử lý làm mờ các kết nối (Edges)
+                edges.forEach(edge => {
+                    if (edge.source.id === node.id || edge.target.id === node.id) {
+                        const line = document.getElementById(edge.id);
+                        if (isDropped) {
+                            line.classList.add('dropped');
+                        } else {
+                            // Cần check xem nếu target/source của edge này cũng bị drop không
+                            // (Ở đây đơn giản hóa vì ta chỉ drop lớp hidden)
+                            line.classList.remove('dropped');
+                        }
+                    }
+                });
+            });
+
+            document.getElementById('networkStatus').innerHTML = `Chế độ Huấn luyện: Đã tắt <span class="text-amber-400 font-bold">${droppedCount}/${hiddens.length}</span> nơ-ron. Các nơ-ron còn lại được scale lên <span class="text-emerald-400">1/(1-${p})</span>.`;
+        }
+
+        // Khôi phục mạng (Chế độ Test)
+        function resetNetwork() {
+            nodes.filter(n => n.type === 'hidden').forEach(node => {
+                document.getElementById(node.id).classList.remove('dropped');
+                document.getElementById(`text-${node.id}`).textContent = 'h';
+            });
+            edges.forEach(edge => {
+                document.getElementById(edge.id).classList.remove('dropped');
+            });
+            document.getElementById('networkStatus').innerHTML = `Chế độ Test (Inference): Tất cả các nơ-ron hoạt động. Trọng số không cần thay đổi nhờ Inverted Dropout.`;
+        }
+
+        // Khởi chạy khi load trang
+        initNetwork();
+    </script>
+</body>
+</html>
