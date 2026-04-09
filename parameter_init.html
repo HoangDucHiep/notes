@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 4: Ổn định Số học & Khởi tạo Tham số</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- Chart.js for interactive graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .math-block { overflow-x: auto; padding: 1rem; background-color: #f1f5f9; border-radius: 0.5rem; margin: 1rem 0; text-align: center; font-size: 1.1rem; border: 1px solid #e2e8f0; }
+        .concept-box { border-left: 4px solid #3b82f6; background-color: #eff6ff; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .warning-box { border-left: 4px solid #ef4444; background-color: #fef2f2; padding: 1rem 1.5rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 1.5rem; }
+        .terminal-box { background-color: #1e1e1e; color: #d4d4d4; font-family: 'Courier New', Courier, monospace; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; white-space: pre-wrap; font-size: 0.95rem; }
+        .chart-container { position: relative; height: 350px; width: 100%; margin: 2rem 0; }
+        h1, h2, h3 { color: #0f172a; }
+    </style>
+</head>
+<body class="max-w-4xl mx-auto p-6 md:p-10 text-lg leading-relaxed">
+
+    <header class="mb-10 border-b-2 border-slate-200 pb-6">
+        <h1 class="text-4xl font-extrabold text-blue-700 mb-2">Bài 4: Ổn định Số học & Khởi tạo</h1>
+        <p class="text-slate-500 text-xl">Tại sao Mạng Nơ-ron thường thất bại trước khi bắt đầu học?</p>
+    </header>
+
+    <!-- PHẦN 1: BẢN CHẤT CỦA SỰ MẤT ỔN ĐỊNH -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">1. Vấn đề cốt lõi: Phép nhân chuỗi ma trận</h2>
+        <p class="mb-4">Trong mạng học sâu với \( L \) lớp, giá trị đầu ra \( \mathbf{o} \) là kết quả của việc áp dụng liên tiếp các hàm biến đổi \( f_l \):</p>
+        <div class="math-block">
+            \( \mathbf{h}^{(l)} = f_l(\mathbf{h}^{(l-1)}) \quad \text{và do đó} \quad \mathbf{o} = f_L \circ \dots \circ f_1(\mathbf{x}) \)
+        </div>
+        <p class="mb-4">Theo <em>Quy tắc chuỗi (Chain Rule)</em>, đạo hàm của đầu ra đối với trọng số ở lớp \( l \) sẽ là tích của rất nhiều ma trận:</p>
+        <div class="math-block">
+            \( \partial_{\mathbf{W}^{(l)}} \mathbf{o} = \underbrace{\partial_{\mathbf{h}^{(L-1)}} \mathbf{h}^{(L)}}_{\mathbf{M}^{(L)}} \dots \underbrace{\partial_{\mathbf{h}^{(l)}} \mathbf{h}^{(l+1)}}_{\mathbf{M}^{(l+1)}} \underbrace{\partial_{\mathbf{W}^{(l)}} \mathbf{h}^{(l)}}_{\mathbf{v}^{(l)}} \)
+        </div>
+        
+        <div class="warning-box">
+            <strong>Nguy hiểm tiềm tàng:</strong> Đạo hàm là tích của \( L - l \) ma trận. Giống như việc bạn nhân 100 con số với nhau. 
+            <br>- Nếu các số đó hơi nhỏ hơn 1 (ví dụ 0.9), kết quả sẽ tiến về <strong>0 (Triệt tiêu đạo hàm - Vanishing)</strong>.
+            <br>- Nếu các số đó hơi lớn hơn 1 (ví dụ 1.1), kết quả sẽ tiến đến <strong>Vô cực (Bùng nổ đạo hàm - Exploding)</strong>.
+        </div>
+    </section>
+
+    <!-- PHẦN 2: TRIỆT TIÊU ĐẠO HÀM (VANISHING) -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">2. Triệt tiêu đạo hàm (Vanishing Gradients)</h2>
+        <p class="mb-4">Thủ phạm phổ biến nhất gây ra hiện tượng này là việc chọn sai hàm kích hoạt, tiêu biểu là hàm <strong>Sigmoid</strong>.</p>
+        
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-2xl font-bold text-slate-800 mb-2">Đồ thị Hàm Sigmoid & Đạo hàm</h3>
+            <p class="text-sm text-slate-600 mb-4">Nhìn vào đường nét đứt màu đỏ (đạo hàm). Nó đạt đỉnh ở 0.25 và nhanh chóng tiến về 0 ở hai phía.</p>
+            <div class="chart-container">
+                <canvas id="sigmoidChart"></canvas>
+            </div>
+        </div>
+        
+        <p class="mt-4">Khi truyền ngược qua nhiều lớp, bạn sẽ nhân liên tục các giá trị tối đa là 0.25 ( \( 0.25 \times 0.25 \times 0.25 \dots \) ). Gradient sẽ nhanh chóng bị "cắt đứt" thành số 0. Trọng số ở các lớp đầu tiên sẽ không được cập nhật, khiến mạng <strong>không thể học</strong>.</p>
+        <p><em>Cách giải quyết hiện đại:</em> Chuyển sang dùng hàm <strong>ReLU</strong> vì đạo hàm của nó bằng 1 ở miền dương, giúp Gradient duy trì sức mạnh đi qua hàng trăm lớp.</p>
+    </section>
+
+    <!-- PHẦN 3: BÙNG NỔ ĐẠO HÀM (EXPLODING) -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">3. Bùng nổ Đạo hàm (Exploding Gradients)</h2>
+        <p class="mb-4">Vấn đề ngược lại xảy ra khi bạn khởi tạo các ma trận trọng số với giá trị quá lớn (phương sai lớn). Khi nhân chúng lại với nhau hàng chục lần, con số sẽ vượt quá giới hạn biểu diễn của máy tính (\( \text{NaN} \) hoặc \( \text{Infinity} \)).</p>
+        
+        <div class="concept-box">
+            <strong>Mô phỏng tương tác:</strong> Hãy thử khởi tạo một ma trận ngẫu nhiên (với các giá trị phân phối chuẩn) và nhân liên tiếp nó với chính nó 100 lần. Bạn sẽ thấy các con số bùng nổ ra sao!
+        </div>
+
+        <div class="bg-slate-100 p-6 rounded-lg border border-slate-300">
+            <button onclick="runExplodingSimulation()" class="px-6 py-3 bg-red-600 text-white font-bold rounded shadow hover:bg-red-700 transition w-full mb-4">
+                ▶ Nhân liên tiếp 100 Ma trận ngẫu nhiên
+            </button>
+            <div id="sim-output" class="terminal-box h-48 overflow-y-auto">
+> Sẵn sàng. Bấm nút để bắt đầu...
+            </div>
+        </div>
+    </section>
+
+    <!-- PHẦN 4: PHÁ VỠ ĐỐI XỨNG -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">4. Tại sao không khởi tạo mọi trọng số bằng 0? (Symmetry Breaking)</h2>
+        <p class="mb-4">Nếu lo sợ tràn số hay triệt tiêu, tại sao ta không gán mọi trọng số \( \mathbf{W} = 0 \) hoặc \( \mathbf{W} = c \) (một hằng số) ngay từ đầu?</p>
+        <ul class="list-disc pl-6 mb-4 space-y-2">
+            <li>Nếu mọi trọng số của một lớp đều giống hệt nhau, trong bước Forward, mọi nơ-ron ẩn sẽ tính ra <strong>cùng một giá trị</strong>.</li>
+            <li>Trong bước Backward, Gradient truyền về mọi nơ-ron cũng sẽ <strong>giống hệt nhau</strong>.</li>
+            <li>Kết quả: Sau khi cập nhật, các trọng số vẫn giống hệt nhau. Dù mạng có 1000 nơ-ron, nó sẽ hành xử y hệt như <strong>1 nơ-ron duy nhất</strong>. Sức mạnh biểu diễn của mạng bị phá hủy.</li>
+        </ul>
+        <p class="font-bold text-indigo-700">Kết luận: Chúng ta BẮT BUỘC phải khởi tạo trọng số ngẫu nhiên (Random Initialization) để phá vỡ sự đối xứng này.</p>
+    </section>
+
+    <!-- PHẦN 5: XAVIER INITIALIZATION -->
+    <section class="mb-12">
+        <h2 class="text-3xl font-bold mb-4">5. Khởi tạo Xavier (Xavier Initialization): Liều thuốc giải</h2>
+        <p class="mb-4">Làm sao để khởi tạo ngẫu nhiên mà không bị Vanishing hay Exploding? Nhà nghiên cứu Xavier Glorot đã đưa ra một công thức toán học xuất sắc: <strong>Giữ cho Phương sai (Variance) của dữ liệu ổn định khi đi qua từng lớp.</strong></p>
+
+        <div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+            <h3 class="font-bold text-xl text-slate-800 mb-3">Chứng minh toán học (Giản lược):</h3>
+            <p>Xét một nơ-ron \( o_i = \sum_{j=1}^{n_{in}} w_{ij}x_j \). Giả sử đầu vào \( x_j \) có phương sai là \( \gamma^2 \) và trọng số \( w_{ij} \) có phương sai là \( \sigma^2 \). Nếu chúng độc lập và có trung bình bằng 0, phương sai của đầu ra sẽ là:</p>
+            <div class="math-block">
+                \( \text{Var}[o_i] = \sum_{j=1}^{n_{in}} \text{Var}[w_{ij}x_j] = n_{in}\sigma^2\gamma^2 \)
+            </div>
+            
+            <p class="mt-4">Để phương sai không bị phình to hay thu nhỏ sau khi đi qua lớp này (tức là \( \text{Var}[o_i] = \gamma^2 \)), ta cần:</p>
+            <div class="math-block font-bold text-blue-700">
+                \( n_{in}\sigma^2 = 1 \)  (Dành cho Lan truyền xuôi - Forward)
+            </div>
+
+            <p class="mt-4">Tương tự, để giữ ổn định Gradient trong quá trình Lan truyền ngược, ta cần:</p>
+            <div class="math-block font-bold text-rose-700">
+                \( n_{out}\sigma^2 = 1 \) (Dành cho Lan truyền ngược - Backward)
+            </div>
+
+            <p class="mt-4">Ta không thể thỏa mãn cả 2 điều kiện cùng lúc (trừ khi \( n_{in} = n_{out} \)). Do đó, Xavier đề xuất lấy giá trị trung bình:</p>
+            <div class="math-block bg-yellow-50 border-yellow-200">
+                \( \frac{1}{2}(n_{in} + n_{out})\sigma^2 = 1 \quad \implies \quad \sigma = \sqrt{\frac{2}{n_{in} + n_{out}}} \)
+            </div>
+        </div>
+
+        <p class="mt-6"><strong>Kết quả thực tế:</strong> Khi lập trình, ta sẽ khởi tạo ma trận trọng số bằng cách lấy mẫu ngẫu nhiên từ phân phối chuẩn với phương sai tính theo công thức trên, hoặc phân phối đều (Uniform) trong khoảng:
+        <div class="math-block">\( U\left(-\sqrt{\frac{6}{n_{in} + n_{out}}}, \sqrt{\frac{6}{n_{in} + n_{out}}}\right) \)</div>
+        <em>Nhờ Xavier Initialization, chúng ta có thể huấn luyện các mạng nơ-ron có hàng trăm lớp mà không sợ đạo hàm bị bốc hơi hay phát nổ ở giai đoạn khởi đầu!</em>
+        </p>
+    </section>
+
+    <!-- JavaScript logic -->
+    <script>
+        // --- 1. Sigmoid Chart ---
+        const xValues = [];
+        for (let x = -8; x <= 8; x += 0.2) {
+            xValues.push(x.toFixed(1));
+        }
+
+        const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+        const sigmoidData = xValues.map(x => sigmoid(x));
+        const sigmoidGradData = xValues.map(x => sigmoid(x) * (1 - sigmoid(x)));
+
+        new Chart(document.getElementById('sigmoidChart'), {
+            type: 'line',
+            data: {
+                labels: xValues,
+                datasets: [
+                    { label: 'Hàm số: Sigmoid(x)', data: sigmoidData, borderColor: '#3b82f6', tension: 0.4, borderWidth: 3 },
+                    { label: 'Đạo hàm: grad(Sigmoid)', data: sigmoidGradData, borderColor: '#ef4444', borderDash: [5, 5], tension: 0.4, borderWidth: 2 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { x: { grid: { color: '#e2e8f0' } }, y: { grid: { color: '#e2e8f0' } } },
+                interaction: { mode: 'index', intersect: false }
+            }
+        });
+
+        // --- 2. Exploding Gradient Simulator ---
+        // Simple matrix multiplication for 2x2 matrices
+        function multiply2x2(a, b) {
+            return [
+                a[0]*b[0] + a[1]*b[2],  a[0]*b[1] + a[1]*b[3],
+                a[2]*b[0] + a[3]*b[2],  a[2]*b[1] + a[3]*b[3]
+            ];
+        }
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        async function runExplodingSimulation() {
+            const outBox = document.getElementById('sim-output');
+            
+            // Randomly initialize a 2x2 matrix with std_dev = 1.2 (slightly > 1 to cause explosion)
+            // Simulating normal distribution roughly
+            let M = [
+                (Math.random()*2 - 1) * 1.5, (Math.random()*2 - 1) * 1.5,
+                (Math.random()*2 - 1) * 1.5, (Math.random()*2 - 1) * 1.5
+            ];
+            const originalM = [...M];
+            let currentM = [...M];
+
+            outBox.innerHTML = `<span class='text-blue-400'>[Bắt đầu]</span> Ma trận khởi tạo ban đầu M (Phương sai hơi lớn):\n`;
+            outBox.innerHTML += `[ ${M[0].toFixed(4)}   ${M[1].toFixed(4)} ]\n[ ${M[2].toFixed(4)}   ${M[3].toFixed(4)} ]\n\n`;
+            outBox.scrollTop = outBox.scrollHeight;
+            await delay(1000);
+
+            let steps = [10, 20, 50, 100];
+            
+            for (let step of steps) {
+                outBox.innerHTML += `<span class='text-yellow-400'>Đang thực hiện nhân...</span> đến lần thứ ${step}\n`;
+                
+                // multiply currentM by original M until we reach 'step'
+                let tempM = [...originalM];
+                for(let i=1; i<step; i++) {
+                    tempM = multiply2x2(tempM, originalM);
+                }
+                
+                outBox.innerHTML += `Kết quả M^${step}:\n`;
+                
+                // Format nicely, handling Infinity or Scientific notation
+                let fmt = tempM.map(val => {
+                    if (!isFinite(val)) return 'Infinity!';
+                    if (Math.abs(val) > 10000) return val.toExponential(4);
+                    return val.toFixed(4);
+                });
+
+                outBox.innerHTML += `<span class='text-red-400'>[ ${fmt[0]}   ${fmt[1]} ]\n[ ${fmt[2]}   ${fmt[3]} ]</span>\n\n`;
+                outBox.scrollTop = outBox.scrollHeight;
+                await delay(1200);
+            }
+
+            outBox.innerHTML += `<span class='text-emerald-400'>[KẾT LUẬN]</span> Như bạn thấy, chỉ sau 100 lần nhân (tương đương đi qua 100 lớp ẩn), các con số đã bùng nổ lên cỡ e+20 hoặc vỡ tràn thành Infinity. Khởi tạo bất cẩn sẽ giết chết Optimizer (ví dụ SGD) ngay lập tức!\n`;
+            outBox.scrollTop = outBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
