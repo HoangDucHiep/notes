@@ -3,28 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mô phỏng Thuật toán Ring</title>
+    <title>Mô phỏng Bầu cử Đồng thời - Ring</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* CSS Variables based on the provided screenshots */
+        /* CSS Variables - Dark Theme */
         :root {
             --bg-main: #242429;
             --bg-card: #3a3a3e;
-            --text-heading: #ecd3de; /* Pale pink */
+            --text-heading: #ecd3de;
             --text-body: #d4d4d4;
-            --accent-pink: #f4a8a8; /* Thick left border color */
-            --accent-blue: #a5c8ff; /* Active node color */
+            --accent-pink: #f4a8a8;
+            --accent-blue: #a5c8ff;
             --node-border: #d4d4d4;
             --line-color: #888888;
-            --msg-election: #f59e0b;
             --msg-coordinator: #10b981;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             background-color: var(--bg-main);
@@ -35,41 +30,36 @@
             flex-direction: column;
         }
 
-        /* Typography */
         h1, h2, h3, .mono-text {
             font-family: 'Consolas', 'Courier New', monospace;
             color: var(--text-heading);
             font-weight: normal;
         }
 
-        h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
-        h2 { font-size: 1.5rem; margin-bottom: 1rem; }
+        h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.3rem; margin-bottom: 1rem; }
 
-        /* Layout */
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             padding: 2rem;
             display: flex;
             flex-direction: column;
-            gap: 2rem;
+            gap: 1.5rem;
             flex-grow: 1;
+            width: 100%;
         }
 
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 400px;
+            grid-template-columns: 1fr 340px 420px;
             gap: 2rem;
             flex-grow: 1;
+            align-items: stretch;
         }
 
-        @media (max-width: 1024px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        @media (max-width: 1200px) { .main-grid { grid-template-columns: 1fr; } }
 
-        /* Cards mimicking the screenshot style */
         .styled-card {
             background-color: var(--bg-card);
             border-radius: 12px;
@@ -80,11 +70,8 @@
             flex-direction: column;
         }
 
-        .styled-card.blue-border {
-            border-left-color: var(--accent-blue);
-        }
+        .styled-card.blue-border { border-left-color: var(--accent-blue); }
 
-        /* Simulation Canvas Area */
         .canvas-container {
             background-color: var(--bg-main);
             border: 2px solid var(--bg-card);
@@ -95,195 +82,95 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            flex-grow: 1;
         }
 
         #ring-svg {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 1;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 1;
         }
 
-        .ring-line {
-            stroke: var(--line-color);
-            stroke-width: 2;
-            stroke-dasharray: 6, 6;
-            fill: none;
-        }
+        .ring-line { stroke: var(--line-color); stroke-width: 2; stroke-dasharray: 6, 6; fill: none; }
 
-        /* Nodes */
         .node {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border: 3px solid var(--node-border);
-            background-color: var(--bg-main);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: var(--text-body);
-            font-family: 'Consolas', monospace;
-            font-size: 1.2rem;
-            cursor: pointer;
-            z-index: 10;
-            transition: all 0.3s ease;
+            position: absolute; width: 50px; height: 50px;
+            border-radius: 50%; border: 3px solid var(--node-border);
+            background-color: var(--bg-main); display: flex; justify-content: center; align-items: center;
+            color: var(--text-body); font-family: 'Consolas', monospace; font-size: 1.2rem;
+            cursor: pointer; z-index: 10; transition: all 0.3s ease;
         }
 
-        .node:hover {
-            transform: scale(1.1);
-        }
+        .node:hover { transform: scale(1.1); }
+        .node.coordinator { background-color: var(--accent-blue); border-color: var(--accent-blue); color: var(--bg-main); font-weight: bold; }
+        .node.dead { border-color: #555; color: #555; background-color: transparent; opacity: 0.5; }
 
-        .node.coordinator {
-            background-color: var(--accent-blue);
-            border-color: var(--accent-blue);
-            color: var(--bg-main);
-            font-weight: bold;
-        }
-
-        .node.dead {
-            border-color: #555;
-            color: #555;
-            background-color: transparent;
-            opacity: 0.5;
-        }
-
-        /* Messages */
         .message {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            z-index: 20;
-            transition: all 1s linear;
-            display: flex;
-            justify-content: center;
+            position: absolute; width: 16px; height: 16px; border-radius: 50%;
+            z-index: 20; transition: all 1s linear; display: flex; justify-content: center;
         }
 
-        .msg-election { background-color: var(--msg-election); box-shadow: 0 0 10px var(--msg-election); }
         .msg-coordinator { background-color: var(--msg-coordinator); box-shadow: 0 0 10px var(--msg-coordinator); }
 
         .msg-label {
-            position: absolute;
-            top: -30px;
-            background-color: var(--bg-card);
-            color: var(--text-heading);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: 'Consolas', monospace;
-            font-size: 0.85rem;
-            white-space: nowrap;
-            border: 1px solid #555;
-        }
-
-        /* Controls */
-        .controls {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            position: absolute; top: -30px; background-color: var(--bg-card);
+            padding: 2px 8px; border-radius: 4px; font-family: 'Consolas', monospace;
+            font-size: 0.85rem; white-space: nowrap; border: 1px solid #555; font-weight: bold;
         }
 
         .btn {
-            background-color: transparent;
-            border: 2px solid var(--text-heading);
-            color: var(--text-heading);
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-family: 'Consolas', monospace;
-            font-size: 1rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
+            background-color: transparent; border: 2px solid var(--text-heading);
+            color: var(--text-heading); padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer;
+            font-family: 'Consolas', monospace; font-size: 1rem; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%;
         }
+        .btn:hover { background-color: var(--text-heading); color: var(--bg-main); }
+        .btn-danger { border-color: #ef4444; color: #ef4444; }
+        .btn-danger:hover { background-color: #ef4444; color: #fff; }
+        .btn-primary { background-color: var(--accent-blue); border-color: var(--accent-blue); color: var(--bg-main); font-weight: bold; }
+        .btn-primary:hover { background-color: #8ab4f8; border-color: #8ab4f8; }
 
-        .btn:hover {
-            background-color: var(--text-heading);
-            color: var(--bg-main);
+        /* Multi-select Checkboxes */
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .cb-label {
+            background-color: var(--bg-main); border: 1px solid #555; padding: 0.4rem 0.6rem;
+            border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;
+            font-family: 'Consolas', monospace; font-size: 0.9rem; transition: 0.2s; user-select: none;
+            flex-grow: 1; justify-content: center;
         }
+        .cb-label:hover { border-color: var(--text-heading); }
+        .cb-label input { cursor: pointer; }
+        .cb-label input:checked + span { color: var(--accent-pink); font-weight: bold; }
 
-        .btn-danger {
-            border-color: #ef4444;
-            color: #ef4444;
-        }
-        .btn-danger:hover {
-            background-color: #ef4444;
-            color: #fff;
-        }
-
-        .btn-primary {
-            background-color: var(--accent-blue);
-            border-color: var(--accent-blue);
-            color: var(--bg-main);
-            font-weight: bold;
-        }
-        .btn-primary:hover {
-            background-color: #8ab4f8;
-            border-color: #8ab4f8;
-        }
-
-        select {
-            background-color: var(--bg-main);
-            color: var(--text-body);
-            border: 1px solid #555;
-            padding: 0.5rem;
-            border-radius: 6px;
-            font-family: 'Consolas', monospace;
-            width: 100%;
-            outline: none;
-        }
-
-        /* Logs */
         .log-container {
-            flex-grow: 1;
-            background-color: #222;
-            border-radius: 8px;
-            padding: 1rem;
-            overflow-y: auto;
-            max-height: 400px;
-            font-family: 'Consolas', monospace;
-            font-size: 0.9rem;
-            line-height: 1.5;
+            flex-grow: 1; background-color: #1e1e22; border-radius: 8px; padding: 1rem;
+            overflow-y: auto; min-height: 400px; font-family: 'Consolas', monospace;
+            font-size: 0.85rem; line-height: 1.5; border: 1px solid #333;
         }
-
-        .log-entry { border-bottom: 1px solid #333; padding: 0.5rem 0; }
-        .log-time { color: #888; font-size: 0.8rem; margin-right: 0.5rem; }
+        .log-entry { border-bottom: 1px solid #2a2a2e; padding: 0.4rem 0; display: flex; flex-direction: column;}
+        .log-time { color: #666; font-size: 0.75rem; margin-bottom: 2px;}
         .log-info { color: var(--text-body); }
-        .log-warn { color: var(--msg-election); }
         .log-success { color: var(--msg-coordinator); }
         .log-error { color: #ef4444; }
 
-        /* Setup Node Pulse */
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        @keyframes pulse-ring {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255, 0.4); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255,255,255, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255, 0); }
         }
-        .initiating { animation: pulse 1.5s infinite; border-color: var(--msg-election); }
+        .initiating { animation: pulse-ring 1s infinite; }
 
-        .legend {
-            display: flex;
-            gap: 1.5rem;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            justify-content: center;
+        .info-box {
+            background: rgba(165, 200, 255, 0.1); border: 1px dashed var(--accent-blue);
+            padding: 1rem; border-radius: 8px; font-size: 0.85rem; color: #a5c8ff; margin-bottom: 1rem;
         }
-        .legend-item { display: flex; align-items: center; gap: 0.5rem; }
-        .dot { width: 12px; height: 12px; border-radius: 50%; }
-        .dot.elec { background-color: var(--msg-election); }
-        .dot.coord { background-color: var(--msg-coordinator); }
-
     </style>
 </head>
 <body>
 
     <div class="container">
         <header>
-            <h1>Mô phỏng thuật toán Ring</h1>
-            <p style="color: var(--line-color); font-family: 'Consolas', monospace;">Logical Ring Leader Election - Click vào node để bật/tắt</p>
+            <h1><i class="fa-solid fa-code-branch text-accent-pink"></i> Bầu cử Đồng thời (Simultaneous Elections)</h1>
+            <p style="color: var(--line-color); font-family: 'Consolas', monospace;">Chứng minh tính ổn định tuyệt đối của Ring Algorithm khi xảy ra đụng độ.</p>
         </header>
 
         <div class="main-grid">
@@ -291,37 +178,44 @@
             <div style="display: flex; flex-direction: column;">
                 <div class="canvas-container" id="canvas-container">
                     <svg id="ring-svg"></svg>
-                    <!-- Nodes injected via JS -->
-                </div>
-                <div class="legend">
-                    <div class="legend-item"><div class="dot elec"></div> Tin nhắn ELECTION [Danh sách ID]</div>
-                    <div class="legend-item"><div class="dot coord"></div> Tin nhắn COORDINATOR</div>
                 </div>
             </div>
 
-            <!-- Right: Panel -->
-            <div class="styled-card blue-border">
+            <!-- Middle: Controls -->
+            <div class="styled-card blue-border" style="height: fit-content;">
                 <h2 class="mono-text">Bảng điều khiển</h2>
                 
+                <div class="info-box">
+                    <i class="fa-solid fa-lightbulb"></i> <b>Hướng dẫn Debate:</b><br>
+                    Hãy đánh sập Leader, sau đó tick chọn 2-3 Node để chúng cùng gào lên phát động bầu cử. Bạn sẽ thấy các tin nhắn chạy rượt đuổi nhau độc lập.
+                </div>
+
                 <div class="controls">
-                    <button class="btn" onclick="sim.resetSimulation()">
-                        <i class="fa-solid fa-rotate-right"></i> Khôi phục mạng
+                    <button class="btn btn-danger" onclick="sim.killCoordinator()">
+                        <i class="fa-solid fa-skull"></i> Đánh sập Leader
                     </button>
                     
-                    <button class="btn btn-danger" onclick="sim.killCoordinator()">
-                        <i class="fa-solid fa-power-off"></i> Đánh sập Leader hiện tại
+                    <button class="btn" onclick="sim.resetSimulation()">
+                        <i class="fa-solid fa-rotate-right"></i> Reset mạng
                     </button>
 
-                    <div style="background-color: var(--bg-main); padding: 1rem; border-radius: 8px; border: 1px solid #555; margin-top: 1rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; font-family: 'Consolas';">Chọn Node phát hiện lỗi:</label>
-                        <select id="startNode"></select>
-                        <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="sim.triggerElection()">
-                            <i class="fa-solid fa-paper-plane"></i> Phát động Bầu cử
+                    <div style="background-color: var(--bg-main); padding: 1rem; border-radius: 8px; border: 1px solid #555; margin-top: 0.5rem;">
+                        <label style="display: block; font-family: 'Consolas'; color: var(--text-heading); font-size: 0.95rem;">
+                            <i class="fa-solid fa-users"></i> Chọn các Node phát động (Đồng thời):
+                        </label>
+                        <div id="multiSelectNodes" class="checkbox-group">
+                            <!-- Checkboxes injected by JS -->
+                        </div>
+                        <button class="btn btn-primary" style="margin-top: 1rem;" onclick="sim.triggerSimultaneousElection()">
+                            <i class="fa-solid fa-bolt"></i> Phát động Bầu cử
                         </button>
                     </div>
                 </div>
+            </div>
 
-                <h2 class="mono-text" style="margin-top: 1rem; border-top: 1px solid #555; padding-top: 1rem;">Trạng thái (Logs)</h2>
+            <!-- Right: Logs -->
+            <div class="styled-card">
+                <h2 class="mono-text">Console Logs</h2>
                 <div class="log-container" id="log-panel">
                     <!-- Logs go here -->
                 </div>
@@ -331,12 +225,17 @@
 
     <script>
         class RingSimulation {
-            constructor(containerId, numNodes = 6) {
+            constructor(containerId, numNodes = 7) {
                 this.container = document.getElementById(containerId);
                 this.svgArea = document.getElementById('ring-svg');
                 this.numNodes = numNodes;
                 this.nodes = [];
-                this.isSimulating = false;
+                
+                // Track ongoing concurrency
+                this.activeElections = 0;
+                // Pre-defined vivid colors for different simultaneous messages
+                this.colors = ['#f59e0b', '#ec4899', '#3b82f6', '#14b8a6', '#8b5cf6']; 
+                
                 this.radius = 0;
                 this.centerX = 0;
                 this.centerY = 0;
@@ -345,7 +244,6 @@
             }
 
             init() {
-                // Resize observer to handle responsive layout
                 const resizeObserver = new ResizeObserver(() => {
                     this.calculateLayout();
                     this.updateNodePositions();
@@ -360,7 +258,7 @@
                 const height = this.container.clientHeight;
                 this.centerX = width / 2;
                 this.centerY = height / 2;
-                this.radius = Math.min(width, height) / 2 - 60; // Padding
+                this.radius = Math.min(width, height) / 2 - 60; 
             }
 
             createNodes() {
@@ -381,7 +279,7 @@
                     node.el.innerHTML = isCoordinator ? `${i} <i class="fa-solid fa-star" style="position:absolute; top:-10px; right:-5px; color:var(--accent-pink); font-size:14px;"></i>` : i;
                     
                     node.el.onclick = () => {
-                        if (this.isSimulating) return;
+                        if (this.activeElections > 0) return;
                         this.toggleNode(node.id);
                     };
 
@@ -389,34 +287,27 @@
                     this.container.appendChild(node.el);
                 }
                 
-                // Need layout calculated before positioning
                 this.calculateLayout();
                 this.updateNodePositions();
                 this.updateSelectOptions();
-                this.log(`Khởi tạo mạng với ${this.numNodes} nodes. Leader: Node ${this.numNodes - 1}.`, 'log-info');
+                this.log(`Hệ thống khởi tạo với ${this.numNodes} nodes. Leader hiện hành: Node ${this.numNodes - 1}.`, 'log-info');
             }
 
             updateNodePositions() {
                 this.svgArea.innerHTML = '';
-                
                 this.nodes.forEach((node, i) => {
-                    // Start from top, clockwise
                     const angle = (Math.PI * 2 * i) / this.numNodes - Math.PI / 2;
-                    const x = this.centerX + this.radius * Math.cos(angle) - 25; // 25 is half width
+                    const x = this.centerX + this.radius * Math.cos(angle) - 25; 
                     const y = this.centerY + this.radius * Math.sin(angle) - 25;
-                    
-                    node.x = x + 25; // Center x for lines
-                    node.y = y + 25; // Center y
-                    
+                    node.x = x + 25; 
+                    node.y = y + 25; 
                     node.el.style.left = `${x}px`;
                     node.el.style.top = `${y}px`;
                 });
 
-                // Draw dashed lines
                 for(let i = 0; i < this.numNodes; i++) {
                     const from = this.nodes[i];
                     const to = this.nodes[(i + 1) % this.numNodes];
-                    
                     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     line.setAttribute('x1', from.x);
                     line.setAttribute('y1', from.y);
@@ -436,10 +327,10 @@
                     node.el.classList.remove('coordinator');
                     if (node.isCoordinator) {
                         node.isCoordinator = false;
-                        node.el.innerHTML = `${id}`; // Remove star
-                        this.log(`Node ${id} (Leader) đã mất kết nối!`, 'log-error');
+                        node.el.innerHTML = `${id}`;
+                        this.log(`💥 CẢNH BÁO: Node ${id} (Leader) đã mất kết nối!`, 'log-error');
                     } else {
-                        this.log(`Node ${id} đã ngừng hoạt động (Chờ Bypass).`, 'log-info');
+                        this.log(`Node ${id} đã bị ngắt kết nối.`, 'log-info');
                     }
                 } else {
                     node.el.classList.remove('dead');
@@ -449,7 +340,7 @@
             }
 
             killCoordinator() {
-                if (this.isSimulating) return;
+                if (this.activeElections > 0) return;
                 const coord = this.nodes.find(n => n.isCoordinator && n.isAlive);
                 if (coord) {
                     this.toggleNode(coord.id);
@@ -459,37 +350,45 @@
             }
 
             resetSimulation() {
-                if (this.isSimulating) return;
+                if (this.activeElections > 0) return;
                 this.createNodes();
                 document.getElementById('log-panel').innerHTML = '';
                 this.log("Mạng đã được khôi phục về trạng thái ban đầu.", "log-info");
             }
 
             updateSelectOptions() {
-                const select = document.getElementById('startNode');
-                const val = select.value;
-                select.innerHTML = '';
-                let hasOptions = false;
+                const container = document.getElementById('multiSelectNodes');
+                // preserve checked states if possible
+                const currentlyChecked = Array.from(container.querySelectorAll('input:checked')).map(cb => cb.value);
+                
+                container.innerHTML = '';
+                
                 this.nodes.forEach(n => {
                     if (n.isAlive && !n.isCoordinator) {
-                        const opt = document.createElement('option');
-                        opt.value = n.id;
-                        opt.textContent = `Node ${n.id}`;
-                        select.appendChild(opt);
-                        hasOptions = true;
+                        const label = document.createElement('label');
+                        label.className = 'cb-label';
+                        
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.value = n.id;
+                        if(currentlyChecked.includes(n.id.toString())) cb.checked = true;
+
+                        const span = document.createElement('span');
+                        span.innerText = `Node ${n.id}`;
+
+                        label.appendChild(cb);
+                        label.appendChild(span);
+                        container.appendChild(label);
                     }
                 });
-                if (val && [...select.options].some(o => o.value === val)) {
-                    select.value = val;
-                }
             }
 
-            log(message, typeClass = 'log-info') {
+            log(message, typeClass = 'log-info', colorStyle = '') {
                 const panel = document.getElementById('log-panel');
-                const time = new Date().toLocaleTimeString('vi-VN', {hour12:false});
+                const time = new Date().toLocaleTimeString('vi-VN', {hour12:false, minute:'2-digit', second:'2-digit'}) + '.' + new Date().getMilliseconds().toString().padStart(3, '0');
                 const el = document.createElement('div');
                 el.className = `log-entry`;
-                el.innerHTML = `<span class="log-time">[${time}]</span> <span class="${typeClass}">${message}</span>`;
+                el.innerHTML = `<div class="log-time">[${time}]</div><div class="${typeClass}" style="color: ${colorStyle || ''}">${message}</div>`;
                 panel.appendChild(el);
                 panel.scrollTop = panel.scrollHeight;
             }
@@ -507,48 +406,78 @@
                 return -1; 
             }
 
-            async animateMessage(fromId, toId, type, labelText) {
+            async animateMessage(fromId, toId, type, labelText, customColor) {
                 const fromNode = this.nodes[fromId];
                 const toNode = this.nodes[toId];
                 
                 const msg = document.createElement('div');
-                msg.className = `message msg-${type.toLowerCase()}`;
+                msg.className = `message`;
                 msg.style.left = `${fromNode.x - 8}px`;
                 msg.style.top = `${fromNode.y - 8}px`;
+
+                if (type === 'election') {
+                    msg.style.backgroundColor = customColor;
+                    msg.style.boxShadow = `0 0 12px ${customColor}`;
+                } else {
+                    msg.classList.add('msg-coordinator');
+                }
 
                 if (labelText) {
                     const label = document.createElement('div');
                     label.className = 'msg-label';
                     label.innerText = labelText;
+                    if (type === 'election') {
+                        label.style.borderColor = customColor;
+                        label.style.color = customColor;
+                    } else {
+                        label.style.borderColor = 'var(--msg-coordinator)';
+                        label.style.color = 'var(--msg-coordinator)';
+                    }
                     msg.appendChild(label);
                 }
 
                 this.container.appendChild(msg);
-                void msg.offsetWidth; // force reflow
+                void msg.offsetWidth; 
 
                 msg.style.left = `${toNode.x - 8}px`;
                 msg.style.top = `${toNode.y - 8}px`;
 
-                await this.delay(1000); 
+                await this.delay(1200); // 1.2s travel time so they interleave nicely
                 msg.remove();
             }
 
-            triggerElection() {
-                if (this.isSimulating) return;
-                const select = document.getElementById('startNode');
-                if (!select.value) {
-                    this.log("Không có node hợp lệ để bắt đầu.", "log-error");
+            triggerSimultaneousElection() {
+                if (this.activeElections > 0) {
+                    this.log("Đang có đợt bầu cử diễn ra, vui lòng chờ...", "log-error");
                     return;
                 }
-                const id = parseInt(select.value);
-                this.startElectionProcess(id);
+
+                const checkboxes = document.querySelectorAll('#multiSelectNodes input:checked');
+                const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+                if (selectedIds.length === 0) {
+                    this.log("Vui lòng chọn ít nhất 1 node để bắt đầu.", "log-error");
+                    return;
+                }
+
+                this.log(`=== BẮT ĐẦU BẦU CỬ ĐỒNG THỜI (${selectedIds.length} Nodes) ===`, 'log-info', '#f4a8a8');
+                
+                this.activeElections = selectedIds.length;
+
+                // Launch them concurrently without awaiting them here!
+                selectedIds.forEach((id, index) => {
+                    // Give each an assigned color
+                    const color = this.colors[index % this.colors.length];
+                    this.startElectionProcess(id, color);
+                });
             }
 
-            async startElectionProcess(initiatorId) {
-                this.isSimulating = true;
+            async startElectionProcess(initiatorId, color) {
+                const prefix = `[Tiến trình ${initiatorId}]`;
                 this.nodes[initiatorId].el.classList.add('initiating');
+                this.nodes[initiatorId].el.style.borderColor = color;
                 
-                this.log(`--- BẮT ĐẦU BẦU CỬ TỪ NODE ${initiatorId} ---`, 'log-warn');
+                this.log(`${prefix} Phát hiện lỗi. Tung tin nhắn ELECTION.`, 'log-info', color);
                 
                 let currentId = initiatorId;
                 let idList = [currentId];
@@ -558,50 +487,48 @@
                     let nextId = this.getSuccessor(currentId);
                     
                     if (nextId === -1) {
-                        this.log(`Node ${initiatorId} là node duy nhất còn sống!`, 'log-error');
+                        this.log(`${prefix} Là node duy nhất sống sót.`, 'log-error');
                         break;
                     }
 
                     if (nextId === initiatorId) {
-                        await this.animateMessage(currentId, nextId, 'election', `[${idList.join(',')}]`);
-                        this.log(`Tin nhắn đi đủ vòng. Danh sách: [${idList.join(',')}]`, 'log-warn');
+                        await this.animateMessage(currentId, nextId, 'election', `[${idList.join(',')}]`, color);
+                        this.log(`${prefix} Tin nhắn vòng về đích. Đã chốt danh sách: [${idList.join(',')}]`, 'log-info', color);
                         break;
                     }
 
-                    if (nextId !== (currentId + 1) % this.numNodes) {
-                         this.log(`-> Bypass node chết, nhảy tới Node ${nextId}`, 'log-info');
-                    }
-
-                    await this.animateMessage(currentId, nextId, 'election', `[${idList.join(',')}]`);
+                    await this.animateMessage(currentId, nextId, 'election', `[${idList.join(',')}]`, color);
                     
                     currentId = nextId;
                     idList.push(currentId);
-                    this.log(`Node ${currentId} thêm ID vào danh sách: [${idList.join(',')}]`, 'log-info');
+                    this.log(`${prefix} Chuyển qua Node ${currentId}, danh sách mới: [${idList.join(',')}]`, 'log-info', color);
                 }
 
                 this.nodes[initiatorId].el.classList.remove('initiating');
+                this.nodes[initiatorId].el.style.borderColor = ''; // reset border
 
                 // Find Winner
                 let newCoordinatorId = Math.max(...idList);
-                this.log(`=> ID lớn nhất là ${newCoordinatorId}. Node ${newCoordinatorId} trở thành Leader mới!`, 'log-success');
+                this.log(`${prefix} -> Tự tính toán Leader mới là: Node ${newCoordinatorId}.`, 'log-info', color);
 
-                this.nodes.forEach(n => {
-                    n.isCoordinator = false;
-                    if(n.isAlive) {
-                        n.el.classList.remove('coordinator');
-                        n.el.innerHTML = `${n.id}`;
-                    }
-                });
+                // Safely update UI (since multiple threads might try to do this simultaneously)
+                if (!this.nodes[newCoordinatorId].isCoordinator) {
+                    this.nodes.forEach(n => {
+                        n.isCoordinator = false;
+                        if(n.isAlive) {
+                            n.el.classList.remove('coordinator');
+                            n.el.innerHTML = `${n.id}`;
+                        }
+                    });
 
-                const winnerNode = this.nodes[newCoordinatorId];
-                winnerNode.isCoordinator = true;
-                winnerNode.el.classList.add('coordinator');
-                winnerNode.el.innerHTML = `${winnerNode.id} <i class="fa-solid fa-star" style="position:absolute; top:-10px; right:-5px; color:var(--accent-pink); font-size:14px;"></i>`;
+                    const winnerNode = this.nodes[newCoordinatorId];
+                    winnerNode.isCoordinator = true;
+                    winnerNode.el.classList.add('coordinator');
+                    winnerNode.el.innerHTML = `${winnerNode.id} <i class="fa-solid fa-star" style="position:absolute; top:-10px; right:-5px; color:var(--accent-pink); font-size:14px;"></i>`;
+                }
 
                 // Phase 2: Inform all
-                this.log(`Truyền tin nhắn COORDINATOR để thông báo...`, 'log-success');
                 currentId = initiatorId;
-                
                 while(true) {
                     let nextId = this.getSuccessor(currentId);
                     if (nextId === -1 || nextId === initiatorId) break;
@@ -610,9 +537,14 @@
                     currentId = nextId;
                 }
 
-                this.log(`Hoàn tất bầu cử. Mạng đã ổn định.`, 'log-success');
-                this.isSimulating = false;
-                this.updateSelectOptions();
+                this.log(`${prefix} Hoàn thành luồng bầu cử.`, 'log-success');
+                
+                // Concurrency tracking
+                this.activeElections--;
+                if (this.activeElections === 0) {
+                    this.log(`✅ Toàn bộ các luồng bầu cử đã kết thúc. Mạng thống nhất 1 kết quả duy nhất!`, 'log-success', '#10b981');
+                    this.updateSelectOptions();
+                }
             }
         }
 
