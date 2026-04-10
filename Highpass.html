@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sharpening (Highpass) Spatial Filters</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    [data-lucide] { display: inline-block; }
+    /* Tùy chỉnh thanh cuộn cho bảng */
+    .custom-scrollbar::-webkit-scrollbar { height: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 pb-20 font-sans text-slate-800 leading-relaxed">
+
+  <!-- HEADER -->
+  <header class="bg-gradient-to-br from-rose-900 via-slate-800 to-red-950 text-white py-16 px-6 shadow-xl relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="max-w-4xl mx-auto relative z-10">
+      <span class="text-rose-300 font-bold tracking-widest uppercase text-sm mb-2 block">Chương 3 - Section 3.6</span>
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-rose-100 to-red-200">
+        Sharpening (Highpass) Spatial Filters
+      </h1>
+      <p class="text-xl text-rose-100 font-light max-w-3xl">
+        Khám phá toán học đằng sau việc làm sắc nét ảnh: Đạo hàm không gian, Toán tử Laplacian và nghệ thuật làm nổi bật các chi tiết siêu nhỏ.
+      </p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6">
+    
+    <!-- PHẦN 1: TỔNG QUAN & NỀN TẢNG TOÁN HỌC -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        1. Nền tảng: Tại sao lại là Đạo hàm?
+      </h2>
+      <p class="mb-4">
+        Mục đích chính của việc làm sắc nét (Sharpening) là <strong>làm nổi bật các vùng có sự thay đổi cường độ đột ngột</strong> (ví dụ: các cạnh, nhiễu, chi tiết nhỏ) và làm giảm bớt sự chú ý ở các vùng cường độ thay đổi chậm.
+      </p>
+      
+      <div class="bg-rose-50 border-l-4 border-rose-500 p-5 rounded-r shadow-sm my-6 text-rose-900">
+        <p>
+          Trong bài trước, ta biết Lọc làm mờ (Smoothing) tương đương với phép <strong>Tích phân / Lấy trung bình (Integration/Averaging)</strong>. 
+          Theo tư duy logic đó, Lọc làm sắc nét (Highpass) chính là quá trình ngược lại: <strong>Vi phân / Đạo hàm (Differentiation)</strong> không gian.
+        </p>
+      </div>
+
+      <h3 class="text-xl font-bold text-slate-700 mt-8 mb-4">Định nghĩa Đạo hàm 1D Rời rạc (Discrete Derivatives)</h3>
+      <p class="mb-4">
+        Vì hình ảnh là dữ liệu số (pixel rời rạc) nên ta không thể dùng đạo hàm liên tục. Thay vào đó, đạo hàm được định nghĩa thông qua <strong>sự chênh lệch (differences)</strong> giữa các pixel kề nhau.
+      </p>
+
+      <div class="grid md:grid-cols-2 gap-6 my-6">
+        <!-- Đạo hàm bậc 1 -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h4 class="font-bold text-slate-800 border-b pb-2 mb-4">Đạo hàm bậc 1 (First-order)</h4>
+          <div class="text-center font-serif text-xl bg-slate-50 p-3 rounded mb-4">
+            <span class="inline-block align-middle text-lg">∂f<hr class="border-slate-800">∂x</span>
+            = f(x + 1) - f(x)
+          </div>
+          <ul class="list-decimal ml-5 space-y-2 text-sm text-slate-600">
+            <li>Bằng 0 ở vùng cường độ không đổi (hằng số).</li>
+            <li>Khác 0 tại điểm bắt đầu của một sườn dốc (ramp) hoặc bậc thang (step).</li>
+            <li><strong class="text-blue-600">Khác 0 dọc theo toàn bộ sườn dốc (ramp).</strong></li>
+          </ul>
+        </div>
+
+        <!-- Đạo hàm bậc 2 -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h4 class="font-bold text-slate-800 border-b pb-2 mb-4">Đạo hàm bậc 2 (Second-order)</h4>
+          <div class="text-center font-serif text-xl bg-slate-50 p-3 rounded mb-4">
+            <span class="inline-block align-middle text-lg">∂²f<hr class="border-slate-800">∂x²</span>
+            = f(x + 1) + f(x - 1) - 2f(x)
+          </div>
+          <ul class="list-decimal ml-5 space-y-2 text-sm text-slate-600">
+            <li>Bằng 0 ở vùng cường độ không đổi.</li>
+            <li>Khác 0 tại điểm bắt đầu <strong class="text-rose-600">và kết thúc</strong> của dốc/bậc.</li>
+            <li><strong class="text-rose-600">Bằng 0 dọc theo các sườn dốc đều (ramp).</strong></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 2: SIMULATOR ĐỒ THỊ -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        2. Trực quan hóa: Cách Đạo hàm phản ứng với Cạnh
+      </h2>
+      <p class="mb-6 text-slate-700">
+        Để hiểu tường tận sức mạnh của Đạo hàm bậc 2 trong xử lý ảnh, hãy xem cách nó phân tích một đường quét (scan line) cắt ngang qua một bức ảnh. Đường quét này chứa các dạng địa hình: Vùng phẳng (Constant), Dốc đều (Ramp), và Nhảy bậc (Step).
+      </p>
+
+      <!-- SIMULATOR -->
+      <div class="bg-white border border-slate-200 p-6 rounded-xl shadow-md my-6">
+        <div class="flex justify-between items-end mb-4">
+          <h4 class="font-bold text-slate-800 flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-5 h-5 text-rose-500"></i>
+            Mô phỏng Đồ thị (Figure 3.44)
+          </h4>
+          <div class="flex gap-4 text-sm font-semibold">
+            <label class="flex items-center gap-1 cursor-pointer text-slate-700">
+              <input type="checkbox" id="toggle-orig" checked class="accent-slate-700 w-4 h-4"> Cường độ gốc
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-blue-600">
+              <input type="checkbox" id="toggle-d1" checked class="accent-blue-600 w-4 h-4"> Đạo hàm bậc 1
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-rose-600">
+              <input type="checkbox" id="toggle-d2" checked class="accent-rose-600 w-4 h-4"> Đạo hàm bậc 2
+            </label>
+          </div>
+        </div>
+
+        <!-- Vùng vẽ đồ thị -->
+        <div class="w-full overflow-x-auto custom-scrollbar pb-4">
+          <div class="min-w-[700px] relative">
+            <svg id="deriv-graph" width="100%" height="320" viewBox="0 0 800 320" class="bg-slate-50 border border-slate-200 rounded">
+              <!-- Lưới & Trục được vẽ bằng JS -->
+            </svg>
+            
+            <!-- Chú thích đồ thị -->
+            <div id="zero-crossing-label" class="absolute hidden text-xs font-bold text-rose-600 bg-white px-1 border border-rose-200 rounded">
+              Zero Crossing
+            </div>
+          </div>
+        </div>
+
+        <!-- Bảng dữ liệu chính xác -->
+        <div class="mt-6 w-full overflow-x-auto custom-scrollbar pb-2">
+          <table class="w-full min-w-[700px] text-sm text-center border-collapse">
+            <tbody>
+              <tr>
+                <td class="text-left font-bold text-slate-600 p-2 whitespace-nowrap">Values (Scan line)</td>
+                <!-- Dữ liệu render bằng JS -->
+                <td id="row-val" class="flex gap-1 p-2"></td>
+              </tr>
+              <tr>
+                <td class="text-left font-bold text-blue-600 p-2 whitespace-nowrap">1st derivative</td>
+                <td id="row-d1" class="flex gap-1 p-2 font-mono"></td>
+              </tr>
+              <tr>
+                <td class="text-left font-bold text-rose-600 p-2 whitespace-nowrap">2nd derivative</td>
+                <td id="row-d2" class="flex gap-1 p-2 font-mono"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="bg-slate-100 p-4 rounded-lg mt-6 text-sm text-slate-700">
+          <strong class="text-slate-900 block mb-2">Quan sát quan trọng rút ra từ đồ thị:</strong>
+          <ul class="list-disc ml-5 space-y-1">
+            <li><strong>Cạnh dày vs Cạnh mỏng:</strong> Đạo hàm bậc 1 tạo ra một "cạnh dày" dọc theo toàn bộ sườn dốc (giá trị -1 kéo dài). Đạo hàm bậc 2 chỉ tạo ra đỉnh nhọn ở 2 đầu sườn dốc (đường nét thanh mảnh hơn).</li>
+            <li><strong class="text-rose-600">Điểm Giao Không (Zero Crossing):</strong> Tại cạnh nhảy bậc (Step), Đạo hàm bậc 2 nhảy từ dương sang âm, cắt ngang qua trục 0. Dấu hiệu này cực kỳ hữu ích để xác định vị trí biên (edge location) chính xác đến từng pixel!</li>
+            <li><strong>Kết luận:</strong> Đạo hàm bậc 2 tăng cường chi tiết nhỏ (fine details) tốt hơn nhiều so với đạo hàm bậc 1. Do đó, nó là công cụ số 1 để làm sắc nét ảnh.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 3: THE LAPLACIAN -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        3. Ứng dụng Đạo hàm bậc 2 vào 2D: Toán tử Laplacian
+      </h2>
+      <p class="mb-4">
+        Hình ảnh là mặt phẳng 2 chiều (x, y). Toán tử đạo hàm bậc 2 <em>đẳng hướng (isotropic)</em> đơn giản nhất dành cho hàm 2 biến chính là <strong>Laplacian</strong>, được định nghĩa là tổng của các đạo hàm riêng bậc 2 chưa hỗn hợp:
+      </p>
+
+      <div class="text-center font-serif text-xl bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm inline-block mx-auto mb-6 min-w-[50%]">
+        ∇²f = 
+        <span class="inline-block align-middle text-lg">∂²f<hr class="border-slate-800">∂x²</span>
+        +
+        <span class="inline-block align-middle text-lg">∂²f<hr class="border-slate-800">∂y²</span>
+      </div>
+
+      <p class="mb-4">
+        Dựa vào công thức đạo hàm bậc 2 rời rạc ở phần 1, áp dụng cho hướng x và hướng y, sau đó cộng lại, ta thu được công thức tính toán <strong>Laplacian rời rạc (Discrete Laplacian)</strong>:
+      </p>
+
+      <div class="bg-white p-4 rounded-lg overflow-x-auto text-center font-serif text-lg italic text-slate-800 mb-6 border border-rose-200">
+        ∇²f(x,y) = f(x+1,y) + f(x-1,y) + f(x,y+1) + f(x,y-1) - 4f(x,y)
+        <div class="text-sm text-slate-500 mt-2 normal-case font-sans">(Equation 3-53)</div>
+      </div>
+
+      <h3 class="text-xl font-bold text-slate-700 mt-8 mb-4">Các Kernel Laplacian phổ biến (Figure 3.45)</h3>
+      <p class="mb-4">Phương trình trên có thể được ánh xạ trực tiếp thành một Kernel không gian (mặt nạ lọc) kích thước 3x3 để chạy tích chập (Convolution) trên ảnh.</p>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <!-- Kernel A -->
+        <div class="bg-white border border-slate-200 rounded-lg p-3 text-center shadow-sm">
+          <p class="text-xs font-bold text-slate-500 mb-2">(a) Bản chuẩn (Eq 3-53)</p>
+          <div class="grid grid-cols-3 gap-1 w-24 h-24 mx-auto text-sm font-bold text-slate-700">
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-rose-200 bg-rose-50 text-rose-600">-4</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+          </div>
+        </div>
+        <!-- Kernel B -->
+        <div class="bg-white border border-slate-200 rounded-lg p-3 text-center shadow-sm">
+          <p class="text-xs font-bold text-slate-500 mb-2">(b) Gồm đường chéo</p>
+          <div class="grid grid-cols-3 gap-1 w-24 h-24 mx-auto text-sm font-bold text-slate-700">
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-rose-200 bg-rose-50 text-rose-600">-8</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">1</div>
+          </div>
+        </div>
+        <!-- Kernel C -->
+        <div class="bg-white border border-slate-200 rounded-lg p-3 text-center shadow-sm">
+          <p class="text-xs font-bold text-slate-500 mb-2">(c) Đảo dấu (a)</p>
+          <div class="grid grid-cols-3 gap-1 w-24 h-24 mx-auto text-sm font-bold text-slate-700">
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-blue-200 bg-blue-50 text-blue-600">4</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">0</div>
+          </div>
+        </div>
+        <!-- Kernel D -->
+        <div class="bg-white border border-slate-200 rounded-lg p-3 text-center shadow-sm">
+          <p class="text-xs font-bold text-slate-500 mb-2">(d) Đảo dấu (b)</p>
+          <div class="grid grid-cols-3 gap-1 w-24 h-24 mx-auto text-sm font-bold text-slate-700">
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-blue-200 bg-blue-50 text-blue-600">8</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+            <div class="flex items-center justify-center border border-slate-100 bg-slate-50">-1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-amber-50 p-4 border-l-4 border-amber-500 rounded text-amber-900 text-sm">
+        <strong>Quan trọng:</strong> Chú ý rằng <strong>tổng các hệ số của mọi Kernel Laplacian đều bằng 0</strong>. Điều này có nghĩa là khi filter đi qua một vùng cường độ không đổi, kết quả (tổng các tích) sẽ bằng 0. Ảnh Laplacian sinh ra thường sẽ tối đen ở hầu hết mọi nơi, chỉ hiện lên các đường viền màu xám (chi tiết sắc nét). Bạn sẽ thấy có cả các giá trị âm trong ảnh kết quả.
+      </div>
+
+    </section>
+
+    <!-- PHẦN 4: QUY TRÌNH LÀM SẮC NÉT -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        4. Hoàn thiện: Phương trình Làm Sắc Nét Ảnh
+      </h2>
+      <p class="mb-4">
+        Vì ảnh Laplacian tự thân nó quá tối (như ảnh X-quang chỉ có viền), để lấy được bức ảnh cuối cùng sắc nét mà vẫn giữ nguyên hình dạng nền gốc, ta phải <strong>cộng (hoặc trừ) ảnh Laplacian vào lại bức ảnh ban đầu</strong>.
+      </p>
+
+      <div class="bg-slate-800 text-white p-6 rounded-xl my-6 flex flex-col items-center shadow-lg">
+        <h4 class="text-rose-300 font-bold mb-4 uppercase tracking-wider text-sm">Công thức tổng quát (Eq 3-54)</h4>
+        <div class="font-serif text-2xl mb-2 flex items-center gap-3">
+          g(x,y) = f(x,y) + c[∇²f(x,y)]
+        </div>
+        <div class="flex justify-center items-center gap-4 mt-6 text-sm flex-wrap">
+          <div class="bg-slate-700 px-4 py-2 rounded-lg flex items-center gap-2">
+            <span class="font-bold text-rose-400">c = -1</span> 
+            nếu dùng Kernel (a) hoặc (b) (Tâm âm)
+          </div>
+          <div class="bg-slate-700 px-4 py-2 rounded-lg flex items-center gap-2">
+            <span class="font-bold text-blue-400">c = 1</span> 
+            nếu dùng Kernel (c) hoặc (d) (Tâm dương)
+          </div>
+        </div>
+      </div>
+
+      <p class="mb-4">
+        <em>Giải thích mẹo nhớ:</em> Nếu tâm của Kernel là số âm (ví dụ -4, -8), ảnh Laplacian sinh ra sẽ bị "ngược sáng" tại các viền. Do đó ta phải <strong>trừ</strong> nó đi (c=-1) khỏi ảnh gốc để nó lật ngược lại thành phần bù sáng (cộng thêm viền sáng vào ảnh).
+      </p>
+
+      <div class="bg-slate-100 p-5 rounded-lg border border-slate-300 mt-6 flex items-start gap-4">
+        <i data-lucide="image" class="w-8 h-8 text-slate-500 shrink-0"></i>
+        <div>
+          <h4 class="font-bold text-slate-800 mb-1">Ví dụ 3.18: Mặt Trăng (Hình 3.46)</h4>
+          <p class="text-sm text-slate-600">
+            Sách cung cấp một bức ảnh cực kỳ kinh điển về Mặt trăng bị mờ. Khi đi qua bộ lọc Laplacian, ta thu được bức ảnh chỉ toàn các miệng núi lửa màu xám nổi lên trên nền đen. Khi lấy ảnh mờ ban đầu <em>trừ đi</em> ảnh Laplacian này, bức ảnh thu được sắc nét đến mức các rãnh nứt và miệng hố thiên thạch hiện ra rõ mồn một. Kết quả sử dụng Kernel có cả đường chéo (b) luôn sắc nét hơn Kernel (a).
+          </p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-24 py-10 bg-slate-900 text-slate-400 text-center text-sm border-t border-slate-800">
+    <div class="max-w-xl mx-auto">
+      <p class="mb-2 text-slate-300 font-semibold">Tài liệu tương tác: Digital Image Processing (Chương 3)</p>
+      <p>Trực quan hóa Đạo hàm bậc 1, bậc 2 và Ứng dụng Toán tử Laplacian.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts Logic -->
+  <script>
+    // Khởi tạo icons
+    lucide.createIcons();
+
+    // --- GRAPH SIMULATOR (Figure 3.44) ---
+    const graphSim = {
+      // Dữ liệu cường độ y xì sách (Figure 3.44)
+      data: [6, 6, 6, 6, 5, 4, 3, 2, 1, 1, 1, 1, 1, 1, 6, 6, 6, 6],
+      d1: [],
+      d2: [],
+      
+      init() {
+        // Tính toán đạo hàm
+        // Sách tính d1 bằng f(x+1) - f(x). Ta tính tới cận cuối - 1
+        for(let i=0; i<this.data.length; i++) {
+          if(i < this.data.length - 1) {
+            this.d1.push(this.data[i+1] - this.data[i]);
+          } else {
+            this.d1.push(0); // Điểm cuối không có next
+          }
+          
+          // d2 bằng f(x+1) + f(x-1) - 2f(x)
+          if(i > 0 && i < this.data.length - 1) {
+            this.d2.push(this.data[i+1] + this.data[i-1] - 2*this.data[i]);
+          } else {
+            this.d2.push(0); // Viền
+          }
+        }
+
+        // Khớp chính xác với sách: sách hiển thị d1 lệch một chút ở edge, 
+        // và d2 có 5, -5 ở cú nhảy bậc.
+        // Data sách chuẩn cho d1: 0, 0, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 5, 0, 0, 0
+        // Data sách chuẩn cho d2: 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 5, -5, 0, 0
+        // Công thức tự động bên trên sinh ra đúng dữ liệu này.
+
+        this.renderTable();
+        this.renderGraph();
+
+        // Gắn sự kiện toggle
+        document.getElementById('toggle-orig').addEventListener('change', () => this.renderGraph());
+        document.getElementById('toggle-d1').addEventListener('change', () => this.renderGraph());
+        document.getElementById('toggle-d2').addEventListener('change', () => this.renderGraph());
+      },
+
+      renderTable() {
+        let hVal = '', hD1 = '', hD2 = '';
+        const boxClass = "min-w-[32px] h-8 flex items-center justify-center border border-slate-300";
+        
+        for(let i=0; i<this.data.length; i++) {
+          hVal += `<div class="${boxClass} text-slate-800 bg-white font-bold">${this.data[i]}</div>`;
+          
+          // Hiển thị d1, d2 ẩn đi phần tử cuối cùng cho giống sách
+          if (i < this.data.length - 1) {
+            hD1 += `<div class="${boxClass} text-blue-600 bg-blue-50">${this.d1[i]}</div>`;
+          }
+          if (i > 0 && i < this.data.length - 1) {
+            let color = this.d2[i] !== 0 ? 'text-rose-600 bg-rose-50 font-bold' : 'text-slate-400 bg-transparent';
+            hD2 += `<div class="${boxClass} ${color}">${this.d2[i]}</div>`;
+          } else if (i===0) {
+            hD2 += `<div class="${boxClass} text-slate-400">0</div>`;
+          }
+        }
+        
+        document.getElementById('row-val').innerHTML = hVal;
+        document.getElementById('row-d1').innerHTML = hD1;
+        document.getElementById('row-d2').innerHTML = hD2;
+      },
+
+      renderGraph() {
+        const svg = document.getElementById('deriv-graph');
+        const showOrig = document.getElementById('toggle-orig').checked;
+        const showD1 = document.getElementById('toggle-d1').checked;
+        const showD2 = document.getElementById('toggle-d2').checked;
+
+        const w = 800, h = 320;
+        const padding = 40;
+        const usableW = w - padding * 2;
+        const usableH = h - padding * 2;
+        
+        // Trục Y chạy từ -5 đến 6 (tổng dải = 11)
+        const yMin = -5;
+        const yMax = 6;
+        const yRange = yMax - yMin;
+
+        // Hàm map tọa độ
+        const getX = (idx) => padding + (idx / (this.data.length - 1)) * usableW;
+        const getY = (val) => padding + usableH - ((val - yMin) / yRange) * usableH;
+
+        let svgHTML = '';
+
+        // Vẽ lưới (Grid) & Trục Y
+        for(let i = yMin; i <= yMax; i++) {
+          let yPos = getY(i);
+          let isZeroAxis = i === 0;
+          svgHTML += `<line x1="${padding}" y1="${yPos}" x2="${w-padding}" y2="${yPos}" stroke="${isZeroAxis ? '#334155' : '#e2e8f0'}" stroke-width="${isZeroAxis ? '2' : '1'}" />`;
+          svgHTML += `<text x="${padding-10}" y="${yPos+4}" text-anchor="end" class="text-[10px] fill-slate-500">${i}</text>`;
+        }
+
+        // Vẽ đường Dữ liệu gốc (Squares, dashed line)
+        if (showOrig) {
+          let pts = this.data.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
+          svgHTML += `<polyline points="${pts}" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6 4" />`;
+          this.data.forEach((v, i) => {
+             svgHTML += `<rect x="${getX(i)-4}" y="${getY(v)-4}" width="8" height="8" fill="white" stroke="#64748b" stroke-width="2" />`;
+          });
+        }
+
+        // Vẽ D1 (Circles, dotted line)
+        if (showD1) {
+          let ptsD1 = this.d1.slice(0, -1).map((v, i) => `${getX(i+0.5)},${getY(v)}`).join(' '); // d1 nằm giữa các điểm trong sách
+          svgHTML += `<polyline points="${ptsD1}" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="2 2" />`;
+          this.d1.slice(0, -1).forEach((v, i) => {
+             svgHTML += `<circle cx="${getX(i+0.5)}" cy="${getY(v)}" r="3" fill="#2563eb" />`;
+          });
+        }
+
+        // Vẽ D2 (Squares open, solid/dash line)
+        if (showD2) {
+          // d2 chỉ chuẩn ở các điểm giữa, điểm viền ép = 0
+          let ptsD2 = this.d2.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
+          svgHTML += `<polyline points="${ptsD2}" fill="none" stroke="#e11d48" stroke-width="2" stroke-dasharray="4 2" />`;
+          this.d2.forEach((v, i) => {
+             svgHTML += `<rect x="${getX(i)-4}" y="${getY(v)-4}" width="8" height="8" fill="white" stroke="#e11d48" stroke-width="2" />`;
+          });
+
+          // Vẽ chỉ báo Zero Crossing
+          // Tìm cú nhảy từ dương sang âm của D2 tại đoạn nhảy bậc.
+          // Trong data: i=12 (val=5), i=13 (val=-5). X line cắt y=0 giữa 12 và 13
+          let xZC = (getX(12) + getX(13)) / 2;
+          let yZC = getY(0);
+          svgHTML += `<circle cx="${xZC}" cy="${yZC}" r="4" fill="white" stroke="#e11d48" stroke-width="2" />`;
+          
+          // Định vị label bằng CSS để nó trôi nổi
+          const label = document.getElementById('zero-crossing-label');
+          label.style.display = 'block';
+          label.style.left = `${(xZC / w) * 100}%`;
+          label.style.top = `${((yZC + 15) / h) * 100}%`;
+          label.style.transform = `translateX(-50%)`;
+        } else {
+          document.getElementById('zero-crossing-label').style.display = 'none';
+        }
+
+        svg.innerHTML = svgHTML;
+      }
+    };
+
+    // Khởi tạo
+    document.addEventListener('DOMContentLoaded', () => {
+      graphSim.init();
+    });
+  </script>
+</body>
+</html>
