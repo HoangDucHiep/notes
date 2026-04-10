@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chương 5.1.2 - Thuật toán Đồng bộ Thời gian</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- MathJax Configuration cho Công thức Toán -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            chtml: { displayAlign: 'center' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; line-height: 1.8; }
+        .textbook { font-family: 'Lora', serif; font-size: 1.1rem; color: #334155; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 2.5rem; margin-bottom: 2rem; }
+        .math-box { background: #f8fafc; border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; overflow-x: auto;}
+        .highlight-box { background: #fefce8; border-left: 4px solid #eab308; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        
+        /* Interactive Chart Styles */
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin: 0 auto; border-left: 3px solid #334155; border-bottom: 3px solid #334155; aspect-ratio: 1/1; }
+        .axis-label-y { position: absolute; left: -60px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-weight: bold; font-family: sans-serif; font-size: 14px;}
+        .axis-label-x { position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); font-weight: bold; font-family: sans-serif; font-size: 14px;}
+        
+        .line-perfect { stroke: #10b981; stroke-width: 4; stroke-dasharray: 5,5; fill: none; }
+        .line-fast { stroke: #ef4444; stroke-width: 4; fill: none; transition: d 0.2s ease-out; }
+        .line-slow { stroke: #3b82f6; stroke-width: 4; fill: none; transition: d 0.2s ease-out; }
+        
+        /* Particle animation for sync */
+        .sync-particle { position: absolute; border-radius: 50%; background: #3b82f6; width: 10px; height: 10px; transition: all linear; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <header class="bg-slate-900 text-white p-10 shadow-lg border-b-4 border-blue-500">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold mb-2">Chương 5.1.2: Thuật toán Đồng bộ Thời gian</h1>
+            <p class="text-blue-300 text-lg">Phân tích Toán học: Mô hình Tích phân của Đồng hồ, Figure 5.4 và Tính toán Chu kỳ Đồng bộ.</p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto mt-10 px-4">
+
+        <!-- MỤC 1: Precision vs Accuracy -->
+        <div class="card textbook">
+            <h2 class="text-2xl font-bold font-sans text-slate-800 mb-4 border-b pb-2"><i class="fas fa-bullseye text-blue-500 mr-2"></i>1. Precision và Accuracy (Độ hội tụ và Độ chuẩn xác)</h2>
+            <p>Sách giáo khoa trang 254 đặt nền móng bằng cách định nghĩa hai khái niệm toán học tối quan trọng. Giả sử $t$ là thời gian tuyệt đối của vũ trụ (thường lấy mốc là UTC), và $C_p(t)$ là thời gian mà phần mềm trên máy $p$ đọc được tại thời điểm $t$.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                <div>
+                    <h3 class="text-lg font-bold font-sans text-indigo-700 mb-2">Đồng bộ nội bộ (Precision - $\pi$)</h3>
+                    <p class="text-sm mb-2">Giữ cho khoảng cách giữa hai máy bất kỳ $p$ và $q$ không vượt quá $\pi$. Đây là <em>Internal synchronization</em>.</p>
+                    <div class="math-box py-2 my-2 text-center text-lg">
+                        $$ \forall t, \forall p, q : |C_p(t) - C_q(t)| \le \pi $$
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold font-sans text-emerald-700 mb-2">Đồng bộ ngoại (Accuracy - $\alpha$)</h3>
+                    <p class="text-sm mb-2">Giữ cho đồng hồ của mọi máy bám sát với thời gian thực $t$ với sai số không quá $\alpha$. Đây là <em>External synchronization</em>.</p>
+                    <div class="math-box py-2 my-2 text-center text-lg">
+                        $$ \forall t, \forall p : |C_p(t) - t| \le \alpha $$
+                    </div>
+                </div>
+            </div>
+
+            <p class="mt-4 font-bold text-slate-800">Định lý hệ quả: $\pi = 2\alpha$</p>
+            <p>Sách khẳng định: <em>"A set of clocks that are accurate within bound $\alpha$, will be precise within bound $\pi = 2\alpha$"</em>. Tại sao lại như vậy? Áp dụng bất đẳng thức tam giác:</p>
+            <p>Ta muốn tìm khoảng cách lớn nhất giữa $p$ và $q$: $|C_p(t) - C_q(t)|$</p>
+            <p>Chèn mốc $t$ vào giữa: $= |C_p(t) - t + t - C_q(t)|$</p>
+            <p>Theo BĐT tam giác: $\le |C_p(t) - t| + |t - C_q(t)|$</p>
+            <p>Vì cả hai máy đều có accuracy $\le \alpha$, nên tổng lớn nhất sẽ là: $\le \alpha + \alpha = 2\alpha$. Vậy Precision $\pi = 2\alpha$.</p>
+
+            <!-- MÔ PHỎNG 1: Precision vs Accuracy -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 font-sans my-8 overflow-hidden relative shadow-sm">
+                <h3 class="font-bold text-slate-800 mb-2"><i class="fas fa-play-circle text-indigo-500 mr-2"></i>Mô phỏng 1: Trực quan hóa Bất đẳng thức $\pi \le 2\alpha$</h3>
+                <p class="text-sm text-slate-600 mb-4">Quan sát 3 đồng hồ bị trôi (A chạy nhanh, B và C chạy chậm). <strong>Vùng màu xanh đậm ($\pi$)</strong> bọc lấy toàn bộ các đồng hồ, còn <strong>Đường chuẩn ($\alpha$)</strong> là khoảng cách từ UTC đến máy xa nhất. Bạn sẽ thấy vùng $\pi$ không bao giờ lớn hơn $2 \times \alpha$.</p>
+                
+                <div class="relative h-48 bg-white border border-slate-300 rounded-lg shadow-inner mt-4 overflow-hidden" id="sim1-track">
+                    <!-- Vạch UTC -->
+                    <div class="absolute top-0 bottom-0 w-0.5 bg-emerald-500 left-1/2 transform -translate-x-1/2 z-10"></div>
+                    <div class="absolute top-2 left-1/2 transform -translate-x-1/2 text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-1 rounded">UTC (Real Time)</div>
+                    
+                    <!-- Precision Box -->
+                    <div id="sim1-pi-box" class="absolute top-10 bottom-8 bg-indigo-200/40 border-x-2 border-indigo-500 z-0 transition-all duration-75" style="left: 50%; width: 0%;">
+                        <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-indigo-700 whitespace-nowrap">Precision ($\pi$)</div>
+                    </div>
+
+                    <!-- Clocks -->
+                    <div id="sim1-c1" class="absolute top-14 w-8 h-8 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center transform -translate-x-1/2 shadow z-20 transition-all duration-75" style="left: 50%;">A</div>
+                    <div id="sim1-c2" class="absolute top-26 w-8 h-8 bg-blue-500 rounded-full text-white text-xs font-bold flex items-center justify-center transform -translate-x-1/2 shadow z-20 transition-all duration-75" style="left: 50%;">B</div>
+                    <div id="sim1-c3" class="absolute top-38 w-8 h-8 bg-orange-500 rounded-full text-white text-xs font-bold flex items-center justify-center transform -translate-x-1/2 shadow z-20 transition-all duration-75" style="left: 50%;">C</div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mt-6 text-center">
+                    <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+                        <div class="text-sm text-indigo-800 font-bold mb-1">Precision ($\pi$)</div>
+                        <div class="text-3xl font-mono text-indigo-600 font-bold">
+                            <span id="sim1-val-pi">0.00</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">Khoảng cách Max(A, B, C)</div>
+                    </div>
+                    <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                        <div class="text-sm text-emerald-800 font-bold mb-1">Accuracy ($\alpha$)</div>
+                        <div class="text-3xl font-mono text-emerald-600 font-bold">
+                            <span id="sim1-val-alpha">0.00</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">Khoảng cách xa nhất tới UTC</div>
+                    </div>
+                </div>
+                <div class="text-center mt-6">
+                    <button id="sim1-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-md">
+                        <i class="fas fa-play mr-2"></i> Trôi dạt đồng hồ
+                    </button>
+                    <button id="sim1-reset" class="bg-slate-300 hover:bg-slate-400 text-slate-700 px-6 py-2 rounded-lg font-bold transition-all ml-2">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MỤC 2: Mô hình Toán học của Đồng hồ -->
+        <div class="card textbook border-t-4 border-t-purple-500">
+            <h2 class="text-2xl font-bold font-sans text-slate-800 mb-4 border-b pb-2"><i class="fas fa-square-root-alt text-purple-500 mr-2"></i>2. Mô hình Tích phân của Software Clock</h2>
+            
+            <p>Ở trang 254 và 255, tác giả đưa ra một mô hình toán học cực kỳ sâu sắc để giải thích tại sao đồng hồ phần mềm lại bị trôi (drift).</p>
+
+            <h3 class="text-lg font-bold font-sans text-slate-800 mt-6 mb-2">Bước 1: Tần số phần cứng</h3>
+            <p>Gọi $F$ là tần số lý tưởng (constant frequency) mà thạch anh <em>đáng lẽ</em> phải đạt được. Nhưng trong thực tế, tại thời điểm $t$, tần số dao động thật sự là $F(t)$. Với tỷ lệ trôi dạt tối đa của phần cứng là $\rho$ (rho), ta có giới hạn tần số:</p>
+            <div class="math-box text-center text-lg">
+                $$ \forall t: (1 - \rho) \le \frac{F(t)}{F} \le (1 + \rho) $$
+            </div>
+
+            <h3 class="text-lg font-bold font-sans text-slate-800 mt-6 mb-2">Bước 2: Hệ điều hành đếm thời gian bằng Tích phân</h3>
+            <p>Sách viết công thức: $C_p(t) = \frac{1}{F} \int_0^t F(t)dt$. <strong>Ý nghĩa vật lý của công thức này là gì?</strong></p>
+            <ul class="list-disc pl-6 space-y-2 mb-4 text-slate-700">
+                <li>$F(t)dt$ chính là <strong>số lượng dao động</strong> (ticks) mà tinh thể thạch anh thực hiện được trong một khoảng thời gian cực nhỏ $dt$.</li>
+                <li>Tích phân $\int_0^t F(t)dt$ chính là <strong>tổng số dao động (total ticks)</strong> từ lúc máy tính khởi động ($t=0$) đến hiện tại.</li>
+                <li>Hệ điều hành lấy "tổng số dao động này" chia cho "Tần số lý tưởng $F$" để quy đổi ngược ra <strong>số giây mà nó nghĩ là đã trôi qua</strong>. Đó chính là Đồng hồ phần mềm $C_p(t)$.</li>
+            </ul>
+
+            <!-- MÔ PHỎNG 2: Integral -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 font-sans my-8 shadow-sm">
+                <h3 class="font-bold text-slate-800 mb-2"><i class="fas fa-wave-square text-purple-500 mr-2"></i>Mô phỏng 2: Giải phẫu Công thức Tích phân</h3>
+                <p class="text-sm text-slate-600 mb-4">Hãy xem cách HĐH đếm <strong>tổng số dao động (ticks)</strong> để quy ra thời gian. Ở đây, thạch anh bị lỗi, chạy nhanh hơn bình thường ($F(t) = 15$ thay vì $10$).</p>
+                
+                <div class="flex flex-wrap items-center gap-4 mb-6">
+                    <div class="flex-1 bg-white p-4 rounded-lg border shadow-sm text-center min-w-[150px]">
+                        <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tần số lý tưởng ($F$)</div>
+                        <div class="text-2xl font-mono text-slate-800 font-bold">10 <span class="text-sm">ticks/s</span></div>
+                    </div>
+                    <div class="flex-1 bg-white p-4 rounded-lg border shadow-sm text-center min-w-[150px]">
+                        <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tần số thực ($F(t)$)</div>
+                        <div class="text-2xl font-mono text-red-600 font-bold">15 <span class="text-sm">ticks/s</span></div>
+                        <div class="text-[10px] font-bold text-red-500 bg-red-100 rounded px-2 inline-block">Fast clock</div>
+                    </div>
+                </div>
+
+                <div class="bg-white border rounded-lg p-5 mb-6 relative shadow-inner">
+                    <div class="flex justify-between text-sm font-bold text-slate-600 mb-3 border-b pb-2">
+                        <span>Thời gian thực trôi qua ($dt$): <span id="sim2-real-time" class="text-emerald-600 font-mono text-lg">0.00</span> s</span>
+                    </div>
+                    <div class="h-12 bg-slate-100 rounded-lg flex items-center border border-slate-300 relative overflow-hidden" id="sim2-track">
+                        <div id="sim2-progress" class="absolute left-0 top-0 bottom-0 bg-emerald-100/50 border-r-2 border-emerald-500 w-0 z-0 transition-none"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center">
+                        <div class="text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Tích phân $\int F(t)dt$</div>
+                        <div class="text-sm text-slate-600 mb-2">Tổng số ticks đếm được</div>
+                        <div class="text-4xl font-mono font-bold text-blue-600" id="sim2-total-ticks">0</div>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-200 p-4 rounded-lg text-center relative overflow-hidden">
+                        <div class="text-xs font-bold text-purple-800 uppercase tracking-wider mb-1">Đồng hồ HĐH $C_p(t)$</div>
+                        <div class="text-sm text-slate-600 mb-2">$\frac{\text{Tổng Ticks}}{F}$ (Sai số xuất hiện!)</div>
+                        <div class="text-4xl font-mono font-bold text-purple-600 relative z-10"><span id="sim2-cp">0.00</span> <span class="text-xl">s</span></div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-6">
+                    <button id="sim2-btn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-md">
+                        <i class="fas fa-play mr-2"></i> Trôi qua 1 giây thực tế
+                    </button>
+                    <button id="sim2-reset" class="bg-slate-300 hover:bg-slate-400 text-slate-700 px-6 py-2 rounded-lg font-bold transition-all ml-2">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-bold font-sans text-slate-800 mt-6 mb-2">Bước 3: Đạo hàm (Tốc độ trôi dạt phần mềm)</h3>
+            <p>Từ phương trình tích phân, tác giả lấy đạo hàm hai vế theo thời gian thực $t$ (áp dụng Định lý cơ bản của Giải tích):</p>
+            <div class="math-box text-center text-lg">
+                $$ \frac{dC_p(t)}{dt} = \frac{F(t)}{F} $$
+            </div>
+            <p>Thế kết quả này ngược lại vào giới hạn ở Bước 1, ta có được <strong>Định lý cốt lõi về tốc độ trôi của đồng hồ phần mềm</strong>:</p>
+            <div class="math-box text-center text-xl text-purple-700 font-bold border-l-4 border-purple-500 bg-purple-50">
+                $$ \forall t: 1 - \rho \le \frac{dC_p(t)}{dt} \le 1 + \rho $$
+            </div>
+            <p class="text-sm text-slate-600 mt-2"><strong>Giải thích:</strong> $\frac{dC_p(t)}{dt}$ chính là <em>tốc độ</em> chạy của đồng hồ phần mềm. Nếu nó bằng 1, đồng hồ chạy hoàn hảo. Nếu nó $> 1$, đồng hồ chạy nhanh (Fast). Nếu $< 1$, đồng hồ chạy chậm (Slow). Độ lệch tốc độ này bị giới hạn chặt chẽ bởi $\pm \rho$.</p>
+        </div>
+
+        <!-- MỤC 3: Hình 5.4 và Mô phỏng -->
+        <div class="card textbook border-t-4 border-t-red-500">
+            <h2 class="text-2xl font-bold font-sans text-slate-800 mb-4 border-b pb-2"><i class="fas fa-chart-line text-red-500 mr-2"></i>3. Trực quan hóa Figure 5.4</h2>
+            <p class="mb-6">Sách giáo khoa vẽ một biểu đồ (Figure 5.4) để minh họa mối quan hệ giữa $C_p(t)$ (trục Y) và $t$ (trục X). Dựa trên giới hạn đạo hàm $\frac{dC_p(t)}{dt}$ ở trên, ta có 3 đường thẳng.</p>
+
+            <!-- MÔ PHỎNG 3: Biểu đồ Figure 5.4 Tương tác -->
+            <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 font-sans mb-8">
+                <h3 class="font-bold text-slate-800 mb-2">Mô phỏng 3: Tái hiện Figure 5.4 Tương tác</h3>
+                <p class="text-sm text-slate-600 mb-6">Hãy kéo thanh trượt để phóng đại giá trị $\rho$ (Clock Drift Rate) và xem các đường "Fast clock" và "Slow clock" phân kỳ như thế nào so với thời gian UTC thực tế.</p>
+                
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <div class="flex-1 w-full relative">
+                        <div class="chart-container" id="chart-area">
+                            <div class="axis-label-y text-slate-600">Clock time, $C$</div>
+                            <div class="axis-label-x text-slate-600">UTC, $t$</div>
+                            
+                            <!-- SVG Chart -->
+                            <svg width="100%" height="100%" viewBox="0 0 400 400" preserveAspectRatio="none" style="transform: scaleY(-1);">
+                                <!-- Perfect clock (Slope = 1) -> y = x. Goes from (0,0) to (400,400) -->
+                                <line x1="0" y1="0" x2="400" y2="400" class="line-perfect" />
+                                
+                                <!-- Fast clock (Slope > 1) -->
+                                <path id="path-fast" class="line-fast" d="M 0 0 L 300 400" />
+                                
+                                <!-- Slow clock (Slope < 1) -->
+                                <path id="path-slow" class="line-slow" d="M 0 0 L 400 300" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 w-full bg-white p-6 rounded-lg border shadow-sm">
+                        <label class="block text-sm font-bold text-slate-700 mb-2">Điều chỉnh Drift Rate ($\rho$ phóng đại):</label>
+                        <input type="range" id="fig54-rho" min="0" max="50" value="20" class="w-full mb-4">
+                        <div class="text-center font-mono text-xl text-red-600 mb-6">$\rho$ = <span id="fig54-rho-val">0.20</span></div>
+                        
+                        <ul class="space-y-4 text-sm">
+                            <li class="flex items-center gap-2 text-emerald-600 font-bold"><div class="w-6 h-1 bg-emerald-500 border-b-2 border-emerald-600 border-dashed"></div> Perfect: $\frac{dC_p(t)}{dt} = 1$</li>
+                            <li class="flex items-center gap-2 text-red-600 font-bold"><div class="w-6 h-1 bg-red-500"></div> Fast: $\frac{dC_p(t)}{dt} = 1 + \rho$</li>
+                            <li class="flex items-center gap-2 text-blue-600 font-bold"><div class="w-6 h-1 bg-blue-500"></div> Slow: $\frac{dC_p(t)}{dt} = 1 - \rho$</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MỤC 4: Chu kỳ tái đồng bộ -->
+        <div class="card textbook border-t-4 border-t-orange-500">
+            <h2 class="text-2xl font-bold font-sans text-slate-800 mb-4 border-b pb-2"><i class="fas fa-sync text-orange-500 mr-2"></i>4. Tính toán Chu kỳ Tái đồng bộ (Resynchronization Interval)</h2>
+            
+            <p>Trang 255 kết thúc bằng một bài toán thiết kế hệ thống cực kỳ thực tế: <strong>"Mất bao lâu thì ta phải gọi thuật toán đồng bộ (như NTP) một lần?"</strong></p>
+
+            <h3 class="text-lg font-bold font-sans text-slate-800 mt-6 mb-2">Lập luận Kịch bản Xấu nhất (Worst-case Scenario)</h3>
+            <p>Giả sử hai máy vừa được đồng bộ hoàn hảo tại $t=0$. Sau đó:</p>
+            <ul class="list-disc pl-6 space-y-2 mb-4">
+                <li>Máy 1 là xui xẻo nhất, nó trôi nhanh hết cỡ: Tốc độ là $1 + \rho$.</li>
+                <li>Máy 2 là xui xẻo nhì, nó trôi chậm hết cỡ: Tốc độ là $1 - \rho$.</li>
+            </ul>
+            <p>Sau một khoảng thời gian thực $\Delta t$ trôi qua, khoảng cách giữa 2 đồng hồ này (theo trục dọc C trong biểu đồ) sẽ là:</p>
+            <div class="math-box text-center">
+                $$ \text{Distance} = (1 + \rho)\Delta t - (1 - \rho)\Delta t = 2\rho \cdot \Delta t $$
+            </div>
+
+            <p>Nếu các kỹ sư thiết kế hệ thống (như bạn) muốn <strong>đảm bảo độ hội tụ (precision) là $\pi$</strong>, tức là hai đồng hồ không bao giờ được phép cách nhau quá $\pi$ giây, ta thiết lập bất phương trình:</p>
+            <div class="math-box text-center">
+                $$ 2\rho \cdot \Delta t \le \pi $$
+            </div>
+            <p>Từ đó, ta suy ra được **khoảng thời gian tối đa** giữa hai lần đồng bộ:</p>
+            <div class="math-box text-center text-xl text-orange-700 font-bold border-l-4 border-orange-500 bg-orange-50">
+                $$ \Delta t \le \frac{\pi}{2\rho} $$
+            </div>
+
+            <!-- MÔ PHỎNG 4: Máy tính chu kỳ đồng bộ -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-8 font-sans relative overflow-hidden">
+                <h3 class="font-bold text-slate-800 mb-4 border-b pb-2"><i class="fas fa-calculator mr-2"></i>Mô phỏng 4: Hệ thống tính toán $\Delta t$ tự động</h3>
+                <p class="text-sm text-slate-600 mb-6">Hãy nhập tham số của phần cứng ($\rho$) và yêu cầu thiết kế hệ thống ($\pi$). Mô phỏng sẽ tính toán chu kỳ phải gọi giao thức mạng, đồng thời chạy đồ họa đếm ngược thời điểm 2 đồng hồ "vỡ giới hạn $\pi$".</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Input Form -->
+                    <div class="space-y-4 bg-white p-5 rounded-lg border shadow-sm">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">Độ trôi phần cứng $\rho$ (sec/sec):</label>
+                            <input type="number" id="sim4-rho" value="0.00001" step="0.00001" class="w-full border rounded p-2 code-font text-blue-700 font-bold focus:ring-2 focus:ring-blue-400 outline-none">
+                            <div class="text-xs text-slate-500 mt-1">VD: $10^{-5}$ (chuẩn thạch anh thông thường)</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1">Precision mục tiêu $\pi$ (giây):</label>
+                            <input type="number" id="sim4-pi" value="0.05" step="0.01" class="w-full border rounded p-2 code-font text-emerald-700 font-bold focus:ring-2 focus:ring-emerald-400 outline-none">
+                            <div class="text-xs text-slate-500 mt-1">VD: 0.05s (50 mili-giây)</div>
+                        </div>
+                        <button id="sim4-calc-btn" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded transition mt-2 shadow-md">
+                            Tính toán & Bắt đầu
+                        </button>
+                    </div>
+
+                    <!-- Output & Visualizer -->
+                    <div class="bg-slate-900 text-white p-5 rounded-lg border border-slate-700 flex flex-col justify-center shadow-inner">
+                        <div class="text-center mb-4">
+                            <div class="text-sm text-slate-400 mb-1">Cần chạy lại thuật toán đồng bộ (NTP) mỗi:</div>
+                            <div class="text-4xl font-mono text-orange-400 font-bold" id="sim4-res-dt">2500 s</div>
+                        </div>
+                        
+                        <!-- Trackers -->
+                        <div class="relative h-16 bg-slate-800 rounded border border-slate-600 mt-4 overflow-hidden flex items-center">
+                            <!-- Center Line -->
+                            <div class="absolute left-1/2 top-0 bottom-0 w-px bg-slate-500"></div>
+                            <div class="absolute w-full text-center text-xs text-slate-500 top-1 font-bold">Biên độ dao động $\pi$</div>
+                            
+                            <!-- Left bound, Right bound UI (visual limits) -->
+                            <div class="absolute left-10 top-0 bottom-0 w-px bg-red-500/50"></div>
+                            <div class="absolute right-10 top-0 bottom-0 w-px bg-red-500/50"></div>
+                            
+                            <!-- Clocks -->
+                            <div id="sim4-clock-slow" class="absolute w-4 h-4 bg-blue-500 rounded-full left-1/2 transform -translate-x-1/2 top-1/2 -translate-y-1/2 shadow-[0_0_10px_#3b82f6]"></div>
+                            <div id="sim4-clock-fast" class="absolute w-4 h-4 bg-red-500 rounded-full left-1/2 transform -translate-x-1/2 top-1/2 -translate-y-1/2 shadow-[0_0_10px_#ef4444]"></div>
+                            
+                            <!-- SYNC ALERT -->
+                            <div id="sim4-sync-alert" class="absolute inset-0 bg-orange-500/90 flex items-center justify-center font-bold text-white opacity-0 transition-opacity duration-200 z-10">
+                                <i class="fas fa-bolt mr-2 text-yellow-300"></i> RESYNC TRIGGERED!
+                            </div>
+                        </div>
+                        <div class="text-center mt-3 text-xs text-slate-400 font-mono">
+                            Time elapsed: <span id="sim4-elapsed">0</span> s
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600 mt-4 italic">* Việc chọn thuật toán nào (NTP, PTP, hay RBS) để thực hiện quá trình tái đồng bộ này là tùy thuộc vào kiến trúc hệ thống mạng, nhưng thời hạn $\Delta t$ là giới hạn toán học không thể thay đổi đối với một cấu hình phần cứng cho trước.</p>
+        </div>
+
+    </main>
+
+    <script>
+        /* =========================================
+           SIMULATION 1: PRECISION VS ACCURACY
+           ========================================= */
+        const s1Btn = document.getElementById('sim1-btn');
+        const s1Reset = document.getElementById('sim1-reset');
+        const s1C1 = document.getElementById('sim1-c1');
+        const s1C2 = document.getElementById('sim1-c2');
+        const s1C3 = document.getElementById('sim1-c3');
+        const s1PiBox = document.getElementById('sim1-pi-box');
+        const s1ValPi = document.getElementById('sim1-val-pi');
+        const s1ValAlpha = document.getElementById('sim1-val-alpha');
+        
+        let s1Running = false;
+        let s1AnimFrame = null;
+        let s1Progress = 0; // 0 to 100
+
+        function updateSim1() {
+            // Tốc độ trôi dạt ngẫu nhiên
+            let v1 = 0.45;  // Máy A: Chạy rất nhanh
+            let v2 = -0.15; // Máy B: Chạy chậm
+            let v3 = -0.35; // Máy C: Chạy rất chậm
+            
+            let p1 = s1Progress * v1;
+            let p2 = s1Progress * v2;
+            let p3 = s1Progress * v3;
+            
+            s1C1.style.left = `calc(50% + ${p1}%)`;
+            s1C2.style.left = `calc(50% + ${p2}%)`;
+            s1C3.style.left = `calc(50% + ${p3}%)`;
+            
+            let minP = Math.min(p1, p2, p3);
+            let maxP = Math.max(p1, p2, p3);
+            let alpha = Math.max(Math.abs(p1), Math.abs(p2), Math.abs(p3));
+            let pi = maxP - minP;
+            
+            // Box Precision bao trọn toàn bộ
+            s1PiBox.style.left = `calc(50% + ${minP}%)`;
+            s1PiBox.style.width = `${pi}%`;
+            
+            s1ValPi.innerText = pi.toFixed(2);
+            s1ValAlpha.innerText = alpha.toFixed(2);
+        }
+
+        s1Btn.addEventListener('click', () => {
+            if (s1Running) return;
+            s1Running = true;
+            s1Btn.disabled = true;
+            s1Btn.classList.add('opacity-50');
+            
+            let lastTime = Date.now();
+            function animateS1() {
+                let now = Date.now();
+                let dt = now - lastTime;
+                lastTime = now;
+                
+                s1Progress += dt * 0.03; // Tốc độ diễn hoạt
+                if (s1Progress >= 100) s1Progress = 100;
+                
+                updateSim1();
+                
+                if (s1Progress < 100) {
+                    s1AnimFrame = requestAnimationFrame(animateS1);
+                } else {
+                    s1Running = false;
+                }
+            }
+            s1AnimFrame = requestAnimationFrame(animateS1);
+        });
+        
+        s1Reset.addEventListener('click', () => {
+            cancelAnimationFrame(s1AnimFrame);
+            s1Running = false;
+            s1Progress = 0;
+            s1Btn.disabled = false;
+            s1Btn.classList.remove('opacity-50');
+            updateSim1();
+        });
+
+
+        /* =========================================
+           SIMULATION 2: INTEGRAL 
+           ========================================= */
+        const s2Btn = document.getElementById('sim2-btn');
+        const s2Reset = document.getElementById('sim2-reset');
+        const s2RealTime = document.getElementById('sim2-real-time');
+        const s2TotalTicks = document.getElementById('sim2-total-ticks');
+        const s2Cp = document.getElementById('sim2-cp');
+        const s2Track = document.getElementById('sim2-track');
+        const s2Progress = document.getElementById('sim2-progress');
+        
+        let s2Running = false;
+        let s2AnimFrame = null;
+        let s2Time = 0; // 0 to 1
+        let currentTicks = 0;
+        let maxTicks = 15; // Fast clock generates 15 ticks instead of 10
+
+        s2Btn.addEventListener('click', () => {
+            if (s2Running) return;
+            s2Running = true;
+            s2Btn.disabled = true;
+            s2Btn.classList.add('opacity-50');
+            
+            // Xóa các tick cũ
+            Array.from(s2Track.children).forEach(c => {
+                if(c.id !== 'sim2-progress') s2Track.removeChild(c);
+            });
+            currentTicks = 0;
+            s2Time = 0;
+            
+            let startTime = Date.now();
+            function animateS2() {
+                let elapsed = Date.now() - startTime;
+                s2Time = elapsed / 2500; // Tốn 2.5 giây ngoài đời để xem 1 giây mô phỏng cho dễ nhìn
+                if(s2Time > 1) s2Time = 1;
+                
+                s2RealTime.innerText = s2Time.toFixed(2);
+                s2Progress.style.width = `${s2Time * 100}%`;
+                
+                let expectedTicks = Math.floor(s2Time * maxTicks);
+                if (expectedTicks > currentTicks) {
+                    for(let i=0; i<expectedTicks - currentTicks; i++) {
+                        let tick = document.createElement('div');
+                        tick.className = 'absolute w-1.5 h-6 bg-red-500 rounded z-10 shadow-sm';
+                        tick.style.left = `${((currentTicks + i + 1) / maxTicks) * 100}%`;
+                        tick.style.top = '50%';
+                        tick.style.transform = 'translate(-50%, -50%)';
+                        s2Track.appendChild(tick);
+                    }
+                    currentTicks = expectedTicks;
+                    s2TotalTicks.innerText = currentTicks;
+                    // Tính giờ HĐH: Lấy tổng tick chia cho tần số chuẩn (10)
+                    s2Cp.innerText = (currentTicks / 10).toFixed(2);
+                }
+                
+                if (s2Time < 1) {
+                    s2AnimFrame = requestAnimationFrame(animateS2);
+                } else {
+                    s2Running = false;
+                }
+            }
+            s2AnimFrame = requestAnimationFrame(animateS2);
+        });
+
+        s2Reset.addEventListener('click', () => {
+            cancelAnimationFrame(s2AnimFrame);
+            s2Running = false;
+            s2Time = 0;
+            currentTicks = 0;
+            s2RealTime.innerText = "0.00";
+            s2TotalTicks.innerText = "0";
+            s2Cp.innerText = "0.00";
+            s2Progress.style.width = "0%";
+            s2Btn.disabled = false;
+            s2Btn.classList.remove('opacity-50');
+            Array.from(s2Track.children).forEach(c => {
+                if(c.id !== 'sim2-progress') s2Track.removeChild(c);
+            });
+        });
+
+
+        /* =========================================
+           SIMULATION 3: FIGURE 5.4 CHART 
+           ========================================= */
+        const rhoSlider = document.getElementById('fig54-rho');
+        const rhoValDisplay = document.getElementById('fig54-rho-val');
+        const pathFast = document.getElementById('path-fast');
+        const pathSlow = document.getElementById('path-slow');
+
+        function updateFigure54() {
+            // Slider value from 0 to 50, represents rho from 0.00 to 0.50
+            const rho = parseInt(rhoSlider.value) / 100;
+            rhoValDisplay.innerHTML = rho.toFixed(2);
+            
+            // X goes 0 to 400.
+            // Y = (1 + rho) * X for Fast. Max X to stay within Y=400 is X = 400/(1+rho)
+            let fastX = 400 / (1 + rho);
+            pathFast.setAttribute('d', `M 0 0 L ${fastX} 400`);
+            
+            // Y = (1 - rho) * X for Slow. For X=400, Y = 400*(1-rho)
+            let slowY = 400 * (1 - rho);
+            pathSlow.setAttribute('d', `M 0 0 L 400 ${slowY}`);
+        }
+
+        rhoSlider.addEventListener('input', updateFigure54);
+        updateFigure54(); // Init
+
+
+        /* =========================================
+           SIMULATION 4: RESYNC INTERVAL CALCULATOR
+           ========================================= */
+        const inRho = document.getElementById('sim4-rho');
+        const inPi = document.getElementById('sim4-pi');
+        const btnCalc = document.getElementById('sim4-calc-btn');
+        const outDt = document.getElementById('sim4-res-dt');
+        
+        const clockSlow = document.getElementById('sim4-clock-slow');
+        const clockFast = document.getElementById('sim4-clock-fast');
+        const syncAlert = document.getElementById('sim4-sync-alert');
+        const txtElapsed = document.getElementById('sim4-elapsed');
+        
+        let sim4Interval = null;
+
+        btnCalc.addEventListener('click', () => {
+            const rho = parseFloat(inRho.value);
+            const pi = parseFloat(inPi.value);
+            
+            if (isNaN(rho) || isNaN(pi) || rho <= 0 || pi <= 0) {
+                alert("Vui lòng nhập số hợp lệ > 0");
+                return;
+            }
+
+            // Tính toán Delta t
+            const dt = pi / (2 * rho);
+            outDt.innerHTML = `${Math.round(dt)} <span class="text-lg">s</span>`;
+
+            // Reset Animation
+            if (sim4Interval) clearInterval(sim4Interval);
+            clockSlow.style.left = '50%';
+            clockFast.style.left = '50%';
+            syncAlert.style.opacity = '0';
+            
+            let elapsed = 0;
+            const animDuration = 3000; // Mô phỏng quá trình chạy tốn 3 giây ngoài đời thực
+            const intervalTime = 50; // update every 50ms
+            const step = dt / (animDuration / intervalTime); // Time speedup
+
+            sim4Interval = setInterval(() => {
+                elapsed += step;
+                txtElapsed.innerText = Math.round(elapsed);
+
+                // Calculate visual distance (50% is center. Let bounds be at 10% and 90% meaning max width is 40% from center)
+                let ratio = (2 * rho * elapsed) / pi;
+                if (ratio > 1) ratio = 1;
+
+                clockSlow.style.left = `calc(50% - ${40 * ratio}%)`;
+                clockFast.style.left = `calc(50% + ${40 * ratio}%)`;
+
+                if (elapsed >= dt) {
+                    clearInterval(sim4Interval);
+                    txtElapsed.innerText = Math.round(dt);
+                    
+                    // Flash SYNC!
+                    syncAlert.style.opacity = '1';
+                    setTimeout(() => {
+                        syncAlert.style.opacity = '0';
+                        // Reset balls to center
+                        clockSlow.style.transition = 'left 0.5s ease-in-out';
+                        clockFast.style.transition = 'left 0.5s ease-in-out';
+                        clockSlow.style.left = '50%';
+                        clockFast.style.left = '50%';
+                        setTimeout(() => {
+                            clockSlow.style.transition = 'none';
+                            clockFast.style.transition = 'none';
+                            btnCalc.innerHTML = "Khởi động lại vòng lặp";
+                        }, 500);
+                    }, 1000);
+                }
+            }, intervalTime);
+        });
+
+    </script>
+</body>
+</html>
