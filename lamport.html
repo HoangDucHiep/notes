@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chương 5.2: Đồng hồ Logic & Thuật toán Lamport</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            chtml: { displayAlign: 'center' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.8; }
+        .textbook { font-family: 'Lora', serif; font-size: 1.1rem; color: #334155; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); padding: 2.5rem; margin-bottom: 2rem; }
+        .math-box { background: #f1f5f9; border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; overflow-x: auto;}
+        
+        /* Space-Time Diagram Styles */
+        .timeline-col { position: relative; border-left: 2px dashed #94a3b8; display: flex; flex-direction: column; align-items: center; padding-top: 2rem; }
+        .event-node { width: 36px; height: 36px; background: white; border: 2px solid #3b82f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: bold; font-size: 0.85rem; margin-bottom: 1.5rem; position: relative; z-index: 10; transition: all 0.3s; }
+        .event-node.adjusted { background: #ef4444; border-color: #b91c1c; color: white; transform: scale(1.1); box-shadow: 0 0 15px rgba(239,68,68,0.5); }
+        .event-node.resolved { background: #10b981; border-color: #047857; color: white; }
+        
+        svg.arrows { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+        .msg-arrow { stroke: #64748b; stroke-width: 2; fill: none; transition: stroke-dashoffset 1s linear; }
+        .msg-arrow.invalid { stroke: #ef4444; stroke-width: 3; }
+        .msg-arrow.valid { stroke: #10b981; stroke-width: 3; }
+        
+        .tooltip { position: absolute; background: #1e293b; color: white; padding: 0.5rem; border-radius: 4px; font-size: 0.75rem; z-index: 20; opacity: 0; transition: opacity 0.2s; pointer-events: none; width: max-content; }
+        .event-node:hover .tooltip { opacity: 1; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <header class="bg-slate-900 text-white p-10 shadow-2xl border-b-4 border-indigo-500 relative overflow-hidden">
+        <i class="fas fa-project-diagram absolute -right-10 -top-10 text-9xl opacity-10"></i>
+        <div class="max-w-4xl mx-auto relative z-10">
+            <div class="text-indigo-400 font-bold tracking-widest text-sm mb-2 uppercase">Chương 5.2 - Sách Hệ thống phân tán</div>
+            <h1 class="text-4xl font-extrabold mb-3">Đồng hồ Logic (Logical Clocks)<br>& Thuật toán Lamport</h1>
+            <p class="text-indigo-200 text-lg">"Chúng ta không cần biết bây giờ là mấy giờ. Chúng ta chỉ cần biết sự kiện nào xảy ra trước!"</p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto mt-12 px-4">
+
+        <!-- ==========================================
+             PHẦN 1: TẠI SAO CẦN ĐỒNG HỒ LOGIC?
+             ========================================== -->
+        <div class="card textbook">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-blue-500 pb-2">1. Khái niệm Đồng hồ Logic</h2>
+            <p>Ở phần trước, chúng ta đã cố gắng đồng bộ thời gian vật lý (Physical Clocks). Nhưng tác giả chỉ ra một sự thật: <strong>Trong nhiều trường hợp, thời gian vật lý là không cần thiết!</strong></p>
+            <p>Trở lại ví dụ lệnh <code>make</code> (biên dịch mã nguồn): Chương trình không quan tâm file <code>input.c</code> được tạo ra lúc 10h00 hay 10h05. Nó chỉ cần biết một sự thật logic duy nhất: <strong>file <code>input.c</code> ĐƯỢC TẠO RA SAU file <code>input.o</code>.</strong></p>
+            
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-5 my-6 rounded-r">
+                <p class="text-slate-800 font-bold mb-2">Bài báo kinh điển của Leslie Lamport (1978)</p>
+                <p class="text-slate-700 text-sm">Lamport chỉ ra rằng: Nếu hai tiến trình không hề giao tiếp với nhau, việc đồng hồ của chúng lệch nhau không gây ra bất kỳ lỗi nào (vì không có ai quan sát được sự sai lệch đó). Điều thực sự quan trọng không phải là các tiến trình đồng thuận về <em>"thời gian tuyệt đối"</em>, mà là chúng phải đồng thuận về <strong>"Thứ tự của các sự kiện" (the order in which events occur)</strong>.</p>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 2: HAPPENS-BEFORE RELATION
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-emerald-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-emerald-500 pb-2">2. Quan hệ "Xảy ra trước" (Happens-Before)</h2>
+            <p>Để toán học hóa khái niệm thứ tự, Lamport định nghĩa một quan hệ gọi là <strong>happens-before</strong>, ký hiệu là $\rightarrow$.</p>
+            <p>Biểu thức $a \rightarrow b$ được đọc là *"Sự kiện $a$ xảy ra trước sự kiện $b$"*, nghĩa là tất cả các tiến trình trong hệ thống đều đồng thuận rằng $a$ chắc chắn đã kết thúc trước khi $b$ bắt đầu.</p>
+            
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">Ba quy tắc cốt lõi của $a \rightarrow b$:</h3>
+            <ol class="list-decimal pl-6 space-y-3 mb-6">
+                <li><strong>Cùng một tiến trình:</strong> Nếu $a$ và $b$ là hai sự kiện diễn ra trong cùng một process, và $a$ xảy ra trước $b$ theo đồng hồ nội bộ của process đó, thì $a \rightarrow b$.</li>
+                <li><strong>Gửi và Nhận tin nhắn:</strong> Nếu $a$ là sự kiện <em>Gửi</em> một tin nhắn $m$, và $b$ là sự kiện <em>Nhận</em> tin nhắn $m$ đó bởi một process khác, thì $a \rightarrow b$. (Vì tin nhắn không thể được nhận trước khi nó được gửi đi).</li>
+                <li><strong>Tính bắc cầu (Transitivity):</strong> Nếu $a \rightarrow b$ và $b \rightarrow c$, thì suy ra $a \rightarrow c$.</li>
+            </ol>
+
+            <div class="math-box">
+                <p class="font-bold text-slate-800 mb-2">Sự kiện Đồng thời (Concurrent Events)</p>
+                <p>Nếu hai sự kiện $x$ và $y$ xảy ra ở hai process khác nhau mà không hề có bất kỳ tin nhắn nào trao đổi giữa chúng (kể cả gián tiếp), thì $x \not\rightarrow y$ và $y \not\rightarrow x$.</p>
+                <p>Lúc này, ta nói $x$ và $y$ là <strong>Đồng thời (Concurrent)</strong>. Hệ thống không quan tâm và không cần xác định cái nào xảy ra trước.</p>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 3: THUẬT TOÁN LAMPORT
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-purple-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-purple-500 pb-2">3. Thuật toán Đồng hồ Logic Lamport</h2>
+            
+            <p>Mục tiêu của thuật toán là gán cho mỗi sự kiện $a$ một giá trị thời gian $C(a)$ sao cho mọi process đều đồng ý. Điều kiện kiên quyết là: <strong>Nếu $a \rightarrow b$, thì $C(a) &lt; C(b)$.</strong></p>
+            <p class="text-sm italic text-slate-500 mb-6">(Lưu ý: Thời gian không bao giờ được đi lùi. Chỉ được cộng thêm, không được trừ đi).</p>
+
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">Cấu trúc thực thi (Trang 258)</h3>
+            <p>Mỗi process $P_i$ duy trì một bộ đếm cục bộ (local counter) $C_i$. Các bước diễn ra như sau:</p>
+            
+            <div class="bg-slate-800 text-slate-200 p-6 rounded-xl font-sans mt-4 shadow-lg">
+                <ol class="space-y-4">
+                    <li class="flex items-start">
+                        <div class="bg-purple-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 shrink-0 mt-1">1</div>
+                        <div>
+                            <strong class="text-purple-300">Tăng bộ đếm trước mỗi sự kiện:</strong><br>
+                            Trước khi thực thi một sự kiện (gửi tin, nhận tin, sự kiện nội bộ), $P_i$ tăng bộ đếm: <br>
+                            <span class="bg-slate-700 px-3 py-1 rounded mt-2 inline-block text-lg">$C_i \leftarrow C_i + 1$</span>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <div class="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 shrink-0 mt-1">2</div>
+                        <div>
+                            <strong class="text-blue-300">Đính kèm thời gian vào tin nhắn:</strong><br>
+                            Khi $P_i$ gửi tin nhắn $m$, nó đính kèm giá trị $C_i$ hiện tại thành timestamp của tin nhắn: <br>
+                            <span class="bg-slate-700 px-3 py-1 rounded mt-2 inline-block text-lg">$ts(m) = C_i$</span>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <div class="bg-emerald-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 shrink-0 mt-1">3</div>
+                        <div>
+                            <strong class="text-emerald-300">Nhận tin nhắn và Sửa đồng hồ:</strong><br>
+                            Khi $P_j$ nhận được tin nhắn $m$, nó so sánh đồng hồ của nó và timestamp của tin nhắn. Lấy giá trị lớn hơn để đảm bảo thời gian không đi lùi: <br>
+                            <span class="bg-slate-700 px-3 py-1 rounded mt-2 inline-block text-lg">$C_j \leftarrow \max(C_j, ts(m))$</span><br>
+                            Sau đó, nó thực hiện lại Bước 1 (Cộng thêm 1) và xử lý tin nhắn.
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <!-- MÔ PHỎNG: FIGURE 5.7 -->
+            <div class="bg-white border-2 border-purple-100 rounded-xl p-6 mt-10 shadow-sm relative">
+                <h3 class="font-bold font-sans text-xl text-purple-800 mb-2"><i class="fas fa-play-circle mr-2"></i>Mô phỏng: Tái hiện Figure 5.7 (Thuật toán Lamport)</h3>
+                <p class="text-sm font-sans text-slate-600 mb-6">Biểu đồ Không gian - Thời gian của 3 tiến trình có tốc độ đồng hồ khác nhau ($P_1$ chạy 6đv/nhịp, $P_2$ chạy 8đv/nhịp, $P_3$ chạy 10đv/nhịp). Nhấn "Tiếp tục" để xem các tin nhắn bay đi và cách Thuật toán Lamport sửa chữa sự kiện phi logic.</p>
+                
+                <!-- Diagram Container -->
+                <div class="relative w-full max-w-2xl mx-auto h-[500px] bg-slate-50 border rounded-lg overflow-hidden font-sans pt-12 pb-4" id="lamport-diagram">
+                    
+                    <!-- SVG for Arrows -->
+                    <svg class="arrows" id="svg-arrows">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+                            </marker>
+                            <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+                            </marker>
+                            <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+                            </marker>
+                        </defs>
+                        <!-- Lines will be drawn here dynamically -->
+                    </svg>
+
+                    <div class="flex justify-around h-full relative z-10 px-10">
+                        
+                        <!-- Process 1 -->
+                        <div class="timeline-col w-1/3" id="col-p1">
+                            <div class="absolute -top-10 font-bold text-slate-700 bg-slate-200 px-4 py-1 rounded">$P_1$ (+6)</div>
+                            <!-- Nodes injected by JS -->
+                        </div>
+
+                        <!-- Process 2 -->
+                        <div class="timeline-col w-1/3" id="col-p2">
+                            <div class="absolute -top-10 font-bold text-slate-700 bg-slate-200 px-4 py-1 rounded">$P_2$ (+8)</div>
+                        </div>
+
+                        <!-- Process 3 -->
+                        <div class="timeline-col w-1/3" id="col-p3">
+                            <div class="absolute -top-10 font-bold text-slate-700 bg-slate-200 px-4 py-1 rounded">$P_3$ (+10)</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between mt-6 font-sans">
+                    <button id="sim-btn-next" class="bg-purple-600 hover:bg-purple-500 text-white px-8 py-3 rounded-lg font-bold transition w-full md:w-auto shadow">
+                        Bắt đầu diễn hoạt (Gửi m1)
+                    </button>
+                    <div id="sim-log" class="flex-1 bg-slate-900 p-3 rounded-lg border border-slate-700 w-full text-xs font-mono text-green-400 min-h-[60px]">
+                        > Hệ thống chưa có tin nhắn. Đồng hồ trôi tự do...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 4: VỊ TRÍ & TIES BREAKING
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-orange-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-orange-500 pb-2">4. Triển khai & Xử lý Trùng lặp (Ties Breaking)</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div>
+                    <h3 class="text-xl font-bold font-sans text-slate-800 mb-3">Vị trí của Đồng hồ Logic (Figure 5.8)</h3>
+                    <p>Thuật toán Lamport không được cài đặt ở tầng Network (Giao thức mạng) hay tầng Application (Ứng dụng). Nó là một phần kinh điển của tầng <strong>Middleware (Phần mềm trung gian)</strong>.</p>
+                    <p class="mt-2 text-sm text-slate-600">Khi Application muốn gửi tin, Middleware chặn lại, gắn timestamp $ts(m)$ rồi mới đẩy xuống Network. Ngược lại, khi Network nhận tin, Middleware rút timestamp ra, sửa đồng hồ nội bộ, rồi mới giao tin nhắn lên cho Application xử lý.</p>
+                </div>
+                <div class="bg-orange-50 p-5 rounded-lg border border-orange-200">
+                    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 150'><rect x='10' y='50' width='280' height='50' fill='%23cbd5e1'/><text x='150' y='80' font-family='sans-serif' font-size='12' text-anchor='middle'>Middleware Layer (Lamport Logic)</text><path d='M 80 10 v 30 M 80 110 v 30 M 220 140 v -30 M 220 40 v -30' stroke='black' stroke-width='2' marker-end='url(%23arrow)'/></svg>" alt="Middleware concept" class="w-full">
+                </div>
+            </div>
+
+            <div class="math-box">
+                <h3 class="text-xl font-bold font-sans text-orange-800 mb-3">Thứ tự toàn phần (Total Ordering)</h3>
+                <p>Đồng hồ Lamport có một hạn chế: Nếu hai sự kiện xảy ra ở hai process khác nhau và cùng nhận được một giá trị thời gian $C = 40$, làm sao biết cái nào trước?</p>
+                <p>Sách giáo khoa (trang 258) đưa ra giải pháp giải quyết trùng lặp (Break ties) bằng cách sử dụng thêm <strong>Định danh tiến trình (Process Identifier - $i$)</strong> để tạo thành một Tuple $(C_i, i)$.</p>
+                
+                <p class="font-mono mt-4 font-bold">Quy tắc so sánh tuple:</p>
+                $$ (C_i, i) &lt; (C_j, j) \iff (C_i &lt; C_j) \text{ hoặc } (C_i = C_j \text{ và } i &lt; j) $$
+                
+                <p class="mt-4 text-sm">Ví dụ: Hai sự kiện cùng có thời gian 40 ở $P_1$ và $P_2$. Ta có tuple là $(40, 1)$ và $(40, 2)$. Vì $1 &lt; 2$, nên hệ thống chốt: Sự kiện ở $P_1$ xảy ra trước $P_2$. Điều này tạo ra một <strong>Thứ tự toàn phần (Total Ordering)</strong> trên toàn hệ thống phân tán.</p>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- LOGIC FOR SIMULATION (Figure 5.7) -->
+    <script>
+        // Data structure matching Figure 5.7
+        const timelines = {
+            p1: [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60],
+            p2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80],
+            p3: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        };
+
+        const nodes = { p1: [], p2: [], p3: [] };
+        const colP1 = document.getElementById('col-p1');
+        const colP2 = document.getElementById('col-p2');
+        const colP3 = document.getElementById('col-p3');
+        const svgArrows = document.getElementById('svg-arrows');
+        const simBtn = document.getElementById('sim-btn-next');
+        const simLog = document.getElementById('sim-log');
+
+        // Draw initial timelines
+        function renderTimelines() {
+            ['p1', 'p2', 'p3'].forEach(p => {
+                const col = document.getElementById(`col-${p}`);
+                col.innerHTML = `<div class="absolute -top-10 font-bold text-slate-700 bg-slate-200 px-4 py-1 rounded">$${p.toUpperCase()}$</div>`;
+                nodes[p] = [];
+                
+                timelines[p].forEach((val, idx) => {
+                    const node = document.createElement('div');
+                    node.className = 'event-node shadow-sm';
+                    node.innerText = val;
+                    node.id = `node-${p}-${idx}`;
+                    
+                    // Tooltip
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip';
+                    tooltip.innerText = `C_${p.charAt(1)} = ${val}`;
+                    tooltip.style.left = '40px';
+                    node.appendChild(tooltip);
+
+                    col.appendChild(node);
+                    nodes[p].push(node);
+                });
+            });
+        }
+        renderTimelines();
+
+        // Helper to draw SVG line between two DOM elements
+        function drawArrow(nodeA, nodeB, id, styleClass, markerId) {
+            const rectA = nodeA.getBoundingClientRect();
+            const rectB = nodeB.getBoundingClientRect();
+            const svgRect = svgArrows.getBoundingClientRect();
+
+            const startX = rectA.left + rectA.width/2 - svgRect.left;
+            const startY = rectA.top + rectA.height/2 - svgRect.top;
+            const endX = rectB.left + rectB.width/2 - svgRect.left;
+            const endY = rectB.top + rectB.height/2 - svgRect.top;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', startX);
+            line.setAttribute('y1', startY);
+            line.setAttribute('x2', endX);
+            line.setAttribute('y2', endY);
+            line.setAttribute('id', `arrow-${id}`);
+            line.setAttribute('class', `msg-arrow ${styleClass}`);
+            line.setAttribute('marker-end', `url(#${markerId})`);
+            svgArrows.appendChild(line);
+        }
+
+        // Simulation Steps
+        let step = 0;
+
+        const steps = [
+            {
+                action: () => {
+                    // m1: P1(6) -> P2(16)
+                    drawArrow(nodes.p1[1], nodes.p2[2], 'm1', '', 'arrowhead');
+                    simLog.innerHTML = "> <strong>Gửi m1:</strong> $P_1$ (nhãn 6) gửi tới $P_2$ (nhận lúc 16).<br>> Nhận định: $16 &gt; 6$. Logic hợp lệ. Không cần sửa đồng hồ.";
+                    simBtn.innerText = "Tiếp tục (Gửi m2)";
+                }
+            },
+            {
+                action: () => {
+                    // m2: P1(24) -> P3(40)
+                    drawArrow(nodes.p1[4], nodes.p3[4], 'm2', '', 'arrowhead');
+                    simLog.innerHTML = "> <strong>Gửi m2:</strong> $P_1$ (nhãn 24) gửi tới $P_3$ (nhận lúc 40).<br>> Nhận định: $40 &gt; 24$. Logic hợp lệ.";
+                    simBtn.innerText = "Tiếp tục (Gửi m3 - BẮT ĐẦU LỖI)";
+                    simBtn.classList.replace('bg-purple-600', 'bg-red-600');
+                    simBtn.classList.replace('hover:bg-purple-500', 'hover:bg-red-500');
+                }
+            },
+            {
+                action: () => {
+                    // m3: P3(60) -> P2(56) - ERROR!
+                    drawArrow(nodes.p3[6], nodes.p2[7], 'm3', 'invalid', 'arrowhead-red');
+                    nodes.p2[7].classList.add('adjusted'); // Pulse red
+                    
+                    simLog.innerHTML = `> <span class="text-red-400 font-bold">[VIOLATION] Gửi m3:</span> $P_3$ (gửi lúc 60) tới $P_2$ (nhận lúc 56).<br>> Nhận định: Thời gian đi lùi! (56 &lt; 60).<br>> Nhấn tiếp tục để Thuật toán Lamport sửa lỗi.`;
+                    simBtn.innerText = "Kích hoạt Lamport sửa P2";
+                }
+            },
+            {
+                action: () => {
+                    // Fix P2
+                    const arrow = document.getElementById('arrow-m3');
+                    arrow.classList.replace('invalid', 'valid');
+                    arrow.setAttribute('marker-end', 'url(#arrowhead-green)');
+                    
+                    nodes.p2[7].classList.replace('adjusted', 'resolved');
+                    nodes.p2[7].childNodes[0].nodeValue = "61"; // Max(56, 60) + 1 = 61
+                    nodes.p2[7].querySelector('.tooltip').innerText = "max(56, 60) + 1 = 61";
+
+                    // Update rest of P2
+                    const newP2 = [0, 8, 16, 24, 32, 40, 48, 61, 69, 77, 85];
+                    for(let i=8; i<11; i++) {
+                        nodes.p2[i].childNodes[0].nodeValue = newP2[i];
+                        nodes.p2[i].classList.add('resolved');
+                    }
+
+                    simLog.innerHTML = `> <strong>Lamport kích hoạt:</strong> $C_2 = \\max(56, 60) + 1 = 61$.<br>> Các node tiếp theo của $P_2$ được cộng dồn theo nhịp cũ (+8): 69, 77, 85.<br>> Logic thời gian đã phục hồi!`;
+                    simBtn.innerText = "Tiếp tục (Gửi m4)";
+                    simBtn.classList.replace('bg-red-600', 'bg-purple-600');
+                    simBtn.classList.replace('hover:bg-red-500', 'hover:bg-purple-500');
+                }
+            },
+            {
+                action: () => {
+                    // m4: P2(69) -> P1(54) - ERROR!
+                    drawArrow(nodes.p2[8], nodes.p1[9], 'm4', 'invalid', 'arrowhead-red');
+                    nodes.p1[9].classList.add('adjusted'); // Pulse red
+                    
+                    simLog.innerHTML = `> <span class="text-red-400 font-bold">[VIOLATION] Gửi m4:</span> $P_2$ (gửi lúc 69) tới $P_1$ (nhận lúc 54).<br>> Nhận định: Lại đi lùi! (54 &lt; 69).<br>> Nhấn tiếp để sửa lỗi P1.`;
+                    simBtn.innerText = "Kích hoạt Lamport sửa P1";
+                    simBtn.classList.replace('bg-purple-600', 'bg-red-600');
+                    simBtn.classList.replace('hover:bg-purple-500', 'hover:bg-red-500');
+                }
+            },
+            {
+                action: () => {
+                    // Fix P1
+                    const arrow = document.getElementById('arrow-m4');
+                    arrow.classList.replace('invalid', 'valid');
+                    arrow.setAttribute('marker-end', 'url(#arrowhead-green)');
+                    
+                    nodes.p1[9].classList.replace('adjusted', 'resolved');
+                    nodes.p1[9].childNodes[0].nodeValue = "70"; // Max(54, 69) + 1 = 70
+                    nodes.p1[9].querySelector('.tooltip').innerText = "max(54, 69) + 1 = 70";
+
+                    // Update rest of P1
+                    nodes.p1[10].childNodes[0].nodeValue = "76";
+                    nodes.p1[10].classList.add('resolved');
+
+                    simLog.innerHTML = `> <strong>Lamport kích hoạt:</strong> $C_1 = \\max(54, 69) + 1 = 70$.<br>> Hệ thống trở lại trạng thái nhất quán. Hình 5.7 hoàn tất!`;
+                    simBtn.innerText = "Hoàn thành. Chạy lại từ đầu.";
+                    simBtn.classList.replace('bg-red-600', 'bg-slate-600');
+                    simBtn.classList.replace('hover:bg-red-500', 'hover:bg-slate-500');
+                }
+            },
+            {
+                action: () => {
+                    // Reset everything
+                    svgArrows.innerHTML = `
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#64748b" /></marker>
+                            <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" /></marker>
+                            <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#10b981" /></marker>
+                        </defs>`;
+                    renderTimelines();
+                    step = 0;
+                    simLog.innerHTML = "> Hệ thống đã reset. Sẵn sàng Gửi m1.";
+                    simBtn.innerText = "Bắt đầu diễn hoạt (Gửi m1)";
+                    simBtn.className = "bg-purple-600 hover:bg-purple-500 text-white px-8 py-3 rounded-lg font-bold transition w-full md:w-auto shadow";
+                    
+                    // Call step 0 directly so it doesn't wait
+                    // Wait, returning keeps it at step 0 for next click
+                }
+            }
+        ];
+
+        simBtn.addEventListener('click', () => {
+            if (step < steps.length) {
+                steps[step].action();
+                if (step < steps.length - 1) {
+                    step++;
+                } else {
+                    step = 0; // Next click will reset
+                }
+            }
+            if(window.MathJax) MathJax.typesetPromise([simLog]);
+        });
+
+        // Redraw arrows if window is resized
+        window.addEventListener('resize', () => {
+            // Need to recalculate all positions. For simplicity in this demo, a reload is suggested.
+            // Complex redrawing logic omitted to keep file clean, but SVG coordinates depend on DOM rects.
+        });
+
+    </script>
+</body>
+</html>
