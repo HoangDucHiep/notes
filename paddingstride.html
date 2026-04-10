@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Padding và Stride: Kiểm soát Mạng Tích Chập</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Grid Cells */
+        .grid-cell { transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 0.8rem; font-weight: bold; }
+        
+        /* Input Cells */
+        .cell-real { background-color: #f8fafc; border: 1px solid #cbd5e1; color: #334155; }
+        .cell-pad { background-color: #f1f5f9; border: 1px dashed #94a3b8; color: #94a3b8; background-image: repeating-linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%, #e2e8f0), repeating-linear-gradient(45deg, #e2e8f0 25%, #f1f5f9 25%, #f1f5f9 75%, #e2e8f0 75%, #e2e8f0); background-position: 0 0, 4px 4px; background-size: 8px 8px; }
+        
+        /* Output Cells */
+        .cell-out { background-color: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; cursor: crosshair; }
+        .cell-out:hover { background-color: #34d399; color: white; transform: scale(1.1); z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* Highlights */
+        .highlight-kernel { background-color: rgba(59, 130, 246, 0.4) !important; border: 2px solid #2563eb !important; color: #1e3a8a !important; transform: scale(1.1); z-index: 10; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
+        
+        .dimmed { opacity: 0.3; }
+
+        /* Custom Range Slider */
+        input[type=range] { accent-color: #4f46e5; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased pb-20">
+
+<div class="max-w-6xl mx-auto p-4 lg:p-8 bg-white shadow-xl rounded-2xl my-8">
+    
+    <!-- HEADER -->
+    <header class="mb-10 text-center border-b pb-6">
+        <h1 class="text-4xl font-extrabold text-slate-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600">
+            Padding & Stride
+        </h1>
+        <p class="text-lg text-slate-600">Nghệ thuật kiểm soát Hình dạng (Shape) trong Mạng Nơ-ron Tích chập</p>
+    </header>
+
+    <!-- LÝ THUYẾT -->
+    <section class="grid md:grid-cols-2 gap-8 mb-12">
+        
+        <!-- Padding -->
+        <div class="bg-violet-50 p-6 rounded-xl border border-violet-100">
+            <h2 class="text-2xl font-bold text-violet-800 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                1. Padding (Đệm)
+            </h2>
+            <div class="prose prose-sm text-slate-700">
+                <p><strong>Vấn đề:</strong> Khi quét Kernel qua ảnh, kích thước ảnh đầu ra luôn bị <em>teo nhỏ lại</em>. Hơn nữa, các pixel ở rìa/góc ảnh chỉ được Kernel chạm qua 1 lần, trong khi pixel ở giữa được quét nhiều lần $\rightarrow$ <strong>Mất mát thông tin ở vùng biên.</strong></p>
+                <p><strong>Giải pháp:</strong> Bao quanh ảnh gốc bằng các lớp viền pixel giả (thường có giá trị = 0, gọi là Zero-Padding).</p>
+                <ul class="list-disc pl-4 mt-2">
+                    <li>Ký hiệu là \(p\). Tổng padding 2 bên là \(p_h\) (chiều cao) và \(p_w\) (chiều rộng).</li>
+                    <li><strong>Mẹo chuẩn:</strong> Để kích thước Đầu ra giữ nguyên bằng Đầu vào (Same Padding), ta chọn Kernel size lẻ (3, 5, 7) và đặt \(p = (k - 1) / 2\).</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Stride -->
+        <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+            <h2 class="text-2xl font-bold text-indigo-800 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                2. Stride (Bước trượt)
+            </h2>
+            <div class="prose prose-sm text-slate-700">
+                <p><strong>Vấn đề:</strong> Nếu ảnh quá lớn (ví dụ 4K), việc trượt Kernel từng pixel một sẽ tạo ra lượng tính toán khổng lồ và giữ nguyên độ phân giải không cần thiết ở các lớp sâu.</p>
+                <p><strong>Giải pháp:</strong> Thay vì trượt 1 ô, ta nhảy cóc! Bước trượt (Stride) \(s\) là số ô mà Kernel dịch chuyển sau mỗi lần tính toán.</p>
+                <ul class="list-disc pl-4 mt-2">
+                    <li>Ký hiệu là \(s\).</li>
+                    <li>Stride > 1 đóng vai trò như một bộ <strong>Downsampling (Giảm lấy mẫu)</strong>, giúp thu nhỏ đáng kể kích thước Feature Map, tiết kiệm bộ nhớ và tính toán.</li>
+                </ul>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- CÔNG THỨC MASTER -->
+    <section class="mb-12">
+        <div class="bg-slate-900 text-white p-6 rounded-xl shadow-lg border border-slate-700 text-center relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20"></div>
+            <h3 class="text-lg text-slate-300 font-semibold mb-2 relative z-10">Công thức Vàng tính Kích thước Đầu ra (Output Shape)</h3>
+            <p class="text-sm text-slate-400 mb-4 relative z-10">Dành cho ảnh vuông: Input (\(n \times n\)), Kernel (\(k \times k\)), Padding mỗi bên (\(p\)), Stride (\(s\))</p>
+            <div class="text-2xl md:text-4xl font-bold text-yellow-400 relative z-10 py-4 font-serif">
+                $$ Output = \left\lfloor \frac{n - k + 2p}{s} \right\rfloor + 1 $$
+            </div>
+            <p class="text-xs text-slate-400 mt-2 relative z-10"><em>(Dấu \(\lfloor \dots \rfloor\) nghĩa là làm tròn xuống. Nếu trong PyTorch bạn khai báo `padding=1`, nghĩa là mỗi bên cộng 1, tổng padding là \(2p\)).</em></p>
+        </div>
+    </section>
+
+    <!-- TƯƠNG TÁC -->
+    <section class="bg-white border-2 border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+        <div class="bg-slate-100 border-b-2 border-slate-200 p-4 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-slate-800">Bàn điều khiển Tích chập (Interactive Lab)</h2>
+            <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full border border-indigo-200">Giả định Ảnh vuông</span>
+        </div>
+
+        <div class="flex flex-col lg:flex-row">
+            
+            <!-- CONTROLS -->
+            <div class="lg:w-1/3 bg-slate-50 p-6 border-r border-slate-200 flex flex-col gap-6">
+                
+                <!-- Input Size -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-bold text-slate-700">Ảnh gốc (n):</label>
+                        <span id="valN" class="text-sm font-mono font-bold text-blue-600 bg-blue-100 px-2 rounded">5</span>
+                    </div>
+                    <input type="range" id="sliderN" min="3" max="10" value="5" class="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <!-- Kernel Size -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-bold text-slate-700">Bộ lọc (k):</label>
+                        <span id="valK" class="text-sm font-mono font-bold text-red-600 bg-red-100 px-2 rounded">3</span>
+                    </div>
+                    <input type="range" id="sliderK" min="1" max="7" step="2" value="3" class="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer">
+                    <p class="text-[10px] text-slate-500 mt-1">Thường dùng số lẻ (1, 3, 5, 7)</p>
+                </div>
+
+                <!-- Padding -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-bold text-slate-700">Padding (p):</label>
+                        <span id="valP" class="text-sm font-mono font-bold text-purple-600 bg-purple-100 px-2 rounded">0</span>
+                    </div>
+                    <input type="range" id="sliderP" min="0" max="4" value="0" class="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer">
+                    <p class="text-[10px] text-slate-500 mt-1">Số viền pixel 0 thêm vào <strong>mỗi bên</strong></p>
+                </div>
+
+                <!-- Stride -->
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-bold text-slate-700">Stride (s):</label>
+                        <span id="valS" class="text-sm font-mono font-bold text-emerald-600 bg-emerald-100 px-2 rounded">1</span>
+                    </div>
+                    <input type="range" id="sliderS" min="1" max="4" value="1" class="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer">
+                    <p class="text-[10px] text-slate-500 mt-1">Bước nhảy của bộ lọc</p>
+                </div>
+
+                <!-- Formula Result -->
+                <div class="mt-auto pt-4 border-t border-slate-300">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Tính toán Đầu ra:</p>
+                    <div class="bg-slate-800 p-3 rounded-lg font-mono text-sm text-center">
+                        <div id="dynamicMath" class="text-slate-300 mb-2 text-base min-h-[35px] flex items-center justify-center">
+                            <!-- MathJax Dynamic Formula -->
+                        </div>
+                        <div class="text-xl font-bold text-white">
+                            = <span id="fResult" class="text-yellow-400">3</span> <span class="text-sm text-slate-400 font-normal">x <span id="fResult2">3</span></span>
+                        </div>
+                    </div>
+                    <div id="errorMsg" class="hidden mt-2 p-2 bg-red-100 text-red-700 text-xs rounded border border-red-200 text-center font-bold">
+                        Cấu hình không hợp lệ! (Đầu ra ≤ 0)
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- VISUALIZATION -->
+            <div class="lg:w-2/3 p-6 bg-slate-200 flex flex-col md:flex-row items-center justify-center gap-8 min-h-[400px]">
+                
+                <!-- Padded Input -->
+                <div class="flex flex-col items-center">
+                    <h3 class="mb-3 text-sm font-bold text-slate-700 bg-white px-3 py-1 rounded shadow-sm">Ảnh Gốc + Padding</h3>
+                    <div id="gridInput" class="grid bg-white p-1 shadow-md border border-slate-300">
+                        <!-- JS generated -->
+                    </div>
+                    <p class="mt-2 text-xs text-slate-500">Kích thước: <span id="lblPaddedSize" class="font-bold">5x5</span></p>
+                </div>
+
+                <!-- Arrow -->
+                <div class="hidden md:flex flex-col items-center justify-center text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                    <span class="text-[10px] font-bold mt-1 uppercase">Conv2D</span>
+                </div>
+
+                <!-- Output -->
+                <div class="flex flex-col items-center">
+                    <h3 class="mb-3 text-sm font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded shadow-sm">Đầu ra (Feature Map)</h3>
+                    <div id="gridOutput" class="grid bg-white p-1 shadow-md border border-slate-300">
+                        <!-- JS generated -->
+                    </div>
+                    <p class="mt-2 text-xs text-slate-500">Kích thước: <span id="lblOutputSize" class="font-bold text-emerald-600">3x3</span></p>
+                    <p class="mt-1 text-[10px] text-slate-400 italic">Di chuột vào để xem cách Kernel trượt</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    // State variables
+    let N = 5;
+    let K = 3;
+    let P = 0;
+    let S = 1;
+    let Out = 3;
+
+    // DOM Elements
+    const sN = document.getElementById('sliderN');
+    const sK = document.getElementById('sliderK');
+    const sP = document.getElementById('sliderP');
+    const sS = document.getElementById('sliderS');
+    
+    const vN = document.getElementById('valN');
+    const vK = document.getElementById('valK');
+    const vP = document.getElementById('valP');
+    const vS = document.getElementById('valS');
+
+    const dynamicMath = document.getElementById('dynamicMath');
+    const fResult = document.getElementById('fResult');
+    const fResult2 = document.getElementById('fResult2');
+    const errorMsg = document.getElementById('errorMsg');
+
+    const gridInput = document.getElementById('gridInput');
+    const gridOutput = document.getElementById('gridOutput');
+    const lblPaddedSize = document.getElementById('lblPaddedSize');
+    const lblOutputSize = document.getElementById('lblOutputSize');
+
+    function calculateOutput() {
+        Out = Math.floor((N - K + 2 * P) / S) + 1;
+        return Out;
+    }
+
+    function updateUI() {
+        // Update variables
+        N = parseInt(sN.value);
+        K = parseInt(sK.value);
+        P = parseInt(sP.value);
+        S = parseInt(sS.value);
+
+        // Update Labels
+        vN.textContent = N;
+        vK.textContent = K;
+        vP.textContent = P;
+        vS.textContent = S;
+
+        // Update Dynamic Formula via MathJax using LaTeX \color
+        const mathString = `\\lfloor \\frac{\\color{#60a5fa}{${N}} - \\color{#f87171}{${K}} + 2(\\color{#c084fc}{${P}})}{\\color{#34d399}{${S}}} \\rfloor + 1`;
+        
+        dynamicMath.innerHTML = '\\(' + mathString + '\\)';
+        // Re-typeset the formula if MathJax is loaded
+        if (typeof MathJax !== 'undefined' && MathJax.typesetClear && MathJax.typesetPromise) {
+            MathJax.typesetClear([dynamicMath]);
+            MathJax.typesetPromise([dynamicMath]).catch((err) => console.log('MathJax error:', err.message));
+        }
+
+        let outSize = calculateOutput();
+
+        if (outSize <= 0) {
+            fResult.textContent = "-";
+            fResult2.textContent = "-";
+            errorMsg.classList.remove('hidden');
+            gridInput.innerHTML = '';
+            gridOutput.innerHTML = '';
+            lblPaddedSize.textContent = '-';
+            lblOutputSize.textContent = '-';
+            return;
+        }
+
+        errorMsg.classList.add('hidden');
+        fResult.textContent = outSize;
+        fResult2.textContent = outSize;
+        
+        drawGrids(outSize);
+    }
+
+    function drawGrids(outSize) {
+        let paddedN = N + 2 * P;
+        lblPaddedSize.textContent = `${paddedN}x${paddedN}`;
+        lblOutputSize.textContent = `${outSize}x${outSize}`;
+
+        // Dynamic Cell Sizing based on grid size
+        let cellSize = 'w-6 h-6 sm:w-8 sm:h-8';
+        if (paddedN > 12) cellSize = 'w-4 h-4 sm:w-5 sm:h-5';
+        
+        let outCellSize = 'w-6 h-6 sm:w-8 sm:h-8';
+        if (outSize > 12) outCellSize = 'w-4 h-4 sm:w-5 sm:h-5';
+
+        // 1. Draw Padded Input
+        gridInput.style.gridTemplateColumns = `repeat(${paddedN}, minmax(0, 1fr))`;
+        gridInput.innerHTML = '';
+
+        for (let y = 0; y < paddedN; y++) {
+            for (let x = 0; x < paddedN; x++) {
+                let cell = document.createElement('div');
+                cell.id = `in-${y}-${x}`;
+                
+                // Check if it's padding or real image
+                if (y < P || y >= N + P || x < P || x >= N + P) {
+                    cell.className = `grid-cell ${cellSize} cell-pad`;
+                    cell.textContent = '0'; // Padding is usually 0
+                } else {
+                    cell.className = `grid-cell ${cellSize} cell-real`;
+                    // cell.textContent = '1'; 
+                }
+                gridInput.appendChild(cell);
+            }
+        }
+
+        // 2. Draw Output
+        gridOutput.style.gridTemplateColumns = `repeat(${outSize}, minmax(0, 1fr))`;
+        gridOutput.innerHTML = '';
+
+        for (let y = 0; y < outSize; y++) {
+            for (let x = 0; x < outSize; x++) {
+                let cell = document.createElement('div');
+                cell.id = `out-${y}-${x}`;
+                cell.className = `grid-cell ${outCellSize} cell-out`;
+                
+                // Interaction
+                cell.addEventListener('mouseenter', () => handleHover(y, x, outSize, paddedN));
+                cell.addEventListener('mouseleave', clearHover);
+                
+                gridOutput.appendChild(cell);
+            }
+        }
+    }
+
+    function handleHover(outY, outX, outSize, paddedN) {
+        // Calculate kernel starting position on padded input
+        let startY = outY * S;
+        let startX = outX * S;
+
+        // Dim everything in input
+        for (let y = 0; y < paddedN; y++) {
+            for (let x = 0; x < paddedN; x++) {
+                document.getElementById(`in-${y}-${x}`).classList.add('dimmed');
+            }
+        }
+
+        // Highlight Kernel window
+        for (let ky = 0; ky < K; ky++) {
+            for (let kx = 0; kx < K; kx++) {
+                let targetY = startY + ky;
+                let targetX = startX + kx;
+                // Safety check (should always pass if math is correct)
+                if (targetY < paddedN && targetX < paddedN) {
+                    let el = document.getElementById(`in-${targetY}-${targetX}`);
+                    el.classList.remove('dimmed');
+                    el.classList.add('highlight-kernel');
+                }
+            }
+        }
+    }
+
+    function clearHover() {
+        const cells = document.querySelectorAll('.grid-cell');
+        cells.forEach(cell => {
+            cell.classList.remove('dimmed', 'highlight-kernel');
+        });
+    }
+
+    // Event Listeners for sliders
+    sN.addEventListener('input', updateUI);
+    sK.addEventListener('input', updateUI);
+    sP.addEventListener('input', updateUI);
+    sS.addEventListener('input', updateUI);
+
+    // Initial draw
+    updateUI();
+
+</script>
+</body>
+</html>
