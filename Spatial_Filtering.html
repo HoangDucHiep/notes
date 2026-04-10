@@ -1,768 +1,771 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Pause, SkipForward, RotateCcw, Info, ArrowRight, CheckCircle2 } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fundamentals of Spatial Filtering</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Ẩn nội dung trước khi JS/Icons load xong để tránh bị giật giao diện */
+    [data-lucide] { display: inline-block; }
+  </style>
+</head>
+<body class="bg-slate-50 pb-20 font-sans text-slate-800 leading-relaxed">
 
-// --- COMPONENTS DÙNG CHUNG ---
-const SectionTitle = ({ children }) => (
-  <h2 className="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
-    {children}
-  </h2>
-);
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-slate-900 to-blue-900 text-white py-12 px-6 shadow-lg">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">
+        Fundamentals of Spatial Filtering
+      </h1>
+      <p class="text-xl text-blue-100 font-light max-w-2xl leading-relaxed">
+        Nền tảng của Xử lý ảnh không gian: Hiểu sâu về cơ chế Lọc tuyến tính, Correlation và Convolution thông qua lý thuyết và mô phỏng tương tác.
+      </p>
+    </div>
+  </header>
 
-const SubTitle = ({ children }) => (
-  <h3 className="text-xl font-semibold text-slate-700 mt-6 mb-3">{children}</h3>
-);
-
-const MathBlock = ({ children }) => (
-  <div className="bg-slate-50 p-4 rounded-lg overflow-x-auto text-center font-serif text-lg italic text-slate-800 my-4 border border-slate-200">
-    {children}
-  </div>
-);
-
-const Highlight = ({ children, color = "blue" }) => {
-  const colors = {
-    blue: "text-blue-600 font-semibold bg-blue-50 px-1 rounded",
-    red: "text-red-600 font-semibold bg-red-50 px-1 rounded",
-    green: "text-green-600 font-semibold bg-green-50 px-1 rounded",
-  };
-  return <span className={colors[color]}>{children}</span>;
-};
-
-// --- MÔ PHỎNG 1D (Dựa trên Figure 3.29) ---
-const Simulator1D = () => {
-  const [mode, setMode] = useState('correlation'); // 'correlation' or 'convolution'
-  const [step, setStep] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  // Dữ liệu từ Figure 3.29
-  const f_original = [0, 0, 0, 1, 0, 0, 0, 0];
-  const w_original = [1, 2, 4, 2, 8];
-  
-  // Padding logic: Kernel size = 5 (a=2). Cần pad 2 số 0 ở hai đầu.
-  // Full padding: m-1 số 0 mỗi bên = 4 số 0 mỗi bên.
-  const padding = 4; 
-  const f_padded = [...Array(padding).fill(0), ...f_original, ...Array(padding).fill(0)];
-  
-  const w = mode === 'correlation' ? w_original : [...w_original].reverse(); // Rotation 180 độ trong 1D là đảo ngược mảng
-
-  const maxSteps = f_padded.length - w.length + 1; // Số bước có thể trượt
-
-  useEffect(() => {
-    let timer;
-    if (isPlaying && step < maxSteps - 1) {
-      timer = setTimeout(() => setStep(step + 1), 1000);
-    } else if (isPlaying && step >= maxSteps - 1) {
-      setIsPlaying(false);
-    }
-    return () => clearTimeout(timer);
-  }, [isPlaying, step, maxSteps]);
-
-  const handleReset = () => {
-    setStep(0);
-    setIsPlaying(false);
-  };
-
-  const toggleMode = () => {
-    setMode(mode === 'correlation' ? 'convolution' : 'correlation');
-    handleReset();
-  };
-
-  // Tính toán mảng kết quả
-  const result = [];
-  for (let i = 0; i <= step; i++) {
-    let sum = 0;
-    for (let j = 0; j < w.length; j++) {
-      sum += w[j] * f_padded[i + j];
-    }
-    result.push(sum);
-  }
-
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 my-6">
-      <div className="flex justify-between items-center mb-6">
-        <h4 className="text-lg font-bold text-slate-800">
-          Mô phỏng 1D: <span className={mode === 'correlation' ? "text-blue-600" : "text-green-600"}>
-            {mode === 'correlation' ? 'Correlation (Tương quan)' : 'Convolution (Tích chập)'}
-          </span>
-        </h4>
-        <button 
-          onClick={toggleMode}
-          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-semibold transition"
-        >
-          Chuyển sang {mode === 'correlation' ? 'Convolution' : 'Correlation'}
-        </button>
+  <main class="max-w-4xl mx-auto px-6">
+    
+    <!-- PHẦN 1 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
+        1. Lọc Không Gian (Spatial Filtering) là gì?
+      </h2>
+      <div class="text-lg text-slate-700 leading-relaxed space-y-4">
+        <p>
+          "Filtering" (Lọc) là thuật ngữ mượn từ xử lý tín hiệu miền tần số (frequency domain), nơi lọc nghĩa là cho qua, sửa đổi hoặc từ chối các tần số cụ thể. Ví dụ, <em>lowpass filter</em> (lọc thông thấp) làm mờ ảnh. 
+          Tuy nhiên, chúng ta có thể đạt được hiệu ứng tương tự bằng cách làm việc <strong>trực tiếp trên chính các pixel của ảnh</strong>. Đây gọi là <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Spatial Filtering (Lọc không gian)</span>.
+        </p>
+        <p>
+          Cơ bản, lọc không gian thay đổi giá trị của một pixel dựa trên một <strong>hàm toán học</strong> liên quan đến giá trị của chính nó và các pixel "hàng xóm" xung quanh nó.
+        </p>
+        <ul class="bg-white p-6 rounded-lg border-l-4 border-blue-500 shadow-sm list-none space-y-3">
+          <li class="flex gap-3">
+            <i data-lucide="check-circle-2" class="text-blue-500 shrink-0 mt-1 w-5 h-5"></i> 
+            <span><strong>Lọc không gian tuyến tính (Linear Spatial Filter):</strong> Phép toán thực hiện trên ảnh là các phép nhân và cộng (tuyến tính). Đây là trọng tâm của bài học này.</span>
+          </li>
+          <li class="flex gap-3">
+            <i data-lucide="check-circle-2" class="text-slate-400 shrink-0 mt-1 w-5 h-5"></i> 
+            <span class="text-slate-500"><strong>Lọc không gian phi tuyến tính (Nonlinear):</strong> Phép toán dựa trên logic/thống kê (ví dụ: tìm Max, Min, Median). Sẽ học ở phần khác.</span>
+          </li>
+        </ul>
       </div>
+    </section>
 
-      <div className="space-y-6 font-mono text-center overflow-x-auto pb-4">
-        {/* Function f (Padded) */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="w-20 text-right font-bold text-slate-500 text-sm">Padded f(x)</div>
-          <div className="flex gap-1">
-            {f_padded.map((val, idx) => {
-              const isPadding = idx < padding || idx >= f_padded.length - padding;
-              const inWindow = idx >= step && idx < step + w.length;
-              return (
-                <div key={`f-${idx}`} className={`w-10 h-10 flex items-center justify-center border-2 rounded 
-                  ${isPadding ? 'text-slate-300 border-slate-100' : 'text-slate-800 border-slate-300 font-bold'}
-                  ${inWindow ? 'bg-yellow-100 border-yellow-400' : ''}`}>
-                  {val}
-                </div>
-              );
-            })}
-          </div>
+    <!-- PHẦN 2 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
+        2. Cơ chế của Lọc Tuyến Tính (Mechanics)
+      </h2>
+      <div class="text-lg text-slate-700 leading-relaxed space-y-4">
+        <p>
+          Lọc không gian tuyến tính thực hiện một phép toán gọi là <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Sum-of-products (Tổng của các tích)</span> giữa một bức ảnh <span class="font-serif italic">f</span> và một bộ lọc gọi là <span class="text-red-600 font-semibold bg-red-50 px-1 rounded">Kernel (w)</span>.
+        </p>
+        <div class="bg-blue-50 p-4 rounded-lg text-blue-900 text-sm">
+            💡 <strong>Thuật ngữ đồng nghĩa:</strong> Kernel còn được gọi là <em>filter mask</em> (mặt nạ lọc), <em>template</em> (bản mẫu), hoặc <em>window</em> (cửa sổ). Kích thước của Kernel xác định phạm vi vùng "hàng xóm" bao trùm.
         </div>
+        
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Trực quan hóa quá trình (Figure 3.28)</h3>
+        <p>
+            Hãy tưởng tượng ảnh là một lưới tọa độ (x,y). Ta đặt Kernel (ví dụ kích thước 3x3) sao cho tâm của Kernel đè lên một pixel tọa độ (x,y) của ảnh.
+            Giá trị kết quả mới <span class="font-serif italic">g(x,y)</span> được tính bằng cách lấy từng hệ số trong Kernel nhân với pixel nằm ngay dưới nó, rồi <strong>cộng tất cả các tích đó lại</strong>.
+        </p>
 
-        {/* Kernel w */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="w-20 text-right font-bold text-slate-500 text-sm">Kernel w(s)</div>
-          <div className="flex gap-1">
-            {/* Không gian trống để căn chỉnh kernel */}
-            {[...Array(step)].map((_, i) => <div key={`space-${i}`} className="w-10 h-10 border-2 border-transparent"></div>)}
-            {/* Hiển thị kernel */}
-            {w.map((val, idx) => (
-              <div key={`w-${idx}`} className={`w-10 h-10 flex items-center justify-center border-2 rounded font-bold
-                ${mode === 'correlation' ? 'text-blue-700 bg-blue-50 border-blue-400' : 'text-green-700 bg-green-50 border-green-400'}`}>
-                {val}
+        <!-- Simulator 2D -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 my-6 flex flex-col md:flex-row gap-8 items-center justify-center">
+          <div class="flex flex-col items-center">
+              <h4 class="font-bold mb-4">Ảnh 5x5 & Kernel 3x3</h4>
+              <div class="relative border-2 border-slate-800 bg-slate-50 p-2 inline-block">
+                  <div id="sim2d-grid" class="grid grid-cols-5 gap-1"></div>
               </div>
-            ))}
+              <button id="sim2d-next" class="mt-6 flex items-center gap-2 px-6 py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition">
+                  Trượt Kernel (Slide) <i data-lucide="skip-forward" class="w-4 h-4"></i>
+              </button>
+          </div>
+          <div class="flex flex-col flex-1 w-full max-w-md">
+              <h4 class="font-bold mb-4">Phép tính "Sum of Products" hiện tại</h4>
+              <div class="bg-slate-800 text-green-400 p-4 rounded-lg font-mono text-sm leading-relaxed shadow-inner h-64 overflow-y-auto">
+                  <div id="sim2d-pos" class="mb-2 text-slate-300">Vị trí góc Kernel: (0, 0)</div>
+                  <div id="sim2d-eq" class="mb-2">g(1, 1) = </div>
+                  <div id="sim2d-calc-math"></div>
+                  <div class="mt-4 border-t border-slate-600 pt-2 text-xl font-bold text-white">
+                      Kết quả pixel mới: <span id="sim2d-sum" class="text-yellow-400">0</span>
+                  </div>
+              </div>
+              <div class="text-sm text-slate-500 mt-2 italic text-center">
+                 Đây là mô phỏng phép tính tại 1 vị trí của <b>Figure 3.28</b>
+              </div>
           </div>
         </div>
 
-        {/* Multiplier Visualization (Sum of products) */}
-        <div className="flex items-center justify-center gap-2 text-sm text-slate-500 h-8">
-            <div className="w-20 text-right"></div>
-            <div className="flex gap-1">
-                {[...Array(step)].map((_, i) => <div key={`s-${i}`} className="w-10"></div>)}
-                {w.map((w_val, idx) => {
-                   const f_val = f_padded[step + idx];
-                   if (f_val === 0 || w_val === 0) return <div key={`mul-${idx}`} className="w-10"></div>;
-                   return <div key={`mul-${idx}`} className="w-10 h-10 flex flex-col items-center justify-center font-bold text-red-500">
-                        <span>↑</span>
-                        <span className="text-xs">{f_val}x{w_val}</span>
-                   </div>
-                })}
+        <p>Tổng quát cho ảnh kích thước MxN và kernel m x n (với m, n là số lẻ), công thức lọc tuyến tính không gian là:</p>
+        <div class="bg-slate-50 p-4 rounded-lg overflow-x-auto text-center font-serif text-lg italic text-slate-800 my-4 border border-slate-200">
+            g(x, y) = ∑<sub>s=-a</sub><sup>a</sup> ∑<sub>t=-b</sub><sup>b</sup> w(s,t) * f(x+s, y+t)
+            <div class="text-sm text-slate-500 mt-2 normal-case font-sans">(Equation 3-31) - Trong đó: a = (m-1)/2 và b = (n-1)/2</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 3 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
+        3. Spatial Correlation và Convolution
+      </h2>
+      <div class="text-lg text-slate-700 leading-relaxed space-y-4">
+        <p>
+          Công thức (3-31) ở trên thực chất mô tả quá trình <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Spatial Correlation (Tương quan không gian)</span>. Có một khái niệm song sinh với nó là <span class="text-green-600 font-semibold bg-green-50 px-1 rounded">Spatial Convolution (Tích chập không gian)</span>.
+        </p>
+        <p>
+          Sự khác biệt duy nhất về mặt cơ học là: <strong>Trong Convolution, Kernel phải được xoay 180 độ (Rotated by 180°) trước khi thực hiện trượt và tính "tổng các tích".</strong> 
+        </p>
+        <div class="bg-red-50 border border-red-200 p-4 rounded-lg mt-4">
+            <p class="font-semibold text-red-800">Tại sao phải xoay 180 độ? Khái niệm "Unit Impulse"</p>
+            <p class="text-red-700 mt-2 text-base">
+                Trong lý thuyết hệ thống tuyến tính, nếu bạn "tích chập" một hàm với một tín hiệu xung nhọn (Unit Impulse - một điểm có giá trị 1, xung quanh toàn số 0), kết quả phải trả về <strong>bản sao chính xác</strong> của chính hàm đó tại vị trí xung. <br><br>
+                Nếu dùng Correlation, kết quả trả về sẽ bị ngược (bạn có thể tự kiểm chứng ở mô phỏng 1D bên dưới). Do đó, toán học quy định phải xoay Kernel 180 độ trước (tức là Convolution) để đảm bảo khi đi qua xung, nó lật lại lần nữa và giữ nguyên hình dạng ban đầu.
+            </p>
+        </div>
+        
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Mô phỏng 1D: Padding & Shifting (Figure 3.29)</h3>
+        <p>
+            Trước khi đi vào 2D, sách đưa ra ví dụ 1D cực kỳ dễ hiểu. Để Kernel có thể trượt từ mép ngoài cùng bên trái sang mép ngoài cùng bên phải của ảnh mà không bị "lỗi ra ngoài mảng", chúng ta phải chèn thêm các số 0 vào hai đầu ảnh. Kỹ thuật này gọi là <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Zero-padding</span>.
+        </p>
+        <p>Hãy thử tương tác với mô phỏng dưới đây để hiểu rõ lý thuyết trên:</p>
+
+        <!-- Simulator 1D -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 my-6">
+          <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <h4 class="text-lg font-bold text-slate-800">
+              Mô phỏng 1D: <span id="sim1-mode-text" class="text-blue-600">Correlation (Tương quan)</span>
+            </h4>
+            <button id="sim1-toggle" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-semibold transition">
+              Chuyển sang Convolution
+            </button>
+          </div>
+
+          <div class="space-y-6 font-mono text-center overflow-x-auto pb-4">
+            <!-- Padded f(x) -->
+            <div class="flex items-center justify-start md:justify-center gap-2">
+              <div class="w-20 shrink-0 text-right font-bold text-slate-500 text-sm">Padded f(x)</div>
+              <div id="sim1-f" class="flex gap-1"></div>
+            </div>
+            <!-- Kernel w(s) -->
+            <div class="flex items-center justify-start md:justify-center gap-2">
+              <div class="w-20 shrink-0 text-right font-bold text-slate-500 text-sm">Kernel w(s)</div>
+              <div id="sim1-w" class="flex gap-1"></div>
+            </div>
+            <!-- Multipliers -->
+            <div class="flex items-center justify-start md:justify-center gap-2 text-sm text-slate-500 h-8">
+                <div class="w-20 shrink-0 text-right"></div>
+                <div id="sim1-mul" class="flex gap-1"></div>
+            </div>
+            <!-- Result g(x) -->
+            <div class="flex items-center justify-start md:justify-center gap-2 mt-4 pt-4 border-t border-slate-100">
+              <div class="w-20 shrink-0 text-right font-bold text-slate-500 text-sm">Result g(x)</div>
+              <div id="sim1-g" class="flex gap-1"></div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex flex-wrap justify-center gap-4 mt-6">
+            <button id="sim1-play" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+              <i data-lucide="play" class="w-4 h-4"></i> Tự động chạy
+            </button>
+            <button id="sim1-next" class="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 transition">
+              <i data-lucide="skip-forward" class="w-4 h-4"></i> Bước tiếp theo
+            </button>
+            <button id="sim1-reset" class="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 transition">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Làm lại
+            </button>
+          </div>
+          
+          <div class="mt-6 bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800 border border-yellow-200">
+            <p><strong>Quan sát:</strong> Đây là minh họa chính xác cho <strong>Figure 3.29</strong> trong sách.</p>
+            <ul class="list-disc ml-5 mt-2 space-y-1">
+                <li>Hàm <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">f</span> có một "unit impulse" (giá trị 1) ở giữa, còn lại là 0.</li>
+                <li>Khi chọn <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Correlation</span>, kết quả thu được là bản sao của kernel, nhưng bị <strong>đảo ngược (rotated)</strong>. (Output: 8,2,4,2,1).</li>
+                <li>Khi chọn <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Convolution</span>, vì kernel đã được lật 180 độ từ trước, kết quả thu được là <strong>bản sao chính xác</strong> của kernel ban đầu. (Output: 1,2,4,2,8). Đây là một tính chất nền tảng của hệ thống tuyến tính!</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PHẦN 4 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
+        4. Định nghĩa Toán học 2D & Tính chất
+      </h2>
+      <div class="text-lg text-slate-700 leading-relaxed space-y-4">
+        <p>Dựa trên sự phân biệt giữa Tương quan và Tích chập, ta có 2 ký hiệu toán học riêng biệt (Figure 3.34 & 3.35):</p>
+        
+        <div class="grid md:grid-cols-2 gap-6 mt-4">
+            <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                <h5 class="font-bold text-blue-700 mb-2">Correlation (Ký hiệu: ☆)</h5>
+                <div class="font-serif italic text-center my-3 text-lg">
+                    (w ☆ f)(x,y) = ∑∑ w(s,t)f(x+s, y+t)
+                </div>
+                <p class="text-sm text-slate-600">Dấu cộng (+) trong f(x+s, y+t) thể hiện việc kernel di chuyển cùng chiều với hệ trục tọa độ mà không xoay.</p>
+            </div>
+            
+            <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                <h5 class="font-bold text-green-700 mb-2">Convolution (Ký hiệu: ★)</h5>
+                <div class="font-serif italic text-center my-3 text-lg">
+                    (w ★ f)(x,y) = ∑∑ w(s,t)f(x-s, y-t)
+                </div>
+                <p class="text-sm text-slate-600">Dấu trừ (-) trong f(x-s, y-t) chính là sự dịch chuyển tọa độ thể hiện việc Kernel đã được <strong>xoay 180 độ</strong>.</p>
             </div>
         </div>
 
-        {/* Result g */}
-        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-slate-100">
-          <div className="w-20 text-right font-bold text-slate-500 text-sm">Result g(x)</div>
-          <div className="flex gap-1">
-            {result.map((val, idx) => (
-              <div key={`g-${idx}`} className="w-10 h-10 flex items-center justify-center border-2 border-slate-800 bg-slate-800 text-white rounded font-bold">
-                {val}
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Các tính chất nền tảng (Table 3.5)</h3>
+        <p>Lý do thứ hai khiến Convolution được ưa chuộng hơn Correlation trong toán học là vì nó có các tính chất đại số quen thuộc:</p>
+        
+        <div class="overflow-x-auto mt-4">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-200 text-slate-800">
+                        <th class="p-3 border border-slate-300">Tính chất (Property)</th>
+                        <th class="p-3 border border-slate-300">Convolution (★)</th>
+                        <th class="p-3 border border-slate-300">Correlation (☆)</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">
+                    <tr>
+                        <td class="p-3 border border-slate-200 font-semibold text-slate-700">Giao hoán (Commutative)</td>
+                        <td class="p-3 border border-slate-200 font-serif">f ★ g = g ★ f</td>
+                        <td class="p-3 border border-slate-200 text-center text-slate-400">— (Không có)</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 border border-slate-200 font-semibold text-slate-700">Kết hợp (Associative)</td>
+                        <td class="p-3 border border-slate-200 font-serif">f ★ (g ★ h) = (f ★ g) ★ h</td>
+                        <td class="p-3 border border-slate-200 text-center text-slate-400">— (Không có)</td>
+                    </tr>
+                    <tr>
+                        <td class="p-3 border border-slate-200 font-semibold text-slate-700">Phân phối (Distributive)</td>
+                        <td class="p-3 border border-slate-200 font-serif">f ★ (g + h) = (f ★ g) + (f ★ h)</td>
+                        <td class="p-3 border border-slate-200 font-serif">f ☆ (g + h) = (f ☆ g) + (f ☆ h)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="bg-yellow-50 p-4 border-l-4 border-yellow-400 text-yellow-800 text-base mt-4 rounded-r">
+            <strong>Ứng dụng thực tế:</strong> Nhờ tính <strong>Giao hoán</strong> và <strong>Kết hợp</strong> của Convolution, nếu bạn phải lọc một bức ảnh qua 3 kernel liên tiếp <span class="font-serif">w<sub>1</sub>, w<sub>2</sub>, w<sub>3</sub></span>, thay vì phải chạy vòng lặp trên toàn bộ ảnh 3 lần, bạn có thể tính gộp 3 kernel lại với nhau trước: <span class="font-serif">w = w<sub>1</sub> ★ w<sub>2</sub> ★ w<sub>3</sub></span>. Sau đó chỉ cần lấy kernel gộp <span class="font-serif">w</span> chập với ảnh 1 lần duy nhất! (Equation 3-38).
+        </div>
+        
+        <p class="mt-6 text-sm text-slate-500 italic">
+            *Lưu ý từ sách: Mặc dù toán học phân biệt rõ ràng, nhưng trong văn chương xử lý ảnh, người ta thường dùng thuật ngữ "Linear Spatial Filtering" và "Spatial Convolution" như từ đồng nghĩa. Các phần mềm thường code theo Correlation, nhưng truyền vào Kernel đã được xoay sẵn 180 độ.
+        </p>
+
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Ví dụ về Kernel thực tế (Figure 3.31)</h3>
+        <p>Đây là 2 ví dụ về Smoothing Kernels (Lọc làm mờ) kích thước 3x3 thường dùng:</p>
+        
+        <div class="flex flex-col md:flex-row gap-8 justify-center mt-6">
+            <!-- Box Filter -->
+            <div class="text-center">
+                <p class="font-bold text-slate-700 mb-2">(a) Box Kernel</p>
+                <div class="flex items-center gap-2 justify-center">
+                    <span class="text-xl font-serif">1/9 ×</span>
+                    <div class="border-2 border-slate-800 grid grid-cols-3 bg-white w-32 h-32">
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                        <div class="flex items-center justify-center border border-slate-300 font-bold text-slate-700">1</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gaussian Filter -->
+            <div class="text-center">
+                <p class="font-bold text-slate-700 mb-2">(b) Gaussian Kernel</p>
+                <div class="flex items-center gap-2 justify-center">
+                    <span class="text-lg font-serif">1/4.8976 ×</span>
+                    <div class="border-2 border-slate-800 grid grid-cols-3 bg-white w-48 h-32 text-sm">
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.3679</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.6065</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.3679</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.6065</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">1.0000</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.6065</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.3679</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.6065</div>
+                        <div class="flex items-center justify-center border border-slate-300 text-slate-700 px-1">0.3679</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="text-center text-sm text-slate-500 mt-4">
+            <em>Lưu ý: Vì các kernel lọc làm mờ này <strong>đối xứng tâm (symmetric about the center)</strong>, nên việc xoay 180 độ không làm thay đổi kernel. Do đó, đối với các kernel đối xứng, kết quả của Correlation và Convolution là <strong>hoàn toàn giống nhau</strong>.</em>
+        </p>
+      </div>
+    </section>
+
+    <!-- PHẦN 5 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
+        5. Kernel Lọc Phân Tách (Separable Filter Kernels)
+      </h2>
+      <div class="text-lg text-slate-700 leading-relaxed space-y-4">
+        <p>
+          Theo định nghĩa toán học, một hàm 2D <span class="font-serif italic">G(x,y)</span> được gọi là <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">separable (có thể phân tách)</span> nếu nó có thể được viết dưới dạng tích của hai hàm 1D: <span class="font-serif italic">G(x,y) = G<sub>1</sub>(x)G<sub>2</sub>(y)</span>.
+        </p>
+        <p>
+          Đối với xử lý ảnh, một Kernel lọc không gian (về bản chất là một ma trận) được gọi là "phân tách được" nếu nó có thể được biểu diễn dưới dạng <span class="text-green-600 font-semibold bg-green-50 px-1 rounded">Outer Product (Tích ngoài)</span> của hai vector (một vector cột và một vector hàng).
+        </p>
+
+        <div class="bg-white p-4 rounded-lg border border-slate-200 my-4 text-center overflow-x-auto shadow-sm">
+          <p class="text-sm text-slate-500 mb-2">Ví dụ với Kernel 2x3 chứa toàn số 1:</p>
+          <div class="font-serif text-xl flex items-center justify-center gap-4 whitespace-nowrap">
+            <span>w =</span>
+            <span class="inline-grid grid-cols-3 gap-x-4 gap-y-1 bg-slate-50 p-2 border-l-2 border-r-2 border-slate-800 rounded">
+              <span>1</span><span>1</span><span>1</span>
+              <span>1</span><span>1</span><span>1</span>
+            </span>
+            <span class="font-sans mx-2">=</span>
+            <span class="inline-grid grid-cols-1 gap-y-1 bg-slate-50 p-2 border-l-2 border-r-2 border-blue-800 text-blue-800 rounded">
+              <span>1</span>
+              <span>1</span>
+            </span>
+            <span class="font-sans text-sm mx-1">(cột) ×</span>
+            <span class="inline-grid grid-cols-3 gap-x-4 bg-slate-50 p-2 border-l-2 border-r-2 border-red-800 text-red-800 rounded">
+              <span>1</span><span>1</span><span>1</span>
+            </span>
+            <span class="font-sans text-sm mx-1">(hàng)</span>
+          </div>
+          <p class="mt-4 text-slate-600">
+            Tổng quát: <span class="font-serif font-bold text-lg">w = v w<sup>T</sup></span> (Equation 3-41)
+          </p>
+        </div>
+
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Tại sao tính chất này lại quan trọng?</h3>
+        <p>
+          Sự vĩ đại của Separable Kernels nằm ở <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">lợi thế tính toán cực kỳ lớn</span> nhờ vào tính chất kết hợp (associative) của phép tích chập (Convolution). Nếu kernel <span class="font-serif italic">w</span> có thể tách thành <span class="font-serif italic">w<sub>1</sub> ★ w<sub>2</sub></span>, thì:
+        </p>
+        
+        <div class="bg-slate-50 p-4 rounded-lg overflow-x-auto text-center font-serif text-lg italic text-slate-800 my-4 border border-slate-200">
+          w ★ f = (w<sub>1</sub> ★ w<sub>2</sub>) ★ f = w<sub>2</sub> ★ (w<sub>1</sub> ★ f) = (w<sub>1</sub> ★ f) ★ w<sub>2</sub>
+          <div class="text-sm text-slate-500 mt-2 normal-case font-sans">(Equation 3-43)</div>
+        </div>
+        
+        <p>
+          <strong>Ý nghĩa:</strong> Thay vì chập bức ảnh trực tiếp với một ma trận 2D khổng lồ, bạn có thể chập bức ảnh với vector cột 1D trước, sau đó lấy kết quả thu được chập tiếp với vector hàng 1D.
+        </p>
+
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Chứng minh Toán học: Ưu thế hiệu năng (Computational Advantage)</h3>
+        <p>Giả sử ta có ảnh kích thước <span class="font-serif italic">M × N</span> và kernel kích thước <span class="font-serif italic">m × n</span>:</p>
+        <ul class="list-disc ml-6 space-y-2 text-slate-600">
+          <li><strong>Cách cũ (Non-separable):</strong> Mỗi pixel trên ảnh cần thực hiện <span class="font-serif italic">m × n</span> phép nhân/cộng. Tổng cộng cần <span class="font-bold text-red-600 font-serif">MNmn</span> phép toán.</li>
+          <li><strong>Cách mới (Separable):</strong> Lượt chập đầu tiên với vector kích thước <span class="font-serif italic">m × 1</span> cần <span class="font-serif italic">MNm</span> phép toán. Lượt chập thứ hai với kết quả (vẫn là ảnh <span class="font-serif italic">M × N</span>) bằng vector <span class="font-serif italic">1 × n</span> cần thêm <span class="font-serif italic">MNn</span> phép toán. Tổng cộng là <span class="font-bold text-green-600 font-serif">MN(m + n)</span> phép toán.</li>
+        </ul>
+
+        <div class="bg-yellow-50 p-5 rounded-lg border border-yellow-300 mt-4 shadow-inner text-center">
+          <p class="text-yellow-800 font-semibold mb-2">Hệ số lợi thế tính toán (Advantage Factor - C)</p>
+          <div class="text-2xl font-serif text-slate-800 py-2">
+            C = <span class="inline-block align-middle"><span class="block border-b border-slate-800 px-2">MNmn</span><span class="block px-2">MN(m + n)</span></span> = <span class="inline-block align-middle"><span class="block border-b border-slate-800 px-2 font-bold text-blue-700">mn</span><span class="block px-2 font-bold text-blue-700">m + n</span></span>
+          </div>
+          <p class="text-sm text-slate-500 mt-2">(Equation 3-44)</p>
+        </div>
+
+        <!-- Calculator -->
+        <div class="bg-slate-800 p-6 rounded-xl shadow-md border border-slate-700 my-6 text-white">
+          <h4 class="text-lg font-bold text-blue-300 mb-4 flex items-center gap-2">
+            <i data-lucide="info" class="w-5 h-5"></i> Máy tính Ưu thế Tính toán (Computational Advantage)
+          </h4>
+          <div class="flex flex-col md:flex-row gap-6 items-center">
+            <div class="flex-1 w-full space-y-4">
+              <div>
+                <label class="block text-sm text-slate-300 mb-1">Kích thước Kernel vuông (m × m):</label>
+                <input id="calc-input" type="number" value="11" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-mono focus:border-blue-500 focus:outline-none" min="3" max="999">
               </div>
-            ))}
-            {/* Ô trống cho các bước chưa tính */}
-            {[...Array(maxSteps - result.length)].map((_, i) => (
-               <div key={`empty-g-${i}`} className="w-10 h-10 flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-300 rounded">
-               ?
-             </div>
-            ))}
+              <p class="text-sm text-slate-400 italic">
+                Thử nhập các giá trị lớn như 11, 31, hoặc 101 để thấy sự khác biệt.
+              </p>
+            </div>
+            
+            <div class="flex-2 grid grid-cols-2 gap-4 w-full md:w-auto">
+              <div class="bg-slate-700 p-4 rounded text-center">
+                <div class="text-sm text-slate-300 mb-1">Non-separable (m×m)</div>
+                <div id="calc-non-sep" class="text-2xl font-bold text-red-400">121</div>
+                <div class="text-xs text-slate-400 mt-1">phép tính / pixel</div>
+              </div>
+              <div class="bg-slate-700 p-4 rounded text-center">
+                <div class="text-sm text-slate-300 mb-1">Separable (m+m)</div>
+                <div id="calc-sep" class="text-2xl font-bold text-green-400">22</div>
+                <div class="text-xs text-slate-400 mt-1">phép tính / pixel</div>
+              </div>
+            </div>
+            
+            <div class="flex-1 w-full bg-blue-900/50 p-4 rounded-lg border border-blue-500/50 text-center flex flex-col justify-center min-w-[150px]">
+              <div class="text-sm text-blue-200 mb-1">Tốc độ tăng gấp</div>
+              <div id="calc-speedup" class="text-3xl font-extrabold text-blue-400">5.50x</div>
+              <div class="text-xs text-blue-300 mt-1">Lợi thế C</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="flex justify-center gap-4 mt-6">
-        <button onClick={() => setIsPlaying(!isPlaying)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-          {isPlaying ? <Pause size={18}/> : <Play size={18}/>}
-          {isPlaying ? 'Tạm dừng' : 'Tự động chạy'}
-        </button>
-        <button 
-          onClick={() => setStep(Math.min(step + 1, maxSteps - 1))} 
-          disabled={step >= maxSteps - 1}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 disabled:opacity-50 transition"
-        >
-          <SkipForward size={18}/> Bước tiếp theo
-        </button>
-        <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 transition">
-          <RotateCcw size={18}/> Làm lại
-        </button>
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Làm sao để biết một Kernel có thể phân tách?</h3>
+        <p>
+          Lý thuyết ma trận chỉ ra rằng: Bất kỳ ma trận nào là kết quả của một vector cột nhân với một vector hàng <strong>luôn luôn có Hạng (Rank) bằng 1</strong>. Do đó, bạn chỉ cần dùng hàm tính Rank (ví dụ <code>rank()</code> trong MATLAB) để kiểm tra. Nếu Rank = 1, kernel đó là separable.
+        </p>
+
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-5 mt-4 rounded-r-lg">
+          <h4 class="font-bold text-blue-800 mb-3 text-lg flex items-center gap-2">
+            <i data-lucide="arrow-right" class="w-5 h-5"></i> Phương pháp 3 bước để tách Kernel (Decomposition)
+          </h4>
+          <p class="text-sm text-slate-600 mb-4 italic">Bởi vì ma trận rank 1 có các hàng/cột phụ thuộc tuyến tính (chỉ khác nhau một hằng số nhân), ta có thể dễ dàng tách nó ra:</p>
+          <ol class="list-decimal ml-5 space-y-3 text-slate-700 font-medium">
+            <li>Tìm bất kỳ một phần tử khác 0 nào trong kernel và gọi giá trị của nó là <strong class="text-red-600 text-lg">E</strong>.</li>
+            <li>Tạo hai vector <strong class="text-blue-600 font-serif">c</strong> và <strong class="text-green-600 font-serif">r</strong>, lần lượt sao chép chính xác toàn bộ cột và hàng chứa phần tử <strong class="text-red-600 text-lg">E</strong> vừa tìm được ở bước 1.</li>
+            <li>Kết quả: vector thứ nhất <strong class="font-serif text-lg">v = c</strong>, và vector thứ hai <strong class="font-serif text-lg">w<sup>T</sup> = r / E</strong>. <br>(Theo công thức <span class="font-serif">w = v w<sup>T</sup></span>).</li>
+          </ol>
+        </div>
+
       </div>
-      
-      <div className="mt-6 bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800 border border-yellow-200">
-        <p><strong>Quan sát:</strong> Đây là minh họa chính xác cho <strong>Figure 3.29</strong> trong sách.</p>
-        <ul className="list-disc ml-5 mt-2 space-y-1">
-            <li>Hàm <Highlight>f</Highlight> có một "unit impulse" (giá trị 1) ở giữa, còn lại là 0.</li>
-            <li>Khi chọn <Highlight>Correlation</Highlight>, kết quả thu được là bản sao của kernel, nhưng bị <strong>đảo ngược (rotated)</strong>. (Output: 8,2,4,2,1).</li>
-            <li>Khi chọn <Highlight>Convolution</Highlight>, vì kernel đã được lật 180 độ từ trước, kết quả thu được là <strong>bản sao chính xác</strong> của kernel ban đầu. (Output: 1,2,4,2,8). Đây là một tính chất nền tảng của hệ thống tuyến tính!</li>
+    </section>
+
+    <!-- PHẦN 6 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-10 mb-6 border-b-2 border-blue-500 pb-2 inline-block">
+        6. Miền Không Gian vs. Miền Tần Số (Spatial vs. Frequency Domains)
+      </h2>
+      <div class="text-lg text-slate-700 leading-relaxed space-y-4">
+        <p>
+          Dù bộ lọc miền tần số (Frequency domain) là chủ đề của chương 4, nhưng việc giới thiệu ngay bây giờ một số khái niệm quan trọng sẽ giúp bạn hiểu sâu sắc hơn bản chất của quá trình lọc không gian.
+        </p>
+        <p>
+          Cầu nối giữa miền không gian và miền tần số chính là <span class="text-blue-600 font-semibold bg-blue-50 px-1 rounded">Biến đổi Fourier (Fourier Transform)</span>. Chúng ta dùng biến đổi Fourier để đi từ miền không gian sang miền tần số, và dùng <em>Biến đổi Fourier ngược (Inverse Fourier Transform)</em> để quay trở lại. Trọng tâm ở đây là hai tính chất đối ngẫu nền tảng:
+        </p>
+
+        <ul class="bg-blue-50 p-6 rounded-lg border-l-4 border-blue-500 shadow-sm list-none space-y-4 mt-4">
+          <li class="flex gap-4 items-center">
+            <span class="bg-blue-200 text-blue-800 font-bold rounded-full w-10 h-10 flex items-center justify-center shrink-0">1</span> 
+            <span><strong class="text-blue-900">Tích chập (Convolution)</strong> - nền tảng của lọc không gian - hoàn toàn tương đương với phép <strong class="text-blue-900">Nhân (Multiplication)</strong> trong miền tần số, và ngược lại.</span>
+          </li>
+          <li class="flex gap-4 items-center">
+            <span class="bg-blue-200 text-blue-800 font-bold rounded-full w-10 h-10 flex items-center justify-center shrink-0">2</span> 
+            <span>Một <strong>Xung (Impulse)</strong> có cường độ A trong miền không gian tương đương với một <strong>Hằng số (Constant)</strong> có giá trị A trong toàn bộ miền tần số, và ngược lại.</span>
+          </li>
         </ul>
+
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Ý nghĩa của Tần số trong Hình ảnh</h3>
+        <p>
+          Một hình ảnh có thể được biểu diễn dưới dạng tổng của các hàm sin với các tần số và biên độ khác nhau. Việc thay đổi các thành phần này sẽ làm thay đổi diện mạo của bức ảnh. Cụ thể:
+        </p>
+        <ul class="list-disc ml-6 space-y-2 text-slate-600">
+          <li><strong>Tần số thấp (Low frequencies):</strong> Đặc trưng cho các vùng ảnh có cường độ thay đổi chậm (ví dụ: mảng tường trơn, bầu trời, da người).</li>
+          <li><strong>Tần số cao (High frequencies):</strong> Đặc trưng cho các cạnh (edges) và các vùng chuyển đổi cường độ sắc nét/đột ngột.</li>
+        </ul>
+        <p>
+          Vì vậy, nếu ta <em>giảm hoặc loại bỏ</em> các thành phần tần số cao, bức ảnh sẽ có xu hướng <strong>bị làm mờ (blurred)</strong>. Việc lọc tuyến tính thực chất là tìm cách thay đổi nội dung tần số của ảnh. Ở miền tần số, ta làm điều này bằng cách <em>nhân</em> (dễ hình dung hơn), còn ở miền không gian, ta dùng <em>tích chập</em>.
+        </p>
+
+        <h3 class="text-xl font-semibold text-slate-700 mt-6 mb-3">Ví dụ: Bộ lọc Thông Thấp Lý tưởng (Ideal Lowpass Filter)</h3>
+        <p>
+          Hãy xem xét một ví dụ 1 chiều (1-D). Giả sử ta muốn loại bỏ tất cả các tần số lớn hơn một giá trị ngưỡng <span class="font-serif">u<sub>0</sub></span>, và "cho qua" tất cả tần số thấp hơn <span class="font-serif">u<sub>0</sub></span>. Hàm thực hiện điều này ở miền tần số được gọi là <em>Ideal Lowpass Filter Transfer Function</em> (Hàm truyền bộ lọc thông thấp lý tưởng).
+        </p>
+        
+        <div class="flex flex-col md:flex-row gap-6 items-center justify-center my-8">
+          <!-- Figure 3.32 (a) Frequency Domain -->
+          <div class="flex-1 w-full max-w-sm">
+            <p class="font-bold text-center text-slate-800 mb-2">(a) Miền Tần số (Frequency Domain)</p>
+            <svg viewBox="0 0 200 120" class="w-full h-auto bg-white border border-slate-200 shadow-sm rounded">
+              <defs>
+                <pattern id="grid1" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+                </pattern>
+              </defs>
+              <rect width="200" height="120" fill="url(#grid1)" />
+              <path d="M 10,90 L 190,90" stroke="black" stroke-width="1.5" />
+              <path d="M 100,100 L 100,10" stroke="black" stroke-width="1.5" />
+              <path d="M 50,90 L 50,30 L 150,30 L 150,90" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6" stroke-width="2.5" />
+              <text x="190" y="80" text-anchor="end" class="text-[10px] font-serif italic">u</text>
+              <text x="100" y="105" text-anchor="middle" class="text-[10px] font-mono">0</text>
+              <text x="50" y="105" text-anchor="middle" class="text-[10px] font-mono">-u₀</text>
+              <text x="150" y="105" text-anchor="middle" class="text-[10px] font-mono">u₀</text>
+              <text x="100" y="25" text-anchor="middle" class="text-[10px] font-mono text-slate-500">1</text>
+              <text x="100" y="60" text-anchor="middle" class="text-[12px] font-bold text-blue-700">Passband</text>
+              <text x="25" y="60" text-anchor="middle" class="text-[10px] font-bold text-slate-400">Stop</text>
+              <text x="175" y="60" text-anchor="middle" class="text-[10px] font-bold text-slate-400">Stop</text>
+            </svg>
+            <p class="text-sm text-slate-500 text-center mt-2">Hàm truyền bộ lọc thông thấp lý tưởng (đột ngột ngắt tại u₀).</p>
+          </div>
+
+          <!-- Duality indicator -->
+          <div class="hidden md:flex flex-col items-center text-slate-400">
+            <span class="text-[10px] uppercase font-bold tracking-wider">Fourier</span>
+            <i data-lucide="arrow-right" class="w-6 h-6 my-1"></i>
+            <span class="text-[10px] uppercase font-bold tracking-wider">Inverse</span>
+          </div>
+
+          <!-- Figure 3.32 (b) Spatial Domain -->
+          <div class="flex-1 w-full max-w-sm">
+            <p class="font-bold text-center text-slate-800 mb-2">(b) Miền Không gian (Spatial Domain)</p>
+            <svg viewBox="0 0 200 120" class="w-full h-auto bg-white border border-slate-200 shadow-sm rounded">
+              <defs>
+                <pattern id="grid2" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+                </pattern>
+              </defs>
+              <rect width="200" height="120" fill="url(#grid2)" />
+              <path d="M 10,90 L 190,90" stroke="black" stroke-width="1.5" />
+              <path d="M 100,100 L 100,10" stroke="black" stroke-width="1.5" />
+              <polyline id="sinc-wave" fill="none" stroke="#ef4444" stroke-width="2.5" />
+              <text x="190" y="80" text-anchor="end" class="text-[10px] font-serif italic">x</text>
+              <text x="100" y="105" text-anchor="middle" class="text-[10px] font-mono">0</text>
+              <text x="140" y="100" class="text-[10px] fill-red-500 font-bold">"Ringing" (Gợn sóng)</text>
+            </svg>
+            <p class="text-sm text-slate-500 text-center mt-2">Kernel không gian tương ứng (kết quả của Biến đổi Fourier ngược).</p>
+          </div>
+        </div>
+
+        <div class="bg-red-50 p-5 border-l-4 border-red-500 rounded-r shadow-sm mt-4">
+          <p class="text-red-800">
+            <strong>Hệ quả quan trọng:</strong> Để lọc thông thấp, bạn có thể chuyển ảnh sang miền tần số rồi <strong>nhân</strong> với hàm dạng khối chữ nhật (Hình a). Cách thứ hai hoàn toàn tương đương là giữ nguyên ảnh ở miền không gian và <strong>tích chập</strong> nó với Kernel có hình dạng sóng nhấp nhô liên tục (Hình b).
+          </p>
+          <p class="text-red-700 text-sm mt-3 border-t border-red-200 pt-3">
+            <em>*Lưu ý: Sự cắt gắt đột ngột (sharp cutoff) ở miền tần số sẽ gây ra đặc tính "ringing" (đổ chuông/gợn sóng) ở Kernel miền không gian. Khi chập Kernel này vào ảnh, ảnh sẽ bị xuất hiện các vòng gợn sóng. Do đó, các bộ lọc lý tưởng không bao giờ được dùng thực tế, và mục tiêu thiết kế bộ lọc số là làm sao mô phỏng được bộ lọc lý tưởng mà vẫn giảm thiểu tối đa hiện tượng ringing này.</em>
+          </p>
+        </div>
       </div>
-    </div>
-  );
-};
+    </section>
 
+  </main>
 
-// --- MÔ PHỎNG 2D ---
-const Simulator2D = () => {
-    // A simplified 2D simulation showing a 3x3 kernel moving over a 5x5 image
-    const [stepX, setStepX] = useState(0);
-    const [stepY, setStepY] = useState(0);
-    
-    const imgSize = 5;
-    const kernelSize = 3;
-    const maxSteps = imgSize - kernelSize + 1; // 3 steps (0, 1, 2)
-  
-    // Simple image with an impulse at (2,2)
-    const image = [
+  <footer class="mt-20 py-8 bg-slate-900 text-slate-400 text-center text-sm">
+    <p>Tài liệu được biên soạn dựa trên sách "Digital Image Processing" - R.C. Gonzalez & R.E. Woods.</p>
+    <p class="mt-2">Mô phỏng tương tác giúp trực quan hóa kiến thức hàn lâm.</p>
+  </footer>
+
+  <!-- Scripts Logic -->
+  <script>
+    // Khởi tạo icons
+    lucide.createIcons();
+
+    // --- MÔ PHỎNG 1D ---
+    const sim1 = {
+      mode: 'correlation',
+      step: 0,
+      isPlaying: false,
+      timer: null,
+      f_orig: [0, 0, 0, 1, 0, 0, 0, 0],
+      w_orig: [1, 2, 4, 2, 8],
+      padding: 4,
+      f_padded: [0,0,0,0, 0,0,0,1,0,0,0,0, 0,0,0,0], // padded manually
+      init: function() {
+        this.maxSteps = this.f_padded.length - this.w_orig.length + 1;
+        
+        document.getElementById('sim1-toggle').onclick = () => {
+          this.mode = this.mode === 'correlation' ? 'convolution' : 'correlation';
+          this.reset();
+        };
+        document.getElementById('sim1-play').onclick = () => {
+          this.isPlaying = !this.isPlaying;
+          if (this.isPlaying) this.playLoop();
+          else clearTimeout(this.timer);
+          this.render();
+        };
+        document.getElementById('sim1-next').onclick = () => {
+          if (this.step < this.maxSteps - 1) {
+             this.step++;
+             this.render();
+          }
+        };
+        document.getElementById('sim1-reset').onclick = () => this.reset();
+        
+        this.render();
+      },
+      playLoop: function() {
+        if (this.isPlaying && this.step < this.maxSteps - 1) {
+          this.step++;
+          this.render();
+          this.timer = setTimeout(() => this.playLoop(), 1000);
+        } else {
+          this.isPlaying = false;
+          this.render();
+        }
+      },
+      reset: function() {
+        this.step = 0;
+        this.isPlaying = false;
+        clearTimeout(this.timer);
+        this.render();
+      },
+      render: function() {
+        const w = this.mode === 'correlation' ? this.w_orig : [...this.w_orig].reverse();
+        
+        const modeSpan = document.getElementById('sim1-mode-text');
+        modeSpan.textContent = this.mode === 'correlation' ? 'Correlation (Tương quan)' : 'Convolution (Tích chập)';
+        modeSpan.className = this.mode === 'correlation' ? 'text-blue-600' : 'text-green-600';
+        document.getElementById('sim1-toggle').textContent = `Chuyển sang ${this.mode === 'correlation' ? 'Convolution' : 'Correlation'}`;
+
+        const playBtn = document.getElementById('sim1-play');
+        playBtn.innerHTML = this.isPlaying ? `<i data-lucide="pause" class="w-4 h-4"></i> Tạm dừng` : `<i data-lucide="play" class="w-4 h-4"></i> Tự động chạy`;
+        
+        const nextBtn = document.getElementById('sim1-next');
+        nextBtn.disabled = this.step >= this.maxSteps - 1;
+        if(this.step >= this.maxSteps - 1) nextBtn.classList.add('opacity-50');
+        else nextBtn.classList.remove('opacity-50');
+
+        let fHTML = '';
+        this.f_padded.forEach((val, idx) => {
+          const isPadding = idx < this.padding || idx >= this.f_padded.length - this.padding;
+          const inWindow = idx >= this.step && idx < this.step + w.length;
+          let classes = 'w-10 h-10 flex items-center justify-center border-2 rounded shrink-0 ';
+          if (isPadding) classes += 'text-slate-300 border-slate-100 ';
+          else classes += 'text-slate-800 border-slate-300 font-bold ';
+          if (inWindow) classes += 'bg-yellow-100 border-yellow-400 ';
+          fHTML += `<div class="${classes}">${val}</div>`;
+        });
+        document.getElementById('sim1-f').innerHTML = fHTML;
+
+        let wHTML = '';
+        for(let i=0; i<this.step; i++) wHTML += `<div class="w-10 h-10 shrink-0"></div>`;
+        w.forEach(val => {
+          let classes = 'w-10 h-10 flex items-center justify-center border-2 rounded font-bold shrink-0 ';
+          classes += this.mode === 'correlation' ? 'text-blue-700 bg-blue-50 border-blue-400' : 'text-green-700 bg-green-50 border-green-400';
+          wHTML += `<div class="${classes}">${val}</div>`;
+        });
+        document.getElementById('sim1-w').innerHTML = wHTML;
+
+        let mHTML = '';
+        for(let i=0; i<this.step; i++) mHTML += `<div class="w-10 shrink-0"></div>`;
+        w.forEach((w_val, idx) => {
+          const f_val = this.f_padded[this.step + idx];
+          if(f_val === 0 || w_val === 0) {
+            mHTML += `<div class="w-10 shrink-0"></div>`;
+          } else {
+            mHTML += `<div class="w-10 h-10 flex flex-col items-center justify-center font-bold text-red-500 shrink-0"><span>↑</span><span class="text-xs">${f_val}x${w_val}</span></div>`;
+          }
+        });
+        document.getElementById('sim1-mul').innerHTML = mHTML;
+
+        const result = [];
+        for (let i = 0; i <= this.step; i++) {
+          let sum = 0;
+          for (let j = 0; j < w.length; j++) sum += w[j] * this.f_padded[i + j];
+          result.push(sum);
+        }
+        let rHTML = '';
+        result.forEach(val => {
+          rHTML += `<div class="w-10 h-10 flex items-center justify-center border-2 border-slate-800 bg-slate-800 text-white rounded font-bold shrink-0">${val}</div>`;
+        });
+        for(let i=0; i<this.maxSteps - result.length; i++) {
+          rHTML += `<div class="w-10 h-10 flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-300 rounded shrink-0">?</div>`;
+        }
+        document.getElementById('sim1-g').innerHTML = rHTML;
+        
+        lucide.createIcons();
+      }
+    };
+
+    // --- MÔ PHỎNG 2D ---
+    const sim2 = {
+      stepX: 0,
+      stepY: 0,
+      imgSize: 5,
+      kernelSize: 3,
+      image: [
         [0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0],
         [0, 0, 1, 0, 0],
         [0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0],
-    ];
-  
-    // Kernel 1 to 9
-    const kernel = [
+      ],
+      kernel: [
         [1, 2, 3],
         [4, 5, 6],
         [7, 8, 9]
-    ];
-  
-    const handleNext = () => {
-        if (stepX < maxSteps - 1) {
-            setStepX(stepX + 1);
-        } else if (stepY < maxSteps - 1) {
-            setStepX(0);
-            setStepY(stepY + 1);
-        } else {
-            // Reset
-            setStepX(0);
-            setStepY(0);
+      ],
+      init: function() {
+        this.maxSteps = this.imgSize - this.kernelSize + 1;
+        document.getElementById('sim2d-next').onclick = () => {
+          if (this.stepX < this.maxSteps - 1) {
+             this.stepX++;
+          } else if (this.stepY < this.maxSteps - 1) {
+             this.stepX = 0;
+             this.stepY++;
+          } else {
+             this.stepX = 0;
+             this.stepY = 0;
+          }
+          this.render();
+        };
+        this.render();
+      },
+      render: function() {
+        let gHTML = '';
+        for(let y=0; y<this.image.length; y++) {
+          for(let x=0; x<this.image[y].length; x++) {
+            const val = this.image[y][x];
+            const inKernel = x >= this.stepX && x < this.stepX + this.kernelSize && y >= this.stepY && y < this.stepY + this.kernelSize;
+            let classes = 'w-12 h-12 flex items-center justify-center text-lg rounded ';
+            if(inKernel) classes += 'bg-blue-200 text-blue-900 font-bold z-10 outline outline-2 outline-blue-500';
+            else classes += 'bg-white border text-slate-400';
+            gHTML += `<div class="${classes}">${val}</div>`;
+          }
         }
+        document.getElementById('sim2d-grid').innerHTML = gHTML;
+
+        document.getElementById('sim2d-pos').textContent = `Vị trí góc Kernel: (${this.stepX}, ${this.stepY})`;
+        document.getElementById('sim2d-eq').textContent = `g(${this.stepX+1}, ${this.stepY+1}) = `;
+        
+        let cHTML = '';
+        let totalSum = 0;
+        for(let ky=0; ky<this.kernelSize; ky++) {
+          for(let kx=0; kx<this.kernelSize; kx++) {
+            const kVal = this.kernel[ky][kx];
+            const imgVal = this.image[this.stepY + ky][this.stepX + kx];
+            totalSum += kVal * imgVal;
+            const isLast = (ky === 2 && kx === 2);
+            const highlight = imgVal !== 0 ? 'text-white bg-blue-600 px-1 rounded' : '';
+            cHTML += `<span><span class="${highlight}">(${kVal} * ${imgVal})</span>${!isLast ? ' + ' : ''}</span>`;
+          }
+        }
+        document.getElementById('sim2d-calc-math').innerHTML = cHTML;
+        document.getElementById('sim2d-sum').textContent = totalSum;
+      }
     };
-  
-    return (
-      <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 my-6 flex flex-col md:flex-row gap-8 items-center justify-center">
+
+    // --- CALCULATOR ---
+    const simCalc = {
+      init: function() {
+        const input = document.getElementById('calc-input');
+        input.addEventListener('input', (e) => this.render(e.target.value));
+        this.render(input.value);
+      },
+      render: function(val) {
+        const m = parseInt(val) || 0;
+        const nonSep = m * m;
+        const sep = m + m;
+        const speedup = sep > 0 ? (nonSep / sep).toFixed(2) : 0;
         
-        {/* Cột trái: Image & trượt */}
-        <div className="flex flex-col items-center">
-            <h4 className="font-bold mb-4">Ảnh 5x5 & Kernel 3x3</h4>
-            <div className="relative border-2 border-slate-800 bg-slate-50 p-2 inline-block">
-                <div className="grid grid-cols-5 gap-1">
-                    {image.map((row, y) => (
-                        row.map((val, x) => {
-                            const inKernel = x >= stepX && x < stepX + kernelSize && y >= stepY && y < stepY + kernelSize;
-                            return (
-                                <div key={`${x}-${y}`} className={`w-12 h-12 flex items-center justify-center text-lg rounded
-                                    ${inKernel ? 'bg-blue-200 text-blue-900 font-bold z-10 outline outline-2 outline-blue-500' : 'bg-white border text-slate-400'}
-                                `}>
-                                    {val}
-                                </div>
-                            );
-                        })
-                    ))}
-                </div>
-            </div>
-            
-            <button 
-                onClick={handleNext}
-                className="mt-6 flex items-center gap-2 px-6 py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition"
-            >
-                Trượt Kernel (Slide) <SkipForward size={18}/>
-            </button>
-        </div>
-  
-        {/* Cột phải: Tính toán Sum of Products */}
-        <div className="flex flex-col flex-1 w-full max-w-md">
-            <h4 className="font-bold mb-4">Phép tính "Sum of Products" hiện tại</h4>
-            <div className="bg-slate-800 text-green-400 p-4 rounded-lg font-mono text-sm leading-relaxed shadow-inner h-64 overflow-y-auto">
-                <div className="mb-2 text-slate-300">Vị trí góc Kernel: ({stepX}, {stepY})</div>
-                <div className="mb-2">g({stepX+1}, {stepY+1}) = </div>
-                
-                {kernel.map((kRow, ky) => (
-                    kRow.map((kVal, kx) => {
-                        const imgY = stepY + ky;
-                        const imgX = stepX + kx;
-                        const imgVal = image[imgY][imgX];
-                        const isLast = (ky === 2 && kx === 2);
-                        const highlight = imgVal !== 0 ? 'text-white bg-blue-600 px-1 rounded' : '';
-                        
-                        return (
-                            <span key={`math-${kx}-${ky}`}>
-                                <span className={highlight}>({kVal} * {imgVal})</span>
-                                {!isLast && " + "}
-                            </span>
-                        );
-                    })
-                ))}
-                
-                <div className="mt-4 border-t border-slate-600 pt-2 text-xl font-bold text-white">
-                    Kết quả pixel mới: <span className="text-yellow-400">
-                        {/* Calculate the actual sum */}
-                        {kernel.reduce((sum, kRow, ky) => {
-                            return sum + kRow.reduce((rowSum, kVal, kx) => {
-                                return rowSum + (kVal * image[stepY + ky][stepX + kx]);
-                            }, 0);
-                        }, 0)}
-                    </span>
-                </div>
-            </div>
-            <div className="text-sm text-slate-500 mt-2 italic text-center">
-               Đây là mô phỏng phép tính tại 1 vị trí của <b>Figure 3.28</b>
-            </div>
-        </div>
-      </div>
-    );
-  };
+        document.getElementById('calc-non-sep').textContent = nonSep;
+        document.getElementById('calc-sep').textContent = sep;
+        document.getElementById('calc-speedup').textContent = speedup + 'x';
+      }
+    };
 
-// --- CÔNG CỤ TÍNH TOÁN HIỆU NĂNG (SEPARABLE KERNEL) ---
-const SeparableCalculator = () => {
-  const [kernelSize, setKernelSize] = useState(11);
+    // Khởi tạo các mô phỏng sau khi tải trang
+    document.addEventListener('DOMContentLoaded', () => {
+      sim1.init();
+      sim2.init();
+      simCalc.init();
 
-  const m = parseInt(kernelSize) || 0;
-  const nonSeparableOps = m * m; // m * n, giả sử m = n (kernel vuông)
-  const separableOps = m + m;    // m + n
-  const speedup = separableOps > 0 ? (nonSeparableOps / separableOps).toFixed(2) : 0;
-
-  return (
-    <div className="bg-slate-800 p-6 rounded-xl shadow-md border border-slate-700 my-6 text-white">
-      <h4 className="text-lg font-bold text-blue-300 mb-4 flex items-center gap-2">
-        <Info size={20} /> Máy tính Ưu thế Tính toán (Computational Advantage)
-      </h4>
-      <div className="flex flex-col md:flex-row gap-6 items-center">
-        <div className="flex-1 space-y-4">
-          <div>
-            <label className="block text-sm text-slate-300 mb-1">Kích thước Kernel vuông (m × m):</label>
-            <input 
-              type="number" 
-              value={kernelSize} 
-              onChange={(e) => setKernelSize(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-mono focus:border-blue-500 focus:outline-none"
-              min="3" max="999"
-            />
-          </div>
-          <p className="text-sm text-slate-400 italic">
-            Thử nhập các giá trị lớn như 11, 31, hoặc 101 để thấy sự khác biệt.
-          </p>
-        </div>
-        
-        <div className="flex-2 grid grid-cols-2 gap-4 w-full md:w-auto">
-          <div className="bg-slate-700 p-4 rounded text-center">
-            <div className="text-sm text-slate-300 mb-1">Non-separable (m×m)</div>
-            <div className="text-2xl font-bold text-red-400">{nonSeparableOps}</div>
-            <div className="text-xs text-slate-400 mt-1">phép tính / pixel</div>
-          </div>
-          <div className="bg-slate-700 p-4 rounded text-center">
-            <div className="text-sm text-slate-300 mb-1">Separable (m+m)</div>
-            <div className="text-2xl font-bold text-green-400">{separableOps}</div>
-            <div className="text-xs text-slate-400 mt-1">phép tính / pixel</div>
-          </div>
-        </div>
-        
-        <div className="flex-1 bg-blue-900/50 p-4 rounded-lg border border-blue-500/50 text-center flex flex-col justify-center min-w-[150px]">
-          <div className="text-sm text-blue-200 mb-1">Tốc độ tăng gấp</div>
-          <div className="text-3xl font-extrabold text-blue-400">{speedup}x</div>
-          <div className="text-xs text-blue-300 mt-1">Lợi thế C</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-// --- MAIN APP COMPONENT ---
-export default function SpatialFilteringApp() {
-  return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-slate-900 to-blue-900 text-white py-12 px-6 shadow-lg">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">
-            Fundamentals of Spatial Filtering
-          </h1>
-          <p className="text-xl text-blue-100 font-light max-w-2xl leading-relaxed">
-            Nền tảng của Xử lý ảnh không gian: Hiểu sâu về cơ chế Lọc tuyến tính, Correlation và Convolution thông qua lý thuyết và mô phỏng tương tác.
-          </p>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-6">
-        
-        {/* PHẦN 1: TỔNG QUAN */}
-        <section>
-          <SectionTitle>1. Lọc Không Gian (Spatial Filtering) là gì?</SectionTitle>
-          <div className="text-lg text-slate-700 leading-relaxed space-y-4">
-            <p>
-              "Filtering" (Lọc) là thuật ngữ mượn từ xử lý tín hiệu miền tần số (frequency domain), nơi lọc nghĩa là cho qua, sửa đổi hoặc từ chối các tần số cụ thể. Ví dụ, <em>lowpass filter</em> (lọc thông thấp) làm mờ ảnh. 
-              Tuy nhiên, chúng ta có thể đạt được hiệu ứng tương tự bằng cách làm việc <strong>trực tiếp trên chính các pixel của ảnh</strong>. Đây gọi là <Highlight>Spatial Filtering (Lọc không gian)</Highlight>.
-            </p>
-            <p>
-              Cơ bản, lọc không gian thay đổi giá trị của một pixel dựa trên một <strong>hàm toán học</strong> liên quan đến giá trị của chính nó và các pixel "hàng xóm" xung quanh nó.
-            </p>
-            <ul className="bg-white p-6 rounded-lg border-l-4 border-blue-500 shadow-sm list-none space-y-3">
-              <li className="flex gap-3"><CheckCircle2 className="text-blue-500 shrink-0"/> <span><strong>Lọc không gian tuyến tính (Linear Spatial Filter):</strong> Phép toán thực hiện trên ảnh là các phép nhân và cộng (tuyến tính). Đây là trọng tâm của bài học này.</span></li>
-              <li className="flex gap-3"><CheckCircle2 className="text-slate-400 shrink-0"/> <span className="text-slate-500"><strong>Lọc không gian phi tuyến tính (Nonlinear):</strong> Phép toán dựa trên logic/thống kê (ví dụ: tìm Max, Min, Median). Sẽ học ở phần khác.</span></li>
-            </ul>
-          </div>
-        </section>
-
-        {/* PHẦN 2: CƠ CHẾ HOẠT ĐỘNG */}
-        <section>
-          <SectionTitle>2. Cơ chế của Lọc Tuyến Tính (Mechanics)</SectionTitle>
-          <div className="text-lg text-slate-700 leading-relaxed space-y-4">
-            <p>
-              Lọc không gian tuyến tính thực hiện một phép toán gọi là <Highlight>Sum-of-products (Tổng của các tích)</Highlight> giữa một bức ảnh <span className="font-serif italic">f</span> và một bộ lọc gọi là <Highlight color="red">Kernel (w)</Highlight>.
-            </p>
-            <div className="bg-blue-50 p-4 rounded-lg text-blue-900 text-sm">
-                💡 <strong>Thuật ngữ đồng nghĩa:</strong> Kernel còn được gọi là <em>filter mask</em> (mặt nạ lọc), <em>template</em> (bản mẫu), hoặc <em>window</em> (cửa sổ). Kích thước của Kernel xác định phạm vi vùng "hàng xóm" bao trùm.
-            </div>
-            
-            <SubTitle>Trực quan hóa quá trình (Figure 3.28)</SubTitle>
-            <p>
-                Hãy tưởng tượng ảnh là một lưới tọa độ (x,y). Ta đặt Kernel (ví dụ kích thước 3x3) sao cho tâm của Kernel đè lên một pixel tọa độ (x,y) của ảnh.
-                Giá trị kết quả mới <span className="font-serif italic">g(x,y)</span> được tính bằng cách lấy từng hệ số trong Kernel nhân với pixel nằm ngay dưới nó, rồi <strong>cộng tất cả các tích đó lại</strong>.
-            </p>
-
-            {/* Chèn Simulator 2D */}
-            <Simulator2D />
-
-            <p>Tổng quát cho ảnh kích thước MxN và kernel m x n (với m, n là số lẻ), công thức lọc tuyến tính không gian là:</p>
-            <MathBlock>
-                g(x, y) = ∑<sub>s=-a</sub><sup>a</sup> ∑<sub>t=-b</sub><sup>b</sup> w(s,t) * f(x+s, y+t)
-                <div className="text-sm text-slate-500 mt-2 normal-case font-sans">(Equation 3-31) - Trong đó: a = (m-1)/2 và b = (n-1)/2</div>
-            </MathBlock>
-          </div>
-        </section>
-
-        {/* PHẦN 3: CORRELATION VS CONVOLUTION */}
-        <section>
-          <SectionTitle>3. Spatial Correlation và Convolution</SectionTitle>
-          <div className="text-lg text-slate-700 leading-relaxed space-y-4">
-            <p>
-              Công thức (3-31) ở trên thực chất mô tả quá trình <Highlight>Spatial Correlation (Tương quan không gian)</Highlight>. Có một khái niệm song sinh với nó là <Highlight color="green">Spatial Convolution (Tích chập không gian)</Highlight>.
-            </p>
-            <p>
-              Sự khác biệt duy nhất về mặt cơ học là: <strong>Trong Convolution, Kernel phải được xoay 180 độ (Rotated by 180°) trước khi thực hiện trượt và tính "tổng các tích".</strong> 
-            </p>
-            <div className="bg-red-50 border border-red-200 p-4 rounded-lg mt-4">
-                <p className="font-semibold text-red-800">Tại sao phải xoay 180 độ? Khái niệm "Unit Impulse"</p>
-                <p className="text-red-700 mt-2 text-base">
-                    Trong lý thuyết hệ thống tuyến tính, nếu bạn "tích chập" một hàm với một tín hiệu xung nhọn (Unit Impulse - một điểm có giá trị 1, xung quanh toàn số 0), kết quả phải trả về <strong>bản sao chính xác</strong> của chính hàm đó tại vị trí xung. <br/><br/>
-                    Nếu dùng Correlation, kết quả trả về sẽ bị ngược (bạn có thể tự kiểm chứng ở mô phỏng 1D bên dưới). Do đó, toán học quy định phải xoay Kernel 180 độ trước (tức là Convolution) để đảm bảo khi đi qua xung, nó lật lại lần nữa và giữ nguyên hình dạng ban đầu.
-                </p>
-            </div>
-            
-            <SubTitle>Mô phỏng 1D: Padding & Shifting (Figure 3.29)</SubTitle>
-            <p>
-                Trước khi đi vào 2D, sách đưa ra ví dụ 1D cực kỳ dễ hiểu. Để Kernel có thể trượt từ mép ngoài cùng bên trái sang mép ngoài cùng bên phải của ảnh mà không bị "lỗi ra ngoài mảng", chúng ta phải chèn thêm các số 0 vào hai đầu ảnh. Kỹ thuật này gọi là <Highlight>Zero-padding</Highlight>.
-            </p>
-            <p>
-                Hãy thử tương tác với mô phỏng dưới đây để hiểu rõ lý thuyết trên:
-            </p>
-
-            {/* Chèn Simulator 1D */}
-            <Simulator1D />
-
-          </div>
-        </section>
-
-        {/* PHẦN 4: TOÁN HỌC & TÍNH CHẤT */}
-        <section>
-          <SectionTitle>4. Định nghĩa Toán học 2D & Tính chất</SectionTitle>
-          <div className="text-lg text-slate-700 leading-relaxed space-y-4">
-            <p>Dựa trên sự phân biệt giữa Tương quan và Tích chập, ta có 2 ký hiệu toán học riêng biệt (Figure 3.34 & 3.35):</p>
-            
-            <div className="grid md:grid-cols-2 gap-6 mt-4">
-                <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
-                    <h5 className="font-bold text-blue-700 mb-2">Correlation (Ký hiệu: ☆)</h5>
-                    <div className="font-serif italic text-center my-3 text-lg">
-                        (w ☆ f)(x,y) = ∑∑ w(s,t)f(x+s, y+t)
-                    </div>
-                    <p className="text-sm text-slate-600">Dấu cộng (+) trong f(x+s, y+t) thể hiện việc kernel di chuyển cùng chiều với hệ trục tọa độ mà không xoay.</p>
-                </div>
-                
-                <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
-                    <h5 className="font-bold text-green-700 mb-2">Convolution (Ký hiệu: ★)</h5>
-                    <div className="font-serif italic text-center my-3 text-lg">
-                        (w ★ f)(x,y) = ∑∑ w(s,t)f(x-s, y-t)
-                    </div>
-                    <p className="text-sm text-slate-600">Dấu trừ (-) trong f(x-s, y-t) chính là sự dịch chuyển tọa độ thể hiện việc Kernel đã được <strong>xoay 180 độ</strong>.</p>
-                </div>
-            </div>
-
-            <SubTitle>Các tính chất nền tảng (Table 3.5)</SubTitle>
-            <p>Lý do thứ hai khiến Convolution được ưa chuộng hơn Correlation trong toán học là vì nó có các tính chất đại số quen thuộc:</p>
-            
-            <div className="overflow-x-auto mt-4">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-200 text-slate-800">
-                            <th className="p-3 border border-slate-300">Tính chất (Property)</th>
-                            <th className="p-3 border border-slate-300">Convolution (★)</th>
-                            <th className="p-3 border border-slate-300">Correlation (☆)</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white">
-                        <tr>
-                            <td className="p-3 border border-slate-200 font-semibold text-slate-700">Giao hoán (Commutative)</td>
-                            <td className="p-3 border border-slate-200 font-serif">f ★ g = g ★ f</td>
-                            <td className="p-3 border border-slate-200 text-center text-slate-400">— (Không có)</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 border border-slate-200 font-semibold text-slate-700">Kết hợp (Associative)</td>
-                            <td className="p-3 border border-slate-200 font-serif">f ★ (g ★ h) = (f ★ g) ★ h</td>
-                            <td className="p-3 border border-slate-200 text-center text-slate-400">— (Không có)</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 border border-slate-200 font-semibold text-slate-700">Phân phối (Distributive)</td>
-                            <td className="p-3 border border-slate-200 font-serif">f ★ (g + h) = (f ★ g) + (f ★ h)</td>
-                            <td className="p-3 border border-slate-200 font-serif">f ☆ (g + h) = (f ☆ g) + (f ☆ h)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            
-            <div className="bg-yellow-50 p-4 border-l-4 border-yellow-400 text-yellow-800 text-base mt-4 rounded-r">
-                <strong>Ứng dụng thực tế:</strong> Nhờ tính <strong>Giao hoán</strong> và <strong>Kết hợp</strong> của Convolution, nếu bạn phải lọc một bức ảnh qua 3 kernel liên tiếp <span className="font-serif">w<sub>1</sub>, w<sub>2</sub>, w<sub>3</sub></span>, thay vì phải chạy vòng lặp trên toàn bộ ảnh 3 lần, bạn có thể tính gộp 3 kernel lại với nhau trước: <span className="font-serif">w = w<sub>1</sub> ★ w<sub>2</sub> ★ w<sub>3</sub></span>. Sau đó chỉ cần lấy kernel gộp <span className="font-serif">w</span> chập với ảnh 1 lần duy nhất! (Equation 3-38).
-            </div>
-            
-            <p className="mt-6 text-sm text-slate-500 italic">
-                *Lưu ý từ sách: Mặc dù toán học phân biệt rõ ràng, nhưng trong văn chương xử lý ảnh, người ta thường dùng thuật ngữ "Linear Spatial Filtering" và "Spatial Convolution" như từ đồng nghĩa. Các phần mềm thường code theo Correlation, nhưng truyền vào Kernel đã được xoay sẵn 180 độ.
-            </p>
-
-            <SubTitle>Ví dụ về Kernel thực tế (Figure 3.31)</SubTitle>
-            <p>Đây là 2 ví dụ về Smoothing Kernels (Lọc làm mờ) kích thước 3x3 thường dùng:</p>
-            
-            <div className="flex flex-col md:flex-row gap-8 justify-center mt-6">
-                {/* Box Filter */}
-                <div className="text-center">
-                    <p className="font-bold text-slate-700 mb-2">(a) Box Kernel</p>
-                    <div className="flex items-center gap-2 justify-center">
-                        <span className="text-xl font-serif">1/9 ×</span>
-                        <div className="border-2 border-slate-800 grid grid-cols-3 bg-white w-32 h-32">
-                            {[1,1,1,1,1,1,1,1,1].map((v, i) => (
-                                <div key={i} className="flex items-center justify-center border border-slate-300 font-bold text-slate-700">{v}</div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Gaussian Filter */}
-                <div className="text-center">
-                    <p className="font-bold text-slate-700 mb-2">(b) Gaussian Kernel</p>
-                    <div className="flex items-center gap-2 justify-center">
-                        <span className="text-lg font-serif">1/4.8976 ×</span>
-                        <div className="border-2 border-slate-800 grid grid-cols-3 bg-white w-48 h-32 text-sm">
-                            {[0.3679, 0.6065, 0.3679, 0.6065, 1.0000, 0.6065, 0.3679, 0.6065, 0.3679].map((v, i) => (
-                                <div key={i} className="flex items-center justify-center border border-slate-300 text-slate-700 px-1">{v}</div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <p className="text-center text-sm text-slate-500 mt-4">
-                <em>Lưu ý: Vì các kernel lọc làm mờ này <strong>đối xứng tâm (symmetric about the center)</strong>, nên việc xoay 180 độ không làm thay đổi kernel. Do đó, đối với các kernel đối xứng, kết quả của Correlation và Convolution là <strong>hoàn toàn giống nhau</strong>.</em>
-            </p>
-
-          </div>
-        </section>
-
-        {/* PHẦN 5: SEPARABLE FILTER KERNELS */}
-        <section>
-          <SectionTitle>5. Kernel Lọc Phân Tách (Separable Filter Kernels)</SectionTitle>
-          <div className="text-lg text-slate-700 leading-relaxed space-y-4">
-            <p>
-              Theo định nghĩa toán học, một hàm 2D <span className="font-serif italic">G(x,y)</span> được gọi là <Highlight>separable (có thể phân tách)</Highlight> nếu nó có thể được viết dưới dạng tích của hai hàm 1D: <span className="font-serif italic">G(x,y) = G<sub>1</sub>(x)G<sub>2</sub>(y)</span>.
-            </p>
-            <p>
-              Đối với xử lý ảnh, một Kernel lọc không gian (về bản chất là một ma trận) được gọi là "phân tách được" nếu nó có thể được biểu diễn dưới dạng <Highlight color="green">Outer Product (Tích ngoài)</Highlight> của hai vector (một vector cột và một vector hàng).
-            </p>
-
-            <div className="bg-white p-4 rounded-lg border border-slate-200 my-4 text-center overflow-x-auto shadow-sm">
-              <p className="text-sm text-slate-500 mb-2">Ví dụ với Kernel 2x3 chứa toàn số 1:</p>
-              <div className="font-serif text-xl flex items-center justify-center gap-4 whitespace-nowrap">
-                <span>w =</span>
-                <span className="inline-grid grid-cols-3 gap-x-4 gap-y-1 bg-slate-50 p-2 border-l-2 border-r-2 border-slate-800 rounded">
-                  <span>1</span><span>1</span><span>1</span>
-                  <span>1</span><span>1</span><span>1</span>
-                </span>
-                <span className="font-sans mx-2">=</span>
-                <span className="inline-grid grid-cols-1 gap-y-1 bg-slate-50 p-2 border-l-2 border-r-2 border-blue-800 text-blue-800 rounded">
-                  <span>1</span>
-                  <span>1</span>
-                </span>
-                <span className="font-sans text-sm mx-1">(cột) ×</span>
-                <span className="inline-grid grid-cols-3 gap-x-4 bg-slate-50 p-2 border-l-2 border-r-2 border-red-800 text-red-800 rounded">
-                  <span>1</span><span>1</span><span>1</span>
-                </span>
-                <span className="font-sans text-sm mx-1">(hàng)</span>
-              </div>
-              <p className="mt-4 text-slate-600">
-                Tổng quát: <span className="font-serif font-bold text-lg">w = v w<sup>T</sup></span> (Equation 3-41)
-              </p>
-            </div>
-
-            <SubTitle>Tại sao tính chất này lại quan trọng?</SubTitle>
-            <p>
-              Sự vĩ đại của Separable Kernels nằm ở <Highlight>lợi thế tính toán cực kỳ lớn</Highlight> nhờ vào tính chất kết hợp (associative) của phép tích chập (Convolution). Nếu kernel <span className="font-serif italic">w</span> có thể tách thành <span className="font-serif italic">w<sub>1</sub> ★ w<sub>2</sub></span>, thì:
-            </p>
-            <MathBlock>
-              w ★ f = (w<sub>1</sub> ★ w<sub>2</sub>) ★ f = w<sub>2</sub> ★ (w<sub>1</sub> ★ f) = (w<sub>1</sub> ★ f) ★ w<sub>2</sub>
-              <div className="text-sm text-slate-500 mt-2 normal-case font-sans">(Equation 3-43)</div>
-            </MathBlock>
-            <p>
-              <strong>Ý nghĩa:</strong> Thay vì chập bức ảnh trực tiếp với một ma trận 2D khổng lồ, bạn có thể chập bức ảnh với vector cột 1D trước, sau đó lấy kết quả thu được chập tiếp với vector hàng 1D.
-            </p>
-
-            <SubTitle>Chứng minh Toán học: Ưu thế hiệu năng (Computational Advantage)</SubTitle>
-            <p>Giả sử ta có ảnh kích thước <span className="font-serif italic">M × N</span> và kernel kích thước <span className="font-serif italic">m × n</span>:</p>
-            <ul className="list-disc ml-6 space-y-2 text-slate-600">
-              <li><strong>Cách cũ (Non-separable):</strong> Mỗi pixel trên ảnh cần thực hiện <span className="font-serif italic">m × n</span> phép nhân/cộng. Tổng cộng cần <span className="font-bold text-red-600 font-serif">MNmn</span> phép toán.</li>
-              <li><strong>Cách mới (Separable):</strong> Lượt chập đầu tiên với vector kích thước <span className="font-serif italic">m × 1</span> cần <span className="font-serif italic">MNm</span> phép toán. Lượt chập thứ hai với kết quả (vẫn là ảnh <span className="font-serif italic">M × N</span>) bằng vector <span className="font-serif italic">1 × n</span> cần thêm <span className="font-serif italic">MNn</span> phép toán. Tổng cộng là <span className="font-bold text-green-600 font-serif">MN(m + n)</span> phép toán.</li>
-            </ul>
-
-            <div className="bg-yellow-50 p-5 rounded-lg border border-yellow-300 mt-4 shadow-inner text-center">
-              <p className="text-yellow-800 font-semibold mb-2">Hệ số lợi thế tính toán (Advantage Factor - C)</p>
-              <div className="text-2xl font-serif text-slate-800 py-2">
-                C = <frac><span className="border-b border-slate-800 px-2">MNmn</span><br/><span className="px-2">MN(m + n)</span></frac> = <frac><span className="border-b border-slate-800 px-2 font-bold text-blue-700">mn</span><br/><span className="px-2 font-bold text-blue-700">m + n</span></frac>
-              </div>
-              <p className="text-sm text-slate-500 mt-2">(Equation 3-44)</p>
-            </div>
-
-            <SeparableCalculator />
-
-            <SubTitle>Làm sao để biết một Kernel có thể phân tách?</SubTitle>
-            <p>
-              Lý thuyết ma trận chỉ ra rằng: Bất kỳ ma trận nào là kết quả của một vector cột nhân với một vector hàng <strong>luôn luôn có Hạng (Rank) bằng 1</strong>. Do đó, bạn chỉ cần dùng hàm tính Rank (ví dụ <code>rank()</code> trong MATLAB) để kiểm tra. Nếu Rank = 1, kernel đó là separable.
-            </p>
-
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-5 mt-4 rounded-r-lg">
-              <h4 className="font-bold text-blue-800 mb-3 text-lg flex items-center gap-2">
-                <ArrowRight size={20} /> Phương pháp 3 bước để tách Kernel (Decomposition)
-              </h4>
-              <p className="text-sm text-slate-600 mb-4 italic">Bởi vì ma trận rank 1 có các hàng/cột phụ thuộc tuyến tính (chỉ khác nhau một hằng số nhân), ta có thể dễ dàng tách nó ra:</p>
-              <ol className="list-decimal ml-5 space-y-3 text-slate-700 font-medium">
-                <li>Tìm bất kỳ một phần tử khác 0 nào trong kernel và gọi giá trị của nó là <strong className="text-red-600 text-lg">E</strong>.</li>
-                <li>Tạo hai vector <strong className="text-blue-600 font-serif">c</strong> và <strong className="text-green-600 font-serif">r</strong>, lần lượt sao chép chính xác toàn bộ cột và hàng chứa phần tử <strong className="text-red-600 text-lg">E</strong> vừa tìm được ở bước 1.</li>
-                <li>Kết quả: vector thứ nhất <strong className="font-serif text-lg">v = c</strong>, và vector thứ hai <strong className="font-serif text-lg">w<sup>T</sup> = r / E</strong>. <br/>(Theo công thức <span className="font-serif">w = v w<sup>T</sup></span>).</li>
-              </ol>
-            </div>
-
-          </div>
-        </section>
-
-        {/* PHẦN 6: MIỀN KHÔNG GIAN VS MIỀN TẦN SỐ */}
-        <section>
-          <SectionTitle>6. Miền Không Gian vs. Miền Tần Số (Spatial vs. Frequency Domains)</SectionTitle>
-          <div className="text-lg text-slate-700 leading-relaxed space-y-4">
-            <p>
-              Dù bộ lọc miền tần số (Frequency domain) là chủ đề của chương 4, nhưng việc giới thiệu ngay bây giờ một số khái niệm quan trọng sẽ giúp bạn hiểu sâu sắc hơn bản chất của quá trình lọc không gian.
-            </p>
-            <p>
-              Cầu nối giữa miền không gian và miền tần số chính là <Highlight>Biến đổi Fourier (Fourier Transform)</Highlight>. Chúng ta dùng biến đổi Fourier để đi từ miền không gian sang miền tần số, và dùng <em>Biến đổi Fourier ngược (Inverse Fourier Transform)</em> để quay trở lại. Trọng tâm ở đây là hai tính chất đối ngẫu nền tảng:
-            </p>
-
-            <ul className="bg-blue-50 p-6 rounded-lg border-l-4 border-blue-500 shadow-sm list-none space-y-4 mt-4">
-              <li className="flex gap-4 items-center">
-                <span className="bg-blue-200 text-blue-800 font-bold rounded-full w-10 h-10 flex items-center justify-center shrink-0">1</span> 
-                <span><strong className="text-blue-900">Tích chập (Convolution)</strong> - nền tảng của lọc không gian - hoàn toàn tương đương với phép <strong className="text-blue-900">Nhân (Multiplication)</strong> trong miền tần số, và ngược lại.</span>
-              </li>
-              <li className="flex gap-4 items-center">
-                <span className="bg-blue-200 text-blue-800 font-bold rounded-full w-10 h-10 flex items-center justify-center shrink-0">2</span> 
-                <span>Một <strong>Xung (Impulse)</strong> có cường độ A trong miền không gian tương đương với một <strong>Hằng số (Constant)</strong> có giá trị A trong toàn bộ miền tần số, và ngược lại.</span>
-              </li>
-            </ul>
-
-            <SubTitle>Ý nghĩa của Tần số trong Hình ảnh</SubTitle>
-            <p>
-              Một hình ảnh có thể được biểu diễn dưới dạng tổng của các hàm sin với các tần số và biên độ khác nhau. Việc thay đổi các thành phần này sẽ làm thay đổi diện mạo của bức ảnh. Cụ thể:
-            </p>
-            <ul className="list-disc ml-6 space-y-2 text-slate-600">
-              <li><strong>Tần số thấp (Low frequencies):</strong> Đặc trưng cho các vùng ảnh có cường độ thay đổi chậm (ví dụ: mảng tường trơn, bầu trời, da người).</li>
-              <li><strong>Tần số cao (High frequencies):</strong> Đặc trưng cho các cạnh (edges) và các vùng chuyển đổi cường độ sắc nét/đột ngột.</li>
-            </ul>
-            <p>
-              Vì vậy, nếu ta <em>giảm hoặc loại bỏ</em> các thành phần tần số cao, bức ảnh sẽ có xu hướng <strong>bị làm mờ (blurred)</strong>. Việc lọc tuyến tính thực chất là tìm cách thay đổi nội dung tần số của ảnh. Ở miền tần số, ta làm điều này bằng cách <em>nhân</em> (dễ hình dung hơn), còn ở miền không gian, ta dùng <em>tích chập</em>.
-            </p>
-
-            <SubTitle>Ví dụ: Bộ lọc Thông Thấp Lý tưởng (Ideal Lowpass Filter)</SubTitle>
-            <p>
-              Hãy xem xét một ví dụ 1 chiều (1-D). Giả sử ta muốn loại bỏ tất cả các tần số lớn hơn một giá trị ngưỡng <span className="font-serif">u<sub>0</sub></span>, và "cho qua" tất cả tần số thấp hơn <span className="font-serif">u<sub>0</sub></span>. Hàm thực hiện điều này ở miền tần số được gọi là <em>Ideal Lowpass Filter Transfer Function</em> (Hàm truyền bộ lọc thông thấp lý tưởng).
-            </p>
-            
-            <div className="flex flex-col md:flex-row gap-6 items-center justify-center my-8">
-              {/* Figure 3.32 (a) Frequency Domain */}
-              <div className="flex-1 w-full max-w-sm">
-                <p className="font-bold text-center text-slate-800 mb-2">(a) Miền Tần số (Frequency Domain)</p>
-                <svg viewBox="0 0 200 120" className="w-full h-auto bg-white border border-slate-200 shadow-sm rounded">
-                  <defs>
-                    <pattern id="grid1" width="20" height="20" patternUnits="userSpaceOnUse">
-                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" strokeWidth="1"/>
-                    </pattern>
-                  </defs>
-                  <rect width="200" height="120" fill="url(#grid1)" />
-                  {/* Axes */}
-                  <path d="M 10,90 L 190,90" stroke="black" strokeWidth="1.5" />
-                  <path d="M 100,100 L 100,10" stroke="black" strokeWidth="1.5" />
-                  {/* Ideal Lowpass */}
-                  <path d="M 50,90 L 50,30 L 150,30 L 150,90" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6" strokeWidth="2.5" />
-                  <text x="190" y="80" textAnchor="end" className="text-[10px] font-serif italic">u</text>
-                  <text x="100" y="105" textAnchor="middle" className="text-[10px] font-mono">0</text>
-                  <text x="50" y="105" textAnchor="middle" className="text-[10px] font-mono">-u₀</text>
-                  <text x="150" y="105" textAnchor="middle" className="text-[10px] font-mono">u₀</text>
-                  <text x="100" y="25" textAnchor="middle" className="text-[10px] font-mono text-slate-500">1</text>
-                  <text x="100" y="60" textAnchor="middle" className="text-[12px] font-bold text-blue-700">Passband</text>
-                  <text x="25" y="60" textAnchor="middle" className="text-[10px] font-bold text-slate-400">Stop</text>
-                  <text x="175" y="60" textAnchor="middle" className="text-[10px] font-bold text-slate-400">Stop</text>
-                </svg>
-                <p className="text-sm text-slate-500 text-center mt-2">Hàm truyền bộ lọc thông thấp lý tưởng (đột ngột ngắt tại u₀).</p>
-              </div>
-
-              {/* Duality indicator */}
-              <div className="hidden md:flex flex-col items-center text-slate-400">
-                <span className="text-[10px] uppercase font-bold tracking-wider">Fourier</span>
-                <ArrowRight size={24} className="my-1"/>
-                <span className="text-[10px] uppercase font-bold tracking-wider">Inverse</span>
-              </div>
-
-              {/* Figure 3.32 (b) Spatial Domain */}
-              <div className="flex-1 w-full max-w-sm">
-                <p className="font-bold text-center text-slate-800 mb-2">(b) Miền Không gian (Spatial Domain)</p>
-                <svg viewBox="0 0 200 120" className="w-full h-auto bg-white border border-slate-200 shadow-sm rounded">
-                  <defs>
-                    <pattern id="grid2" width="20" height="20" patternUnits="userSpaceOnUse">
-                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" strokeWidth="1"/>
-                    </pattern>
-                  </defs>
-                  <rect width="200" height="120" fill="url(#grid2)" />
-                  {/* Axes */}
-                  <path d="M 10,90 L 190,90" stroke="black" strokeWidth="1.5" />
-                  <path d="M 100,100 L 100,10" stroke="black" strokeWidth="1.5" />
-                  {/* Sinc wave */}
-                  <polyline fill="none" stroke="#ef4444" strokeWidth="2.5" 
-                    points={Array.from({length: 200}, (_, i) => {
-                      const x = (i - 100) / 12; 
-                      const y = x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x);
-                      return `${i},${90 - (y * 70)}`;
-                    }).join(' ')} 
-                  />
-                  <text x="190" y="80" textAnchor="end" className="text-[10px] font-serif italic">x</text>
-                  <text x="100" y="105" textAnchor="middle" className="text-[10px] font-mono">0</text>
-                  <text x="140" y="100" className="text-[10px] fill-red-500 font-bold">"Ringing" (Gợn sóng)</text>
-                </svg>
-                <p className="text-sm text-slate-500 text-center mt-2">Kernel không gian tương ứng (kết quả của Biến đổi Fourier ngược).</p>
-              </div>
-            </div>
-
-            <div className="bg-red-50 p-5 border-l-4 border-red-500 rounded-r shadow-sm mt-4">
-              <p className="text-red-800">
-                <strong>Hệ quả quan trọng:</strong> Để lọc thông thấp, bạn có thể chuyển ảnh sang miền tần số rồi <strong>nhân</strong> với hàm dạng khối chữ nhật (Hình a). Cách thứ hai hoàn toàn tương đương là giữ nguyên ảnh ở miền không gian và <strong>tích chập</strong> nó với Kernel có hình dạng sóng nhấp nhô liên tục (Hình b).
-              </p>
-              <p className="text-red-700 text-sm mt-3 border-t border-red-200 pt-3">
-                <em>*Lưu ý: Sự cắt gắt đột ngột (sharp cutoff) ở miền tần số sẽ gây ra đặc tính "ringing" (đổ chuông/gợn sóng) ở Kernel miền không gian. Khi chập Kernel này vào ảnh, ảnh sẽ bị xuất hiện các vòng gợn sóng. Do đó, các bộ lọc lý tưởng không bao giờ được dùng thực tế, và mục tiêu thiết kế bộ lọc số là làm sao mô phỏng được bộ lọc lý tưởng mà vẫn giảm thiểu tối đa hiện tượng ringing này.</em>
-              </p>
-            </div>
-          </div>
-        </section>
-
-      </main>
-
-      {/* Footer */}
-      <footer className="mt-20 py-8 bg-slate-900 text-slate-400 text-center text-sm">
-        <p>Tài liệu được biên soạn dựa trên sách "Digital Image Processing" - R.C. Gonzalez & R.E. Woods.</p>
-        <p className="mt-2">Mô phỏng tương tác giúp trực quan hóa kiến thức hàn lâm.</p>
-      </footer>
-    </div>
-  );
-}
+      // Khởi tạo đường cong Sinc-wave cho SVG
+      const points = Array.from({length: 200}, (_, i) => {
+        const x = (i - 100) / 12; 
+        const y = x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x);
+        return `${i},${90 - (y * 70)}`;
+      }).join(' ');
+      document.getElementById('sinc-wave').setAttribute('points', points);
+    });
+  </script>
+</body>
+</html>
