@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lớp Pooling: Khái niệm & Trực quan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Grid Cells */
+        .grid-cell { transition: all 0.2s ease-in-out; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold; border-width: 1px; }
+        
+        /* Sim 1 Styles */
+        .in-cell { background-color: #f8fafc; border-color: #cbd5e1; color: #334155; }
+        .out-cell { background-color: #fef2f2; border-color: #fca5a5; color: #991b1b; cursor: pointer; }
+        .out-cell:hover { background-color: #ef4444; color: white; transform: scale(1.1); z-index: 10; box-shadow: 0 4px 10px rgba(239,68,68,0.3); }
+        
+        .hl-area { background-color: #fee2e2 !important; border-color: #f87171 !important; transform: scale(1.05); z-index: 5; }
+        .hl-max-val { background-color: #ef4444 !important; color: white !important; transform: scale(1.15); z-index: 10; box-shadow: 0 0 10px rgba(239,68,68,0.5); border-color: #b91c1c !important;}
+        
+        .dimmed { opacity: 0.3; filter: grayscale(50%); }
+
+        /* Sim 2 Styles (Invariance) */
+        .inv-0 { background-color: #f1f5f9; color: #cbd5e1; border-color: #e2e8f0; }
+        .inv-9 { background-color: #3b82f6; color: white; border-color: #1d4ed8; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .inv-out { background-color: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+        .inv-highlight { border: 3px solid #f59e0b; }
+
+        /* General UI */
+        .custom-btn { transition: all 0.2s; }
+        .custom-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased pb-20">
+
+<div class="max-w-6xl mx-auto p-4 lg:p-8 bg-white shadow-2xl rounded-2xl my-8">
+    
+    <!-- HEADER -->
+    <header class="mb-10 text-center border-b pb-6">
+        <h1 class="text-4xl font-extrabold text-slate-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-orange-600">
+            Pooling (Lớp Gộp / Trích Mẫu)
+        </h1>
+        <p class="text-lg text-slate-600">Cách Mạng nơ-ron "nhìn xa trông rộng" và chống lại sự dịch chuyển</p>
+    </header>
+
+    <!-- 1. LÝ THUYẾT & TÁC DỤNG -->
+    <section class="grid md:grid-cols-2 gap-8 mb-12">
+        <div class="bg-red-50 p-6 rounded-xl border border-red-100">
+            <h2 class="text-2xl font-bold text-red-800 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                Pooling là gì?
+            </h2>
+            <div class="prose prose-sm text-slate-700">
+                <p>Giống như Convolution, Pooling cũng dùng một cửa sổ (window) trượt qua ảnh. Nhưng thay vì nhân với ma trận trọng số (Kernel), nó thực hiện một <strong>phép toán thống kê tĩnh (không cần học)</strong> trên vùng đó.</p>
+                <ul class="list-disc pl-4 space-y-1">
+                    <li><strong>Max Pooling (Gộp Tối đa):</strong> Lấy giá trị lớn nhất trong cửa sổ. Cực kỳ phổ biến hiện nay vì nó giữ lại các tín hiệu mạnh nhất (như đường biên).</li>
+                    <li><strong>Average Pooling (Gộp Trung bình):</strong> Lấy giá trị trung bình. Thường dùng ở các kiến trúc cũ (như LeNet) hoặc ở layer cuối cùng (Global Average Pooling) trước khi phân loại.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="bg-orange-50 p-6 rounded-xl border border-orange-100">
+            <h2 class="text-2xl font-bold text-orange-800 mb-4">Mục đích sâu xa (The "Why")</h2>
+            <div class="prose prose-sm text-slate-700">
+                <ul class="list-disc pl-4 space-y-2">
+                    <li><strong>1. Giảm chiều (Downsampling):</strong> Thu nhỏ kích thước ảnh (thường cắt đôi chiều dài/rộng), giúp giảm mạnh khối lượng tính toán và lượng tham số \(\rightarrow\) Ngăn ngừa <em>Overfitting</em>.</li>
+                    <li><strong>2. Tăng Vùng Cảm Nhận (Receptive Field):</strong> Khi ảnh nhỏ đi, các lớp Tích chập tiếp theo sẽ có cái nhìn bao quát hơn về bức ảnh gốc (từ nhìn cái mũi \(\rightarrow\) nhìn ra khuôn mặt).</li>
+                    <li><strong>3. Bất biến Dịch chuyển (Translation Invariance):</strong> Tính năng quan trọng nhất! Dù đặc trưng xê dịch 1-2 pixel do camera rung lắc, giá trị Max Pooling vẫn không đổi (Xem Mô phỏng 2).</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- MÔ PHỎNG 1: CƠ CHẾ MAX / AVG POOLING -->
+    <section class="mb-12 bg-slate-900 text-white p-6 lg:p-8 rounded-2xl shadow-xl relative overflow-hidden">
+        <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+            Mô phỏng 1: Cơ chế Hoạt động (Fig 7.5.1)
+        </h2>
+        <p class="text-slate-400 text-sm mb-6">
+            Khác với Tích chập, Framework thường mặc định <strong>Stride = Kích thước Pooling (Pool Size)</strong>. Tức là cửa sổ trượt đi không hề chồng lấp lên nhau.
+        </p>
+
+        <div class="flex flex-col md:flex-row gap-8 items-center justify-center bg-slate-800 p-6 rounded-xl border border-slate-700">
+            
+            <!-- Controls -->
+            <div class="flex flex-col gap-4 bg-slate-700 p-4 rounded-lg w-full md:w-auto">
+                <label class="text-xs font-bold text-slate-300 uppercase">Chế độ Pooling:</label>
+                <button id="btnMax" class="custom-btn px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg ring-2 ring-red-400 ring-offset-2 ring-offset-slate-700">
+                    Max Pooling
+                </button>
+                <button id="btnAvg" class="custom-btn px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded shadow">
+                    Average Pooling
+                </button>
+                <div class="mt-4 text-xs font-mono text-slate-400">
+                    Window: 2x2<br>Stride: 2
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="flex flex-col items-center">
+                <span class="text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">Input (4x4)</span>
+                <div id="poolInput" class="grid grid-cols-4 gap-1 bg-slate-600 p-1.5 rounded">
+                    <!-- JS Gen -->
+                </div>
+            </div>
+
+            <!-- Arrow -->
+            <div class="hidden md:block text-slate-500 text-3xl">
+                &rarr;
+            </div>
+
+            <!-- Output -->
+            <div class="flex flex-col items-center">
+                <span class="text-sm font-bold text-red-400 mb-2 uppercase tracking-wide">Output (2x2)</span>
+                <div id="poolOutput" class="grid grid-cols-2 gap-1 bg-red-900/30 border border-red-500/50 p-1.5 rounded">
+                    <!-- JS Gen -->
+                </div>
+                <span class="text-[10px] text-slate-400 mt-2 italic">Di chuột vào để xem chi tiết</span>
+            </div>
+
+        </div>
+
+        <div id="poolMath" class="mt-6 text-center font-mono text-lg text-slate-300 min-h-[40px]">
+            <!-- Math display -->
+        </div>
+
+    </section>
+
+    <!-- MÔ PHỎNG 2: BẤT BIẾN DỊCH CHUYỂN -->
+    <section class="mb-12 border-2 border-blue-100 rounded-2xl overflow-hidden shadow-lg">
+        <div class="bg-blue-50 border-b border-blue-100 p-6">
+            <h2 class="text-2xl font-bold text-blue-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                Mô phỏng 2: Tính Bất biến Dịch chuyển (Translation Invariance)
+            </h2>
+            <p class="text-sm text-slate-600 mt-2">
+                Hãy thử di chuyển đặc trưng (số 9) xung quanh bức ảnh. Bạn sẽ thấy nhờ dùng <strong>Max Pooling 2x2</strong>, Dù đầu vào thay đổi vị trí, Đầu ra vẫn giữ nguyên được tín hiệu đặc trưng (số 9) ở cùng một ô. Đây là cách mạng lưới nhận ra "vẫn là con mèo đó" dù nó xê dịch một chút!
+            </p>
+        </div>
+
+        <div class="p-6 bg-white flex flex-col lg:flex-row gap-8 items-center justify-center">
+            
+            <!-- Shifter Controls -->
+            <div class="grid grid-cols-3 gap-2 w-32">
+                <div></div>
+                <button id="btnUp" class="custom-btn bg-blue-100 hover:bg-blue-200 text-blue-800 rounded p-2 flex justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg></button>
+                <div></div>
+                <button id="btnLeft" class="custom-btn bg-blue-100 hover:bg-blue-200 text-blue-800 rounded p-2 flex justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg></button>
+                <div class="flex items-center justify-center font-bold text-slate-400">Di chuyển</div>
+                <button id="btnRight" class="custom-btn bg-blue-100 hover:bg-blue-200 text-blue-800 rounded p-2 flex justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg></button>
+                <div></div>
+                <button id="btnDown" class="custom-btn bg-blue-100 hover:bg-blue-200 text-blue-800 rounded p-2 flex justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></button>
+                <div></div>
+            </div>
+
+            <!-- Invariance Input -->
+            <div class="relative">
+                <span class="absolute -top-6 left-0 text-xs font-bold text-slate-400 uppercase">Input (4x4)</span>
+                <!-- Vẽ vùng pooling (viền cam) -->
+                <div class="absolute top-0 left-0 w-24 h-24 border-4 border-amber-400/50 rounded pointer-events-none z-10"></div>
+                <div id="invInput" class="grid grid-cols-4 gap-1 p-1 bg-slate-200 rounded">
+                    <!-- JS -->
+                </div>
+            </div>
+
+            <div class="text-slate-400 text-2xl font-bold">&rarr;</div>
+
+            <!-- Invariance Output -->
+            <div class="relative">
+                <span class="absolute -top-6 left-0 text-xs font-bold text-amber-500 uppercase">Max Pool Output</span>
+                <div id="invOutput" class="grid grid-cols-2 gap-1 p-1 bg-amber-100 rounded border border-amber-300">
+                    <!-- JS -->
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- KIẾN THỨC MỞ RỘNG (HẠN CHẾ & CHANNELS) -->
+    <section class="grid md:grid-cols-2 gap-8 mb-4">
+        <!-- Đa kênh -->
+        <div class="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
+            <h3 class="text-xl font-bold text-emerald-800 mb-3">Xử lý Đa Kênh (Multiple Channels)</h3>
+            <p class="text-sm text-slate-700">
+                Hãy nhớ lại ở bài trước, lớp Convolution gộp (sum) tất cả các kênh Đầu vào lại. Tuy nhiên, <strong>Pooling hoạt động hoàn toàn độc lập trên từng Kênh!</strong> 
+                <br><br>
+                Nếu đầu vào có 64 kênh, Pooling sẽ lần lượt lấy Max/Avg của từng kênh một. Kết quả trả về vẫn là Tensor có <strong>đúng 64 kênh</strong>. Nó chỉ thay đổi (thu nhỏ) Chiều cao và Chiều rộng không gian.
+            </p>
+        </div>
+
+        <!-- Hạn chế -->
+        <div class="bg-slate-100 p-6 rounded-xl border border-slate-300">
+            <h3 class="text-xl font-bold text-slate-800 mb-3">Hạn chế & Xu hướng hiện đại</h3>
+            <div class="text-sm text-slate-700">
+                Mặc dù có lợi, Pooling đang dần bớt "thần thánh" vì các nhược điểm:
+                <ul class="list-disc pl-5 mt-2 space-y-1">
+                    <li><strong>Làm mất thông tin không gian:</strong> Nó biết có đặc trưng tồn tại (ví dụ có con mắt), nhưng không biết <em>chính xác ở vị trí nào</em>. Điều này gây hại cho các bài toán cần vẽ viền vật thể (Segmentation).</li>
+                    <li><strong>Không có tham số học:</strong> Thay vì dùng Pooling cứng nhắc, các kiến trúc hiện đại (ResNet, ConvNeXt) thường dùng lớp <strong>Convolution với Stride=2</strong> để mạng lưới tự <em>học</em> cách giảm kích thước (Learnable Downsampling) một cách tối ưu nhất.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    // ==========================================
+    // MÔ PHỎNG 1: MAX / AVG POOLING
+    // ==========================================
+    const inputData1 = [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7],
+        [8, 9, 10, 11],
+        [12, 13, 14, 15]
+    ];
+    let poolMode = 'max'; // 'max' or 'avg'
+    
+    const poolInEl = document.getElementById('poolInput');
+    const poolOutEl = document.getElementById('poolOutput');
+    const poolMath = document.getElementById('poolMath');
+    
+    const btnMax = document.getElementById('btnMax');
+    const btnAvg = document.getElementById('btnAvg');
+
+    function renderSim1() {
+        // Draw Input
+        poolInEl.innerHTML = '';
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                let cell = document.createElement('div');
+                cell.id = `sim1-in-${i}-${j}`;
+                cell.className = `grid-cell w-10 h-10 md:w-12 md:h-12 text-sm md:text-base rounded in-cell`;
+                cell.textContent = inputData1[i][j];
+                poolInEl.appendChild(cell);
+            }
+        }
+
+        // Draw Output
+        poolOutEl.innerHTML = '';
+        // 2x2 Pool, Stride 2 => Output 2x2
+        for (let i = 0; i < 2; i++) {
+            for (let j = 0; j < 2; j++) {
+                let cell = document.createElement('div');
+                cell.id = `sim1-out-${i}-${j}`;
+                cell.className = `grid-cell w-12 h-12 md:w-16 md:h-16 text-lg md:text-xl rounded out-cell`;
+                
+                // Calculate Value
+                let vals = [];
+                for(let ki=0; ki<2; ki++) {
+                    for(let kj=0; kj<2; kj++) {
+                        vals.push(inputData1[i*2 + ki][j*2 + kj]);
+                    }
+                }
+                
+                let res = 0;
+                if(poolMode === 'max') {
+                    res = Math.max(...vals);
+                } else {
+                    res = vals.reduce((a,b)=>a+b, 0) / 4;
+                }
+
+                cell.textContent = res;
+                
+                // Events
+                cell.addEventListener('mouseenter', () => hoverSim1(i, j, vals, res));
+                cell.addEventListener('mouseleave', clearSim1);
+
+                poolOutEl.appendChild(cell);
+            }
+        }
+    }
+
+    function hoverSim1(outI, outJ, vals, result) {
+        // Dim all
+        for(let i=0; i<4; i++) {
+            for(let j=0; j<4; j++) {
+                document.getElementById(`sim1-in-${i}-${j}`).classList.add('dimmed');
+            }
+        }
+
+        let maxVal = Math.max(...vals);
+
+        // Highlight area
+        for(let ki=0; ki<2; ki++) {
+            for(let kj=0; kj<2; kj++) {
+                let inI = outI*2 + ki;
+                let inJ = outJ*2 + kj;
+                let el = document.getElementById(`sim1-in-${inI}-${inJ}`);
+                
+                el.classList.remove('dimmed');
+                el.classList.add('hl-area');
+
+                // Highlight specifically the max value if in Max mode
+                if(poolMode === 'max' && inputData1[inI][inJ] === maxVal) {
+                    el.classList.add('hl-max-val');
+                }
+            }
+        }
+
+        // Update Math text
+        if(poolMode === 'max') {
+            poolMath.innerHTML = `max(${vals.join(', ')}) = <span class="text-red-400 font-bold">${result}</span>`;
+        } else {
+            poolMath.innerHTML = `avg(${vals.join(' + ')} / 4) = <span class="text-slate-100 font-bold">${result}</span>`;
+        }
+    }
+
+    function clearSim1() {
+        for(let i=0; i<4; i++) {
+            for(let j=0; j<4; j++) {
+                let el = document.getElementById(`sim1-in-${i}-${j}`);
+                el.classList.remove('dimmed', 'hl-area', 'hl-max-val');
+            }
+        }
+        poolMath.innerHTML = '';
+    }
+
+    btnMax.addEventListener('click', () => {
+        poolMode = 'max';
+        btnMax.className = "custom-btn px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg ring-2 ring-red-400 ring-offset-2 ring-offset-slate-700";
+        btnAvg.className = "custom-btn px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded shadow";
+        renderSim1();
+    });
+
+    btnAvg.addEventListener('click', () => {
+        poolMode = 'avg';
+        btnAvg.className = "custom-btn px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg ring-2 ring-red-400 ring-offset-2 ring-offset-slate-700";
+        btnMax.className = "custom-btn px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded shadow";
+        renderSim1();
+    });
+
+    renderSim1();
+
+    // ==========================================
+    // MÔ PHỎNG 2: INVARIANCE
+    // ==========================================
+    // 4x4 array filled with 0s. The feature is '9'.
+    let featurePos = {x: 0, y: 0}; // Top Left within the first 2x2 block
+    
+    const invInEl = document.getElementById('invInput');
+    const invOutEl = document.getElementById('invOutput');
+
+    function renderSim2() {
+        // Create 4x4 array
+        let arr = Array(4).fill(0).map(()=>Array(4).fill(0));
+        arr[featurePos.y][featurePos.x] = 9;
+
+        // Draw In
+        invInEl.innerHTML = '';
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                let cell = document.createElement('div');
+                cell.className = `grid-cell w-10 h-10 md:w-11 md:h-11 rounded ${arr[i][j]===9 ? 'inv-9' : 'inv-0'}`;
+                cell.textContent = arr[i][j];
+                invInEl.appendChild(cell);
+            }
+        }
+
+        // Draw Out (2x2 Max Pool)
+        invOutEl.innerHTML = '';
+        for (let i = 0; i < 2; i++) {
+            for (let j = 0; j < 2; j++) {
+                let cell = document.createElement('div');
+                let max = Math.max(
+                    arr[i*2][j*2], arr[i*2][j*2+1],
+                    arr[i*2+1][j*2], arr[i*2+1][j*2+1]
+                );
+                
+                // Giả sử ta đang quan sát vùng Output trên cùng bên trái (i=0, j=0)
+                let isObservedWindow = (i===0 && j===0);
+                
+                cell.className = `grid-cell w-12 h-12 md:w-16 md:h-16 text-xl rounded ${max===9 ? 'font-bold bg-blue-100 text-blue-700' : 'inv-out'}`;
+                if(isObservedWindow && max===9) cell.classList.add('inv-highlight');
+                if(isObservedWindow && max===0) cell.classList.add('border-2', 'border-red-400'); // Alert if it leaves the window
+
+                cell.textContent = max;
+                invOutEl.appendChild(cell);
+            }
+        }
+    }
+
+    // Button controls
+    document.getElementById('btnUp').addEventListener('click', () => { if(featurePos.y > 0) featurePos.y--; renderSim2(); });
+    document.getElementById('btnDown').addEventListener('click', () => { if(featurePos.y < 3) featurePos.y++; renderSim2(); });
+    document.getElementById('btnLeft').addEventListener('click', () => { if(featurePos.x > 0) featurePos.x--; renderSim2(); });
+    document.getElementById('btnRight').addEventListener('click', () => { if(featurePos.x < 3) featurePos.x++; renderSim2(); });
+
+    renderSim2();
+
+</script>
+</body>
+</html>
