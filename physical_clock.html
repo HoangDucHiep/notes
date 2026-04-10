@@ -3,321 +3,531 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bài 2: Đồng hồ Vật lý & Các Thuật toán Đồng bộ</title>
+    <title>Chương 5.1.1 - Đồng hồ Vật lý & Thời gian thực</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Tích hợp MathJax để hiển thị công thức Toán học chuẩn xác -->
+    <!-- MathJax Configuration cho Công thức Toán -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script>
-        MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']]
-            }
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            chtml: { displayAlign: 'center' }
         };
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Fira+Code:wght@400;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; line-height: 1.7; }
-        .academic-text { font-family: 'Lora', serif; font-size: 1.05rem; color: #334155; }
-        .code-font { font-family: 'Fira Code', monospace; }
-        .glass-panel { background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025); }
-        .math-block { overflow-x: auto; padding: 1rem; background: #f1f5f9; border-radius: 0.5rem; margin: 1rem 0; border-left: 4px solid #3b82f6; }
-        .note-box { background: #fefce8; border-left: 4px solid #eab308; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 0.5rem 0.5rem 0; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; line-height: 1.7; }
+        .textbook { font-family: 'Lora', serif; font-size: 1.1rem; color: #334155; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 2rem; margin-bottom: 2rem; }
+        .highlight-box { background: #fefce8; border-left: 4px solid #eab308; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+        
+        /* Hardware Timer Animations */
+        @keyframes crystal-vibrate {
+            0% { transform: translateX(-2px) scaleY(0.98); }
+            50% { transform: translateX(2px) scaleY(1.02); }
+            100% { transform: translateX(-2px) scaleY(0.98); }
+        }
+        .vibrating { animation: crystal-vibrate 0.1s infinite; }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); background-color: #ef4444; color: white;}
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); background-color: #fca5a5; color: #7f1d1d;}
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); background-color: #ef4444; color: white;}
+        }
+        .interrupt-flash { animation: pulse-red 0.3s ease-out; }
+
+        /* Progress bars for time simulation */
+        .time-track { background: #e2e8f0; height: 24px; border-radius: 12px; overflow: hidden; position: relative; }
+        .time-fill { height: 100%; transition: width 0.1s linear; }
     </style>
 </head>
-<body class="text-gray-800 antialiased pb-24">
+<body class="pb-20">
 
     <!-- Header -->
-    <header class="bg-slate-900 text-white p-10 shadow-2xl relative overflow-hidden">
-        <div class="absolute top-0 right-0 opacity-10 pointer-events-none">
-            <i class="fas fa-clock fa-10x transform translate-x-1/4 -translate-y-1/4"></i>
-        </div>
-        <div class="max-w-5xl mx-auto relative z-10">
-            <div class="flex items-center gap-3 mb-3 text-blue-400 text-sm font-bold uppercase tracking-widest">
-                <span>Chương 5: Coordination</span> <i class="fas fa-chevron-right text-xs"></i> <span>Mục 5.1</span>
-            </div>
-            <h1 class="text-4xl font-extrabold mb-4 leading-tight">Đồng hồ Vật lý &<br>Các Thuật toán Đồng bộ (Chuyên sâu)</h1>
-            <p class="text-slate-300 text-lg font-light max-w-3xl">Khảo sát chi tiết cơ chế hoạt động của tinh thể thạch anh, sự sai lệch thời gian, giao thức NTP, mạng vô tuyến RBS và hệ thống TrueTime của Google.</p>
+    <header class="bg-slate-800 text-white p-10 shadow-lg border-b-4 border-indigo-500">
+        <div class="max-w-5xl mx-auto">
+            <h1 class="text-3xl font-bold mb-2">Chương 5: Coordination (Điều phối)</h1>
+            <p class="text-indigo-300 text-lg">Mục 5.1.1: Physical clocks & Note 5.1: Determining real time</p>
         </div>
     </header>
 
-    <main class="max-w-5xl mx-auto mt-10 px-4 space-y-16">
+    <main class="max-w-5xl mx-auto mt-10 px-4">
 
-        <!-- 1. Cơ sở Phần cứng -->
-        <section class="glass-panel rounded-2xl p-10">
-            <h2 class="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-blue-500 pb-3">1. Cấu trúc Đồng hồ Máy tính (Physical Clocks)</h2>
-            <div class="academic-text space-y-5">
-                <p>Khái niệm "đồng hồ" trong máy tính thực chất là một sự lạm dụng thuật ngữ. Một thuật ngữ chính xác hơn phải là <strong>Bộ định thời (Timer)</strong>. Hầu như mọi máy tính đều sử dụng một tinh thể thạch anh (quartz crystal) được gia công tinh xảo.</p>
-                
-                <h3 class="text-xl font-bold text-slate-800 mt-6 mb-3">Cơ chế hoạt động của Timer:</h3>
-                <ul class="list-disc pl-6 space-y-3">
-                    <li>Khi được cấp một điện áp, tinh thể thạch anh sẽ dao động với một tần số được xác định rất rõ ràng (phụ thuộc vào loại tinh thể, cách cắt và điện áp).</li>
-                    <li>Gắn liền với mỗi tinh thể là hai thanh ghi: <strong>thanh ghi đếm (counter)</strong> và <strong>thanh ghi giữ (holding register)</strong>.</li>
-                    <li>Mỗi dao động của tinh thể sẽ làm thanh ghi đếm giảm đi 1. Khi bộ đếm chạm mốc 0, một <strong>ngắt (interrupt)</strong> được sinh ra, và bộ đếm tự động được nạp lại giá trị từ thanh ghi giữ. Mức độ ngắt này có thể được lập trình (ví dụ: 60 ngắt/giây).</li>
-                    <li>Mỗi ngắt như vậy được gọi là một <strong>clock tick</strong>. Ở mỗi tick, hệ điều hành sẽ kích hoạt một quy trình phục vụ ngắt (interrupt service procedure) để cộng thêm 1 vào biến lưu trữ thời gian trong bộ nhớ phần mềm.</li>
-                </ul>
-
-                <div class="bg-slate-50 p-6 rounded-lg border border-slate-200 mt-6">
-                    <h3 class="text-lg font-bold text-red-600 mb-3"><i class="fas fa-exclamation-circle mr-2"></i>Vấn đề Trôi dạt đồng hồ (Clock Drift)</h3>
-                    <p>Trong thực tế, khi có $n$ máy tính, $n$ tinh thể thạch anh sẽ chạy ở các tốc độ hơi khác nhau. Điều này gây ra độ lệch đồng hồ (<strong>clock skew</strong>). Hơn nữa, tần số dao động không hoàn hảo mà bị ảnh hưởng bởi nhiệt độ môi trường, gây ra hiện tượng <strong>clock drift</strong>.</p>
-                    <p class="mt-3">Gọi $F$ là tần số lý tưởng, và $F(t)$ là tần số thực tế của thạch anh tại thời điểm $t$. Nếu đồng hồ phần cứng đáp ứng được thông số kỹ thuật với <strong>tỷ lệ trôi dạt tối đa (maximum clock drift rate)</strong> là $\rho$, ta có bất phương trình:</p>
-                    
-                    <div class="math-block text-center text-xl">
-                        \( \forall t: (1 - \rho) \le \frac{F(t)}{F} \le (1 + \rho) \)
-                    </div>
-                    
-                    <p>Vì hệ điều hành (đồng hồ phần mềm $C$) gắn trực tiếp số lượng tick vào thời gian, ta có đạo hàm của thời gian phần mềm theo thời gian thực $t$ (nếu đồng hồ hoàn hảo, đạo hàm này bằng 1):</p>
-                    
-                    <div class="math-block text-center text-xl">
-                        \( 1 - \rho \le \frac{dC}{dt} \le 1 + \rho \)
-                    </div>
-                    <p class="text-sm text-slate-500 mt-2">* Thông thường, tinh thể thạch anh có $\rho \approx 10^{-6}$ (tức là sai lệch 1 micro-giây mỗi giây, tương đương khoảng 31.5 giây mỗi năm).</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- 2. Thiên văn học và Thời gian -->
-        <section class="glass-panel rounded-2xl p-10">
-            <h2 class="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-indigo-500 pb-3">2. Thời gian thực tế được đo thế nào? (Note 5.1)</h2>
-            <div class="academic-text space-y-5">
-                <p>Trước khi đồng bộ, ta phải hiểu "thời gian chuẩn" đến từ đâu. Đây không phải là vấn đề đơn giản của kỹ thuật máy tính, mà là vấn đề của vật lý thiên văn.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-800 mb-2">Từ Ngày Mặt Trời (Solar Day)</h3>
-                        <p>Lịch sử dùng vị trí mặt trời để đo thời gian (transit of the sun). Khoảng cách giữa 2 lần mặt trời lên cao nhất gọi là <strong>ngày mặt trời</strong>. Một <strong>giây mặt trời (solar second)</strong> được định nghĩa là $1/86400$ của một ngày mặt trời.</p>
-                        <p class="mt-3 font-semibold text-red-600">Tuy nhiên, Trái Đất đang quay chậm lại do lực cản thủy triều!</p>
-                        <p>Từ thập niên 1940, người ta phát hiện ra ngày mặt trời đang dần dài ra. Để giải quyết, các nhà thiên văn học phải lấy trung bình độ dài các ngày để tạo ra <strong>mean solar second</strong> (giây mặt trời trung bình).</p>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-800 mb-2">Đến Giờ Nguyên Tử (TAI)</h3>
-                        <p>Năm 1948, đồng hồ nguyên tử ra đời, đếm chính xác số lần chuyển đổi trạng thái của nguyên tử <strong>Cesium 133</strong>. Các nhà vật lý định nghĩa 1 giây chuẩn bằng đúng <strong>9,192,631,770</strong> dao động của Cesium 133. Đây chính là chuẩn <strong>TAI (International Atomic Time)</strong>.</p>
-                    </div>
-                </div>
-
-                <div class="note-box">
-                    <h3 class="text-xl font-bold text-yellow-800 mb-2">Sự ra đời của UTC và Giây Nhuận (Leap Seconds)</h3>
-                    <p>TAI cực kỳ hoàn hảo. Mỗi ngày TAI có chính xác 86,400 giây. <strong>Nhưng ngày của Trái Đất thì đang dài hơn 86,400 giây.</strong></p>
-                    <p>Hiện nay, 86,400 giây TAI ngắn hơn một ngày mặt trời thực tế khoảng 3 mili-giây. Nếu ta cứ dùng TAI làm giờ dân sự, mặt trời sẽ dần dần mọc lúc... nửa đêm (như sự kiện đổi lịch năm 1582 của Giáo hoàng Gregory XIII từng gây bạo loạn vì dân chúng bị mất 10 ngày lương).</p>
-                    <p class="mt-3 font-bold">Giải pháp (Chuẩn UTC):</p>
-                    <p>Bureau International de l'Heure (BIH) ở Paris tạo ra chuẩn <strong>Coordinated Universal Time (UTC)</strong>. UTC chạy cùng nhịp với TAI, nhưng bất cứ khi nào UTC lệch với mặt trời quá 800 mili-giây, BIH sẽ chèn thêm một <strong>Giây Nhuận (Leap second)</strong> vào UTC. Kể từ khi bắt đầu, đã có khoảng 30 giây nhuận được chèn thêm. <em>(Xem Figure 5.3 trong sách)</em>.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- 3. Accuracy vs Precision -->
-        <section class="glass-panel rounded-2xl p-10">
-            <h2 class="text-2xl font-bold text-slate-800 mb-4 border-b-2 border-emerald-500 pb-2">3. Định nghĩa Toán học của Đồng bộ</h2>
-            <div class="academic-text space-y-4">
-                <p>Gọi $C_p(t)$ là thời gian trên phần mềm của máy $p$ tại thời điểm thế giới thực là $t$. Có hai mục tiêu riêng biệt trong đồng bộ hóa:</p>
-                
-                <div class="flex flex-col md:flex-row gap-6 mt-4">
-                    <div class="flex-1 bg-white p-6 border border-slate-300 rounded-lg shadow-sm">
-                        <h3 class="text-lg font-bold text-indigo-700 mb-2">Precision (Độ hội tụ / Đồng bộ nội bộ)</h3>
-                        <p class="text-sm mb-4">Giữ cho tất cả các máy tính trong hệ thống chạy cùng giờ với nhau, <em>không quan trọng giờ đó có đúng với thế giới bên ngoài hay không</em>.</p>
-                        <div class="math-block text-center">
-                            \( \forall t, \forall p, q : |C_p(t) - C_q(t)| \le \pi \)
-                        </div>
-                        <p class="text-sm text-slate-600 mt-2 text-center">$\pi$ là giới hạn Precision.</p>
-                    </div>
-                    
-                    <div class="flex-1 bg-white p-6 border border-slate-300 rounded-lg shadow-sm">
-                        <h3 class="text-lg font-bold text-emerald-700 mb-2">Accuracy (Độ chuẩn xác / Đồng bộ ngoại)</h3>
-                        <p class="text-sm mb-4">Giữ cho đồng hồ của một máy tính bám sát với thời gian thực của thế giới bên ngoài (ví dụ: UTC).</p>
-                        <div class="math-block text-center">
-                            \( \forall t, \forall p : |C_p(t) - t| \le \alpha \)
-                        </div>
-                        <p class="text-sm text-slate-600 mt-2 text-center">$\alpha$ là giới hạn Accuracy. Một tập hợp đồng hồ đạt chuẩn $\alpha$ thì tự động đạt Precision $\pi = 2\alpha$.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 4. Giao thức NTP -->
-        <section class="glass-panel rounded-2xl p-10">
-            <h2 class="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-orange-500 pb-3">4. Network Time Protocol (NTP)</h2>
-            <div class="academic-text space-y-5">
-                <p>Nếu bạn không có bộ thu tín hiệu vệ tinh UTC, bạn phải đồng bộ qua mạng. Vấn đề là bản thân việc gửi tin nhắn qua mạng cũng mất thời gian (delay). Giao thức NTP giải quyết điều này bằng cách trao đổi qua lại giữa Server B và Client A để tìm ra cả thời gian trễ và độ lệch.</p>
-                
-                <h3 class="text-xl font-bold text-slate-800 mt-6">A. Công thức Tính toán</h3>
-                <ul class="list-none space-y-2 mb-4">
-                    <li><span class="inline-block w-8 font-bold code-font">T1:</span> Máy A ghi lại thời gian chuẩn bị gửi Request.</li>
-                    <li><span class="inline-block w-8 font-bold code-font">T2:</span> Máy B nhận được Request, ghi lại thời gian (theo đồng hồ B).</li>
-                    <li><span class="inline-block w-8 font-bold code-font">T3:</span> Máy B chuẩn bị trả lời, ghi lại thời gian (theo đồng hồ B).</li>
-                    <li><span class="inline-block w-8 font-bold code-font">T4:</span> Máy A nhận được kết quả.</li>
-                </ul>
-
-                <p>NTP ước lượng độ trễ đường truyền $\delta$ (delay) và độ lệch đồng hồ $\theta$ (offset) của A so với B qua công thức:</p>
-                <div class="math-block text-lg grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="text-center border-r border-slate-300">
-                        <strong>Độ lệch (Offset):</strong><br>
-                        \( \theta = \frac{(T_2 - T_1) + (T_3 - T_4)}{2} \)
-                    </div>
-                    <div class="text-center">
-                        <strong>Độ trễ một chiều (Delay):</strong><br>
-                        \( \delta = \frac{(T_4 - T_1) - (T_3 - T_2)}{2} \)
-                    </div>
-                </div>
-
-                <div class="bg-red-50 border-l-4 border-red-500 p-5 my-6 rounded-r-lg">
-                    <h4 class="font-bold text-red-800 mb-2">Nguyên tắc Tối thượng: Thời gian Không Đi Lùi!</h4>
-                    <p class="mb-2">Nếu tính ra $\theta < 0$, nghĩa là đồng hồ máy A đang chạy nhanh hơn B. Theo phản xạ, ta có thể nghĩ "Hãy chỉnh đồng hồ máy A lùi lại!". <strong>KHÔNG ĐƯỢC PHÉP.</strong></p>
-                    <p>Như ví dụ lệnh <code>make</code> ở Bài 1, nếu chỉnh đồng hồ lùi lại, một file vừa được compiler tạo ra sẽ có thời gian tạo ra <em>trước</em> cả lúc mã nguồn được sửa, gây sụp đổ hệ thống log và transaction.</p>
-                    <p class="font-semibold text-slate-800 mt-3">Cách xử lý bằng Ngắt (Interrupt Adjustment):</p>
-                    <p>Thay vì nhảy cóc thời gian, HĐH sẽ làm đồng hồ chạy "chậm lại" (slowing down). Giả sử 1 giây có 100 ngắt, bình thường mỗi ngắt HĐH cộng thêm 10 msec. Khi cần chạy chậm lại, trong mỗi ngắt nó chỉ cộng thêm <strong>9 msec</strong>. Đồng hồ vẫn tiến lên, nhưng chậm hơn thực tế, dần dần đồng bộ với chuẩn. Ngược lại, nếu cần nhanh hơn, nó cộng <strong>11 msec</strong> cho mỗi ngắt.</p>
-                </div>
-
-                <h3 class="text-xl font-bold text-slate-800 mt-6">B. Kiến trúc Phân tầng (NTP Strata)</h3>
-                <p>NTP chia mạng lưới thành các tầng bậc. Máy chủ được kết nối trực tiếp với đồng hồ phần cứng nguyên tử/GPS là <strong>stratum-1</strong> (đồng hồ phần cứng đó là stratum-0). Khi máy A đồng bộ với máy B ở tầng $k$ (stratum-$k$), máy A sẽ trở thành <strong>stratum-(k+1)</strong>. Khi A kết nối B, nó chỉ chịu điều chỉnh giờ theo B nếu tầng của nó thấp hơn B (số stratum cao hơn).</p>
+        <!-- MỤC 1: PHYSICAL CLOCKS -->
+        <div class="card textbook">
+            <div class="flex items-center gap-3 mb-6 border-b pb-4">
+                <div class="bg-indigo-100 text-indigo-700 p-3 rounded-lg"><i class="fas fa-microchip text-2xl"></i></div>
+                <h2 class="text-3xl font-bold font-sans text-slate-800">5.1.1 Physical clocks (Đồng hồ vật lý)</h2>
             </div>
             
-            <!-- Mô phỏng Thuật toán NTP Thực tế -->
-            <div class="mt-8 bg-white p-6 rounded-xl border-2 border-slate-800 shadow-lg">
-                <h3 class="font-bold text-lg mb-4 text-slate-800"><i class="fas fa-microchip mr-2"></i>Mô phỏng Tính toán NTP</h3>
-                <div class="flex flex-wrap gap-4 mb-4">
-                    <div class="flex-1 min-w-[120px]"><label class="block text-xs text-slate-500 font-bold mb-1">T1 (A gửi)</label><input type="number" id="sim-t1" value="10.0" class="w-full bg-slate-100 p-2 rounded border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none code-font"></div>
-                    <div class="flex-1 min-w-[120px]"><label class="block text-xs text-slate-500 font-bold mb-1">T2 (B nhận)</label><input type="number" id="sim-t2" value="25.0" class="w-full bg-slate-100 p-2 rounded border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none code-font"></div>
-                    <div class="flex-1 min-w-[120px]"><label class="block text-xs text-slate-500 font-bold mb-1">T3 (B trả lời)</label><input type="number" id="sim-t3" value="30.0" class="w-full bg-slate-100 p-2 rounded border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none code-font"></div>
-                    <div class="flex-1 min-w-[120px]"><label class="block text-xs text-slate-500 font-bold mb-1">T4 (A nhận)</label><input type="number" id="sim-t4" value="20.0" class="w-full bg-slate-100 p-2 rounded border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none code-font"></div>
-                </div>
-                <button onclick="calcDetailedNTP()" class="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded-lg font-bold transition-all shadow">Tính Offset & Đề xuất HĐH</button>
+            <p class="mb-4">Theo sách giáo khoa, việc dùng từ "đồng hồ" (clock) để chỉ các thiết bị theo dõi thời gian trong máy tính là không chính xác. Thuật ngữ đúng đắn nhất phải là <strong>Bộ định thời (Timer)</strong>. Một máy tính thường có nhiều bộ mạch định thời khác nhau.</p>
+
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-8 mb-4">Cấu trúc giải phẫu của một Timer</h3>
+            <p class="mb-4">Một timer phần cứng bao gồm 3 thành phần liên kết chặt chẽ với nhau:</p>
+            <ol class="list-decimal pl-6 space-y-3 mb-8">
+                <li><strong>Tinh thể Thạch anh (Quartz Crystal):</strong> Được gia công cơ khí cực kỳ chính xác. Khi được cấp điện áp (kept under tension), nó dao động với một tần số được xác định rất rõ ràng (phụ thuộc vào loại tinh thể, cách cắt và điện áp).</li>
+                <li><strong>Thanh ghi Bộ đếm (Counter):</strong> Một vùng nhớ nhỏ. Mỗi một dao động của thạch anh sẽ làm giá trị của bộ đếm giảm đi 1 (decrements by one).</li>
+                <li><strong>Thanh ghi Lưu giữ (Holding Register):</strong> Một vùng nhớ lưu trữ giá trị gốc. Khi <em>Counter</em> đếm lùi về đúng 0, hai sự kiện xảy ra đồng thời:
+                    <ul class="list-disc pl-6 mt-2 text-slate-600">
+                        <li>Một <strong>Ngắt (Interrupt)</strong> được sinh ra gửi tới CPU. Ngắt này được gọi là một <strong>Clock tick</strong>.</li>
+                        <li><em>Counter</em> lập tức được nạp lại giá trị từ <em>Holding register</em> để bắt đầu chu kỳ mới.</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <!-- MÔ PHỎNG 1: HARDWARE TIMER -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-8 font-sans">
+                <h4 class="font-bold text-slate-800 mb-4 border-b pb-2"><i class="fas fa-cogs mr-2"></i>Mô phỏng 1: Nguyên lý hoạt động của Hardware Timer</h4>
+                <p class="text-sm text-slate-600 mb-6">Bạn có thể thay đổi giá trị của <em>Holding Register</em>. Giá trị này càng nhỏ, bộ đếm (Counter) càng nhanh về 0, tần số sinh ra Ngắt (Interrupt) càng cao.</p>
                 
-                <div id="ntp-output-box" class="hidden mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                    <!-- Kết quả hiển thị ở đây -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Tinh thể thạch anh -->
+                    <div class="bg-white border-2 border-indigo-100 rounded-lg p-4 text-center shadow-sm">
+                        <div class="text-sm font-bold text-slate-500 mb-3">1. Quartz Crystal</div>
+                        <div id="sim1-crystal" class="w-16 h-20 bg-indigo-200 mx-auto rounded-t-full border-4 border-indigo-400 relative flex items-center justify-center">
+                            <i class="fas fa-bolt text-indigo-500 text-2xl"></i>
+                        </div>
+                        <div class="mt-3 text-xs text-indigo-600 font-bold" id="sim1-osc-status">Đang dao động...</div>
+                    </div>
+
+                    <!-- Counter & Holding Register -->
+                    <div class="bg-white border-2 border-blue-100 rounded-lg p-4 shadow-sm flex flex-col justify-center relative">
+                        <div class="text-sm font-bold text-slate-500 mb-3 text-center">2. Registers (Thanh ghi)</div>
+                        
+                        <div class="flex justify-between items-center bg-blue-50 p-2 rounded border mb-3">
+                            <span class="text-xs font-bold text-slate-600">Holding Reg:</span>
+                            <input type="number" id="sim1-holding" value="10" min="2" max="50" class="w-16 text-center border rounded font-mono text-blue-700 font-bold p-1">
+                        </div>
+
+                        <div class="text-center">
+                            <span class="text-xs font-bold text-slate-600 block mb-1">Counter (Giảm theo dao động):</span>
+                            <div id="sim1-counter" class="text-4xl font-mono font-bold text-slate-800 bg-slate-100 py-2 rounded border-2 border-slate-300">10</div>
+                        </div>
+                        
+                        <!-- Mũi tên Reload -->
+                        <div id="sim1-reload-arrow" class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-400 opacity-0 transition-opacity">
+                            <i class="fas fa-sync-alt text-3xl animate-spin"></i>
+                        </div>
+                    </div>
+
+                    <!-- CPU / Software Clock -->
+                    <div class="bg-white border-2 border-green-100 rounded-lg p-4 text-center shadow-sm flex flex-col">
+                        <div class="text-sm font-bold text-slate-500 mb-3">3. Hệ Điều Hành (OS)</div>
+                        
+                        <div id="sim1-interrupt" class="bg-slate-200 text-slate-500 font-bold py-2 px-4 rounded-full mb-4 transition-all">
+                            Chờ Ngắt...
+                        </div>
+
+                        <div class="mt-auto">
+                            <span class="text-xs font-bold text-slate-600 block mb-1">Software Clock (Ticks):</span>
+                            <div id="sim1-sw-clock" class="text-3xl font-mono font-bold text-green-600">0</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-6">
+                    <button id="sim1-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold transition">
+                        <i class="fas fa-play mr-2"></i> Khởi động Timer
+                    </button>
                 </div>
             </div>
-        </section>
 
-        <!-- 5. RBS - Reference Broadcast Synchronization -->
-        <section class="glass-panel rounded-2xl p-10">
-            <h2 class="text-3xl font-bold text-slate-800 mb-6 border-b-2 border-purple-500 pb-3">5. Mạng Không dây: RBS Algorithm</h2>
-            <div class="academic-text space-y-5">
-                <p>NTP hoạt động tuyệt vời trên mạng có dây. Nhưng trên <strong>mạng cảm biến không dây (wireless sensor networks)</strong>, năng lượng rất hạn hẹp và định tuyến đa chặng (multi-hop routing) vô cùng tốn kém. Hơn nữa, giao thức truyền thông vô tuyến bị phụ thuộc vào contention (tranh chấp kênh truyền), khiến cho thời gian gửi đi không thể đoán trước.</p>
-
-                <h3 class="text-xl font-bold text-purple-700 mt-6">Sự khác biệt cốt lõi của RBS (Hình 5.6)</h3>
-                <p>NTP phải tính độ trễ bao gồm 2 phần rất biến động: <em>Thời gian tạo gói tin (Message preparation)</em> và <em>Thời gian chờ Card mạng truyền (Time spent in NIC)</em>. <br>
-                <strong>Giao thức RBS (Reference Broadcast Synchronization)</strong> loại bỏ hoàn toàn các biến động này bằng cách: <strong>Loại Sender ra khỏi cuộc chơi.</strong></p>
-                <ul class="list-disc pl-6 space-y-2">
-                    <li>Sender chỉ đóng vai trò phát đi một thông điệp tham chiếu (Reference message) dạng Broadcast (phát thanh).</li>
-                    <li>Nó <em>không</em> nhúng timestamp vào gói tin đó.</li>
-                    <li>Chỉ các máy nhận (Receivers) mới đồng bộ với nhau. Khi sóng vô tuyến chạm tới các Receiver, thời gian lan truyền (Propagation time) gần như bằng nhau.</li>
-                    <li>Máy $p$ và máy $q$ ghi lại thời điểm nhận gói tin lần lượt là $T_{p,m}$ và $T_{q,m}$. Chúng trao đổi chéo cho nhau để tìm ra độ lệch.</li>
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-8 mb-4">Clock Skew (Độ lệch đồng hồ)</h3>
+            <p>Mặc dù bộ định thời hoạt động rất ổn định, nhưng sự thật là <strong>không có hai tinh thể thạch anh nào trên đời dao động với tần số giống hệt nhau $100\%$</strong>. Khi bạn có một hệ thống phân tán với $n$ máy tính, $n$ tinh thể sẽ chạy ở các tốc độ hơi khác nhau.</p>
+            <p>Sự khác biệt này khiến các đồng hồ phần mềm dần dần chỉ ra các giá trị thời gian khác nhau khi được đọc cùng một lúc. Hiện tượng này gọi là <strong>Clock Skew</strong>. Hệ quả của việc này (như đã thấy ở ví dụ lệnh <code>make</code>) là các file, process, message không còn giữ được tính nhất quán về mặt thời gian trên toàn hệ thống.</p>
+            
+            <!-- VÍ DỤ MAKE VÀ MÔ PHỎNG -->
+            <div class="bg-red-50 border-l-4 border-red-500 p-5 my-6 rounded-r-lg font-sans">
+                <h4 class="font-bold text-red-800 mb-2">Ví dụ kinh điển: Lỗi biên dịch với lệnh <code>make</code> (Figure 5.1)</h4>
+                <p class="text-slate-700 mb-2">Trong hệ điều hành Unix, lệnh <code>make</code> giúp biên dịch mã nguồn nhanh hơn bằng cách chỉ biên dịch lại các file bị thay đổi. Quy tắc của nó dựa trên thời gian:</p>
+                <ul class="list-disc pl-6 mb-4 text-slate-700 space-y-1">
+                    <li>Nếu thời gian sửa của mã nguồn <code>output.c</code> <strong>></strong> thời gian của file đã biên dịch <code>output.o</code> &rarr; Cần biên dịch lại.</li>
+                    <li>Nếu <code>output.c</code> <strong><</strong> <code>output.o</code> &rarr; Không cần biên dịch.</li>
                 </ul>
-
-                <h3 class="text-xl font-bold text-slate-800 mt-6">Xử lý bù trừ tuyến tính (Linear Regression)</h3>
-                <p>Vì đồng hồ luôn trôi dạt (drift apart), tính trung bình thông thường cho $M$ thông điệp sẽ bị sai số lớn (do các thông điệp cũ bị lệch nhiều hơn). Công thức trung bình cơ bản:</p>
-                <div class="math-block text-center">
-                    \( \text{Offset}[p, q] = \frac{\sum_{k=1}^{M} (T_{p,k} - T_{q,k})}{M} \)
-                </div>
-                <p>Để tăng độ chính xác, RBS sử dụng thuật toán <strong>Hồi quy tuyến tính (Standard Linear Regression)</strong> để mô hình hóa độ trôi dạt của đồng hồ như một hàm theo thời gian:</p>
-                <div class="math-block text-center text-lg font-bold text-purple-800">
-                    \( \text{Offset}[p, q](t) = \alpha t + \beta \)
-                </div>
-                <p>Hằng số $\alpha$ và $\beta$ được tính toán từ các cặp $(T_{p,k}, T_{q,k})$. Nhờ phương trình này, máy tính có thể tự "dự đoán" độ lệch của máy kia ở bất kỳ thời điểm tương lai nào mà không cần liên tục nhận broadcast.</p>
+                <p class="text-slate-700 font-bold">Thảm họa xảy ra khi mất đi sự đồng thuận thời gian toàn cục:</p>
+                <p class="text-slate-700">Giả sử lập trình viên sửa <code>output.c</code> trên <strong>Máy Editor</strong> (có đồng hồ chạy chậm), nhưng lệnh <code>make</code> lại chạy trên <strong>Máy Compiler</strong>. Mã nguồn rõ ràng vừa được sửa bằng tay (sự kiện xảy ra <em>sau</em>), nhưng vì đồng hồ máy Editor bị chậm, nó bị gán một mốc thời gian (timestamp) <em>nhỏ hơn</em> cả mốc thời gian lúc <code>output.o</code> được sinh ra. Lệnh <code>make</code> sẽ bỏ qua không biên dịch lại file này, tạo ra một chương trình chạy với mã nguồn cũ kĩ mà người lập trình viên không hiểu tại sao.</p>
             </div>
-        </section>
 
-        <!-- 6. Google TrueTime (Note 5.2) -->
-        <section class="glass-panel rounded-2xl p-10 border-4 border-red-100">
-            <h2 class="text-3xl font-bold text-red-700 mb-6 border-b-2 border-red-500 pb-3"><i class="fab fa-google mr-3"></i>6. Google TrueTime & Spanner (Note 5.2)</h2>
-            <div class="academic-text space-y-5">
-                <p>Bạn không thể có một mốc thời gian hoàn hảo (infinite precision) trong môi trường phân tán. Tại Google, khi xây dựng cơ sở dữ liệu toàn cầu Spanner hỗ trợ Transaction quy mô lớn, họ đã gặp giới hạn này. Thay vì cố gắng đạt độ chính xác vô hạn, họ chế tạo ra một API hoàn toàn mới: <strong>TrueTime</strong>.</p>
+            <!-- MÔ PHỎNG MAKE BUGS -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-8 font-sans">
+                <h4 class="font-bold text-slate-800 mb-4 border-b pb-2"><i class="fas fa-bug mr-2"></i>Mô phỏng 1.2: Lỗi lệnh Make do Clock Skew</h4>
+                <p class="text-sm text-slate-600 mb-6">Hãy kéo thanh trượt để làm đồng hồ máy Editor chạy chậm hơn máy Compiler (ví dụ: -5 giây). Sau đó bấm "Chạy Make", rồi nhanh tay bấm "Lưu code" để xem lệnh Make bị lừa như thế nào.</p>
                 
-                <h3 class="text-xl font-bold text-slate-800 mt-6">A. Cơ sở Phần cứng</h3>
-                <p>Google đặt các máy <em>Time-masters</em> ở mọi Data Center. Các máy này sử dụng song song bộ thu tín hiệu GPS và Đồng hồ Nguyên tử (Atomic clocks) để chống lỗi (mutual independence). Sai số của toàn bộ hệ thống khổng lồ này, đáng kinh ngạc thay, được Google cam kết ở mức $\epsilon = 6ms$.</p>
+                <div class="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                        Độ lệch đồng hồ (Skew) ở Máy Editor: <span id="make-skew-val" class="text-red-600 font-mono">0</span> giây
+                    </label>
+                    <input type="range" id="make-skew-slider" min="-10" max="10" value="0" class="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer">
+                </div>
 
-                <h3 class="text-xl font-bold text-slate-800 mt-6">B. Khái niệm Khoảng thời gian (Time Interval)</h3>
-                <p>Lời gọi hàm <code>TT.now()</code> trong TrueTime KHÔNG trả về một con số. Nó trả về một khoảng <strong>$\left[T_{lwb}, T_{upb}\right]$</strong> (Lower bound và Upper bound) sao cho $T_{lwb} < T_{upb}$.</p>
-                <p class="font-bold text-red-600">Luật thép: Google cam kết bằng toán học và vật lý rằng thời gian tuyệt đối của vũ trụ (absolute time) CHẮC CHẮN nằm trong khoảng này vào thời điểm gọi hàm.</p>
-                <p>Độ rộng của khoảng bất định (uncertainty) chính là $2\epsilon$ ($T_{upb} - T_{lwb} = 2\epsilon$).</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Compiler Machine -->
+                    <div class="border-2 border-blue-200 bg-white rounded-xl p-5 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 bg-blue-500 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">Máy Compiler</div>
+                        <div class="text-center mb-4 mt-2">
+                            <i class="fas fa-server text-3xl text-blue-400 mb-2"></i>
+                            <h5 class="font-bold text-slate-800">Đồng hồ thực (Chuẩn)</h5>
+                        </div>
+                        <div class="bg-slate-800 rounded p-3 text-center mb-4 shadow-inner">
+                            <span class="text-green-400 font-mono text-xl" id="make-clock-compiler">T=2144</span>
+                        </div>
+                        <button id="make-btn-compile" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
+                            <i class="fas fa-cogs mr-1"></i> Chạy Make (Tạo output.o)
+                        </button>
+                    </div>
 
-                <h3 class="text-xl font-bold text-slate-800 mt-6">C. Cấu trúc Lập trình</h3>
-                <table class="w-full text-left border-collapse border border-slate-300 mt-4 mb-6 shadow-sm">
-                    <thead>
-                        <tr class="bg-red-50">
-                            <th class="border border-slate-300 p-3">Operation (Lệnh)</th>
-                            <th class="border border-slate-300 p-3">Result (Kết quả)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="border border-slate-300 p-3 code-font text-red-700">TT.now()</td>
-                            <td class="border border-slate-300 p-3">Trả về khoảng $\left[T_{lwb}, T_{upb}\right]$</td>
-                        </tr>
-                        <tr>
-                            <td class="border border-slate-300 p-3 code-font text-red-700">TT.after(t)</td>
-                            <td class="border border-slate-300 p-3">Trả về True nếu mốc $t$ <strong>chắc chắn</strong> đã nằm trong quá khứ.</td>
-                        </tr>
-                        <tr>
-                            <td class="border border-slate-300 p-3 code-font text-red-700">TT.before(t)</td>
-                            <td class="border border-slate-300 p-3">Trả về True nếu mốc $t$ <strong>chắc chắn</strong> vẫn nằm ở tương lai.</td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <!-- Editor Machine -->
+                    <div class="border-2 border-orange-200 bg-orange-50/30 rounded-xl p-5 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 bg-orange-500 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">Máy Editor</div>
+                        <div class="text-center mb-4 mt-2">
+                            <i class="fas fa-laptop-code text-3xl text-orange-400 mb-2"></i>
+                            <h5 class="font-bold text-slate-800">Đồng hồ bị lệch</h5>
+                        </div>
+                        <div class="bg-slate-800 rounded p-3 text-center mb-4 shadow-inner">
+                            <span class="text-orange-400 font-mono text-xl" id="make-clock-editor">T=2144</span>
+                        </div>
+                        <button id="make-btn-edit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded transition">
+                            <i class="fas fa-keyboard mr-1"></i> Lưu code (Sửa output.c)
+                        </button>
+                    </div>
+                </div>
 
-                <div class="bg-red-900 text-white p-6 rounded-lg shadow-xl relative overflow-hidden mt-8">
-                    <i class="fas fa-database absolute right-[-20px] top-[-20px] text-8xl text-red-800 opacity-50"></i>
-                    <h4 class="text-xl font-bold mb-3 relative z-10">Thuật toán Commit Wait (Bắt buộc chờ)</h4>
-                    <p class="relative z-10 mb-4 text-red-100">Để đảm bảo thứ tự tuyến tính (Linearizability) của các Transactions trên toàn cầu, Spanner dùng cơ chế "Chờ bi quan" (Pessimistic waiting):</p>
-                    <ol class="list-decimal pl-6 space-y-2 relative z-10 text-sm font-semibold">
-                        <li>Khi Transaction muốn ghi dữ liệu, hệ thống gọi <code>TT.now()</code> và nhận về khoảng $\left[T_{lwb}, T_{upb}\right]$.</li>
-                        <li>Nó gán nhãn thời gian (timestamp) cho dữ liệu mới bằng $t = T_{upb}$ (lấy thời điểm trễ nhất có thể).</li>
-                        <li><span class="text-yellow-400">Điều kiện sinh tử:</span> Client <strong>không bao giờ</strong> được thấy dữ liệu này trước khi thời gian $t$ thực sự trôi qua. Do đó, Server phải <strong>TẠM DỪNG (WAIT)</strong> khoảng thời gian bằng $\epsilon$ (khoảng $6ms$) cho đến khi hàm <code>TT.after(t)</code> trả về <strong>True</strong>. Sau đó mới phản hồi thành công cho Client.</li>
-                    </ol>
+                <div id="make-status" class="hidden rounded-lg p-4 font-bold text-center shadow-sm"></div>
+            </div>
+        </div>
+
+        <!-- MỤC 2: XÁC ĐỊNH THỜI GIAN THỰC -->
+        <div class="card textbook border-t-4 border-t-orange-500">
+            <div class="flex items-center gap-3 mb-6 border-b pb-4">
+                <div class="bg-orange-100 text-orange-700 p-3 rounded-lg"><i class="fas fa-globe-americas text-2xl"></i></div>
+                <h2 class="text-3xl font-bold font-sans text-slate-800">Note 5.1: Xác định thời gian thực</h2>
+            </div>
+            
+            <p class="mb-4">Nếu các máy tính bị lệch nhau (Clock Skew), ta cần đồng bộ chúng. Nhưng câu hỏi đặt ra là: <em>Đồng bộ với cái gì? Thời gian thực là gì và ai quy định nó?</em> Tác giả đưa chúng ta về lịch sử thiên văn học và vật lý lượng tử.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                <div>
+                    <h4 class="font-bold font-sans text-lg text-slate-800 border-l-4 border-yellow-400 pl-3 mb-2">1. Giờ Mặt Trời (Solar Time)</h4>
+                    <p class="text-sm">Từ thế kỷ 17, con người đo thời gian bằng thiên văn. Khi mặt trời lên đến điểm cao nhất trên bầu trời (zenith), đó là <strong>sự quá cảnh của mặt trời (transit of the sun)</strong>. Khoảng cách giữa 2 lần quá cảnh liên tiếp là 1 <strong>ngày mặt trời (solar day)</strong>. Chia cho 86,400 ta có 1 <em>giây mặt trời</em>.</p>
+                    <p class="text-sm text-red-600 font-bold mt-2">Nghịch lý: Trái đất đang quay chậm lại do ma sát thủy triều. Cách đây 300 triệu năm, 1 năm có 400 ngày. Do đó, "Ngày mặt trời" đang ngày càng dài ra, nó không phải là hằng số!</p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold font-sans text-lg text-slate-800 border-l-4 border-blue-400 pl-3 mb-2">2. Giờ Nguyên Tử (TAI)</h4>
+                    <p class="text-sm">Năm 1948, các nhà vật lý chế tạo đồng hồ đếm sự chuyển đổi trạng thái của nguyên tử <strong>Cesium 133</strong>. Họ định nghĩa: đúng <code>9,192,631,770</code> dao động của Cesium 133 bằng 1 giây. Đây gọi là <strong>TAI (International Atomic Time)</strong>.</p>
+                    <p class="text-sm text-blue-700 font-bold mt-2">Đặc điểm: TAI cực kỳ ổn định. Mỗi giây TAI đều dài bằng nhau chằn chặn. Thời gian TAI được tính từ ngày 01/01/1958.</p>
                 </div>
             </div>
-        </section>
+
+            <div class="highlight-box font-sans">
+                <h4 class="text-xl font-bold text-yellow-800 mb-2">Sự xung đột và "Giây Nhuận" (Leap Seconds)</h4>
+                <p class="text-slate-700 mb-3">TAI chạy hoàn hảo. Nhưng Trái đất (Solar Time) thì đang quay chậm lại. Hậu quả là, 86,400 giây TAI hiện nay ngắn hơn 1 ngày Trái đất khoảng <strong>3 mili-giây</strong>. Nếu cứ dùng TAI làm đồng hồ dân sự, vài ngàn năm nữa mặt trời sẽ mọc lúc... nửa đêm!</p>
+                <p class="text-slate-700 mb-3"><em>Trong lịch sử, năm 1582, Giáo hoàng Gregory XIII từng phải xóa bỏ 10 ngày khỏi lịch để bù đắp sai số, gây ra bạo loạn vì địa chủ đòi tiền thuê nhà nguyên tháng trong khi công nhân bị mất 10 ngày lương.</em></p>
+                <p class="font-bold text-slate-800">Giải pháp: Chuẩn UTC (Coordinated Universal Time)</p>
+                <p class="text-slate-700">UTC là chuẩn chúng ta dùng hiện nay. Nó chạy cùng nhịp độ với TAI. Tuy nhiên, Viện BIH ở Paris liên tục theo dõi độ lệch giữa TAI và Mặt trời. Khi độ lệch này chạm ngưỡng <strong>800 mili-giây</strong>, BIH sẽ chèn thêm một <strong>Giây Nhuận (Leap Second)</strong> vào UTC để kéo nó khớp lại với vị trí mặt trời.</p>
+            </div>
+
+            <!-- MÔ PHỎNG 2: LEAP SECOND -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 my-8 font-sans">
+                <h4 class="font-bold text-slate-800 mb-4 border-b pb-2"><i class="fas fa-stopwatch mr-2"></i>Mô phỏng 2: Cuộc đua TAI vs Solar Time & Giây Nhuận</h4>
+                <p class="text-sm text-slate-600 mb-6">Mô phỏng này phóng đại sự thật để bạn dễ quan sát. Giờ mặt trời (Trái đất) chạy chậm hơn Giờ TAI. Khi độ lệch vượt ngưỡng, UTC sẽ tự động "đứng yên 1 giây" (chèn Giây Nhuận) để đợi Mặt trời.</p>
+                
+                <div class="space-y-6">
+                    <!-- TAI Track -->
+                    <div>
+                        <div class="flex justify-between mb-1 text-sm font-bold">
+                            <span class="text-blue-600">Giờ Nguyên Tử (TAI) - Chuẩn tuyệt đối</span>
+                            <span id="sim2-tai-val" class="code-font text-blue-800">0.0 s</span>
+                        </div>
+                        <div class="time-track"><div id="sim2-tai-bar" class="time-fill bg-blue-500 w-0"></div></div>
+                    </div>
+
+                    <!-- Solar Track -->
+                    <div>
+                        <div class="flex justify-between mb-1 text-sm font-bold">
+                            <span class="text-yellow-600">Giờ Mặt Trời (Trái Đất) - Quay chậm hơn</span>
+                            <span id="sim2-solar-val" class="code-font text-yellow-800">0.0 s</span>
+                        </div>
+                        <div class="time-track"><div id="sim2-solar-bar" class="time-fill bg-yellow-400 w-0"></div></div>
+                    </div>
+
+                    <!-- UTC Track -->
+                    <div class="p-3 bg-slate-200 rounded-lg border border-slate-300">
+                        <div class="flex justify-between mb-1 text-sm font-bold">
+                            <span class="text-green-600">Giờ Phối Hợp (UTC) - Đồng hồ máy tính của bạn</span>
+                            <span id="sim2-utc-val" class="code-font text-green-800">0.0 s</span>
+                        </div>
+                        <div class="time-track bg-slate-300"><div id="sim2-utc-bar" class="time-fill bg-green-500 w-0 transition-none"></div></div>
+                        <div class="mt-2 text-xs font-bold text-center text-slate-600">
+                            Độ lệch UTC vs Mặt Trời: <span id="sim2-diff" class="text-red-500 font-mono">0.0</span> s 
+                            <span id="sim2-leap-alert" class="ml-2 text-red-600 hidden"><i class="fas fa-exclamation-triangle"></i> THÊM GIÂY NHUẬN! (UTC Tạm dừng)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-6">
+                    <button id="sim2-btn" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-bold transition">
+                        <i class="fas fa-play mr-2"></i> Bắt đầu Cuộc đua
+                    </button>
+                    <button id="sim2-reset" class="bg-slate-300 hover:bg-slate-400 text-slate-700 px-6 py-2 rounded-lg font-bold transition ml-2">
+                        Reset
+                    </button>
+                </div>
+            </div>
+            
+            <p class="text-sm mt-4 text-slate-600 italic">* Các máy tính hiện đại được đồng bộ với chuẩn UTC thông qua bộ thu vệ tinh (GPS - độ chính xác 50 nano-giây đến 0.5 mili-giây) hoặc qua đài phát thanh sóng ngắn sóng (độ chính xác ~10 mili-giây).</p>
+        </div>
 
     </main>
 
-    <!-- JS Logic cho Mô phỏng nhỏ -->
+    <!-- Simulation Scripts -->
     <script>
-        function calcDetailedNTP() {
-            const t1 = parseFloat(document.getElementById('sim-t1').value);
-            const t2 = parseFloat(document.getElementById('sim-t2').value);
-            const t3 = parseFloat(document.getElementById('sim-t3').value);
-            const t4 = parseFloat(document.getElementById('sim-t4').value);
-            const outBox = document.getElementById('ntp-output-box');
+        /* =========================================
+           SIMULATION 1: HARDWARE TIMER
+           ========================================= */
+        const sim1Btn = document.getElementById('sim1-btn');
+        const sim1Crystal = document.getElementById('sim1-crystal');
+        const sim1Holding = document.getElementById('sim1-holding');
+        const sim1Counter = document.getElementById('sim1-counter');
+        const sim1Interrupt = document.getElementById('sim1-interrupt');
+        const sim1SwClock = document.getElementById('sim1-sw-clock');
+        const sim1ReloadArrow = document.getElementById('sim1-reload-arrow');
+        const sim1OscStatus = document.getElementById('sim1-osc-status');
 
-            if (isNaN(t1) || isNaN(t2) || isNaN(t3) || isNaN(t4)) return;
+        let sim1Running = false;
+        let sim1Interval;
+        let counterValue = parseInt(sim1Holding.value);
+        let softwareTicks = 0;
 
-            const offset = ((t2 - t1) + (t3 - t4)) / 2;
-            const delay = ((t4 - t1) - (t3 - t2)) / 2;
-
-            let actionHtml = '';
-            if (offset > 0) {
-                actionHtml = `<div class="text-green-700 font-bold mt-2"><i class="fas fa-arrow-up mr-1"></i> Đồng hồ Client CHẬM. Lệnh cho HĐH: <strong>Nâng tần số (Advance clock)</strong> bằng cách cộng 11 msec cho mỗi interrupt thay vì 10 msec.</div>`;
-            } else if (offset < 0) {
-                actionHtml = `<div class="text-red-700 font-bold mt-2"><i class="fas fa-arrow-down mr-1"></i> Đồng hồ Client NHANH. Lệnh cho HĐH: <strong>Hạ tần số (Slow down clock)</strong> bằng cách chỉ cộng 9 msec cho mỗi interrupt. <span class="underline">Tuyệt đối không lùi giờ!</span></div>`;
+        sim1Btn.addEventListener('click', () => {
+            if (sim1Running) {
+                // Stop
+                clearInterval(sim1Interval);
+                sim1Running = false;
+                sim1Btn.innerHTML = '<i class="fas fa-play mr-2"></i> Khởi động Timer';
+                sim1Btn.classList.replace('bg-red-600', 'bg-indigo-600');
+                sim1Btn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+                sim1Crystal.classList.remove('vibrating');
+                sim1OscStatus.innerText = "Tạm dừng";
             } else {
-                actionHtml = `<div class="text-blue-700 font-bold mt-2"><i class="fas fa-check mr-1"></i> Đồng hồ hoàn hảo. Không thay đổi interrupt.</div>`;
-            }
+                // Start
+                sim1Running = true;
+                sim1Btn.innerHTML = '<i class="fas fa-stop mr-2"></i> Tắt Timer';
+                sim1Btn.classList.replace('bg-indigo-600', 'bg-red-600');
+                sim1Btn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
+                sim1Crystal.classList.add('vibrating');
+                sim1OscStatus.innerText = "Đang dao động...";
+                
+                // Cập nhật lại counter nếu holding đổi
+                counterValue = parseInt(sim1Holding.value);
+                sim1Counter.innerText = counterValue;
 
-            outBox.innerHTML = `
-                <div class="grid grid-cols-2 gap-4 text-slate-800">
-                    <div>
-                        <span class="text-sm text-slate-500 block">Độ lệch (Offset - \\(\\theta\\)):</span>
-                        <span class="text-2xl font-bold code-font">${offset}</span> ms
-                    </div>
-                    <div>
-                        <span class="text-sm text-slate-500 block">Độ trễ truyền tải (Delay - \\(\\delta\\)):</span>
-                        <span class="text-2xl font-bold code-font">${delay}</span> ms
-                    </div>
-                </div>
-                <div class="mt-4 pt-4 border-t border-slate-300">
-                    <span class="text-sm text-slate-500 block mb-1">Cơ chế áp dụng (Ngắt hệ điều hành):</span>
-                    ${actionHtml}
-                </div>
-            `;
-            outBox.classList.remove('hidden');
+                // Tốc độ mô phỏng dao động: cứ 100ms thì counter giảm 1
+                sim1Interval = setInterval(() => {
+                    counterValue--;
+                    sim1Counter.innerText = counterValue;
+
+                    if (counterValue <= 0) {
+                        // GENERATE INTERRUPT
+                        softwareTicks++;
+                        sim1SwClock.innerText = softwareTicks;
+                        
+                        // Flash interrupt UI
+                        sim1Interrupt.innerText = "INTERRUPT GIAO CHO OS!";
+                        sim1Interrupt.classList.add('interrupt-flash');
+                        
+                        // Show reload arrow
+                        sim1ReloadArrow.style.opacity = '1';
+
+                        setTimeout(() => {
+                            sim1Interrupt.classList.remove('interrupt-flash');
+                            sim1Interrupt.innerText = "Chờ Ngắt...";
+                            sim1ReloadArrow.style.opacity = '0';
+                        }, 300);
+
+                        // RELOAD COUNTER FROM HOLDING REGISTER
+                        counterValue = parseInt(sim1Holding.value);
+                        sim1Counter.innerText = counterValue;
+                    }
+                }, 100);
+            }
+        });
+
+        // Tự động update counter khởi điểm khi đổi holding
+        sim1Holding.addEventListener('change', () => {
+            if(!sim1Running) {
+                counterValue = parseInt(sim1Holding.value);
+                sim1Counter.innerText = counterValue;
+            }
+        });
+
+        /* =========================================
+           SIMULATION 1.2: MAKE BUGS DO LỆCH CLOCK SKEW
+           ========================================= */
+        let makeRealTime = 2144; // Thời gian khởi điểm giống ví dụ trong sách
+        let makeSkew = 0;
+        let timeOutputO = null;
+        let timeOutputC = null;
+        
+        const makeSlider = document.getElementById('make-skew-slider');
+        const makeSkewVal = document.getElementById('make-skew-val');
+        const makeClockCompiler = document.getElementById('make-clock-compiler');
+        const makeClockEditor = document.getElementById('make-clock-editor');
+        const makeBtnCompile = document.getElementById('make-btn-compile');
+        const makeBtnEdit = document.getElementById('make-btn-edit');
+        const makeStatus = document.getElementById('make-status');
+
+        // Loop thời gian
+        setInterval(() => {
+            makeRealTime++;
+            makeClockCompiler.innerText = `T=${makeRealTime}`;
+            makeClockEditor.innerText = `T=${makeRealTime + makeSkew}`;
+        }, 1000);
+
+        // Lắng nghe thanh trượt Skew
+        makeSlider.addEventListener('input', (e) => {
+            makeSkew = parseInt(e.target.value);
+            makeSkewVal.innerText = makeSkew;
+            makeClockEditor.innerText = `T=${makeRealTime + makeSkew}`;
+        });
+
+        // Hàm kiểm tra tính hợp lệ của lệnh Make
+        function evaluateMake() {
+            if (timeOutputO === null || timeOutputC === null) return;
+            makeStatus.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'border-green-300', 'bg-red-100', 'text-red-800', 'border-red-300', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
             
-            // Re-render math if any
-            if(window.MathJax) {
-                MathJax.typesetPromise();
+            if (timeOutputC > timeOutputO) {
+                makeStatus.classList.add('bg-green-100', 'text-green-800', 'border-green-300', 'border');
+                makeStatus.innerHTML = `<i class="fas fa-check-circle"></i> Make chạy đúng! Thời gian output.c (${timeOutputC}) > output.o (${timeOutputO}). Sẽ biên dịch lại.`;
+            } else if (timeOutputC < timeOutputO) {
+                makeStatus.classList.add('bg-red-100', 'text-red-800', 'border-red-300', 'border');
+                makeStatus.innerHTML = `<i class="fas fa-bug"></i> LỖI THẢM HỌA! Thời gian output.c (${timeOutputC}) < output.o (${timeOutputO}).<br><span class="text-sm font-normal">Mặc dù code vừa được sửa, Make tưởng file cũ và KHÔNG BIÊN DỊCH LẠI.</span>`;
+            } else {
+                makeStatus.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-300', 'border');
+                makeStatus.innerHTML = `Bằng thời gian. Make có thể bỏ qua biên dịch.`;
             }
         }
+
+        makeBtnCompile.addEventListener('click', () => {
+            timeOutputO = makeRealTime;
+            evaluateMake();
+        });
+
+        makeBtnEdit.addEventListener('click', () => {
+            timeOutputC = makeRealTime + makeSkew;
+            evaluateMake();
+        });
+
+
+        /* =========================================
+           SIMULATION 2: TAI vs SOLAR TIME (LEAP SEC)
+           ========================================= */
+        const sim2Btn = document.getElementById('sim2-btn');
+        const sim2Reset = document.getElementById('sim2-reset');
+        
+        const barTai = document.getElementById('sim2-tai-bar');
+        const barSolar = document.getElementById('sim2-solar-bar');
+        const barUtc = document.getElementById('sim2-utc-bar');
+        
+        const valTai = document.getElementById('sim2-tai-val');
+        const valSolar = document.getElementById('sim2-solar-val');
+        const valUtc = document.getElementById('sim2-utc-val');
+        
+        const valDiff = document.getElementById('sim2-diff');
+        const leapAlert = document.getElementById('sim2-leap-alert');
+
+        let sim2Running = false;
+        let sim2Interval;
+        
+        // Thời gian (ảo trong mô phỏng)
+        let timeTai = 0.0;
+        let timeSolar = 0.0;
+        let timeUtc = 0.0;
+        let isLeapSecondActive = false;
+        let leapTimer = 0;
+
+        function updateSim2UI() {
+            // Hiển thị số
+            valTai.innerText = timeTai.toFixed(1) + " s";
+            valSolar.innerText = timeSolar.toFixed(1) + " s";
+            valUtc.innerText = timeUtc.toFixed(1) + " s";
+            
+            // Cập nhật độ rộng thanh (scale để 100% = 60s)
+            barTai.style.width = Math.min((timeTai / 60) * 100, 100) + "%";
+            barSolar.style.width = Math.min((timeSolar / 60) * 100, 100) + "%";
+            barUtc.style.width = Math.min((timeUtc / 60) * 100, 100) + "%";
+            
+            // Tính độ lệch giữa UTC và Mặt Trời
+            let diff = timeUtc - timeSolar;
+            valDiff.innerText = diff.toFixed(1);
+
+            // Xử lý Leap Second
+            // Sách: Nếu lệch > 800ms (0.8s) thì thêm leap second
+            if (diff > 0.8 && !isLeapSecondActive) {
+                isLeapSecondActive = true;
+                leapTimer = 1.0; // UTC sẽ "đứng yên" trong 1 giây (để mặt trời đuổi kịp)
+                leapAlert.classList.remove('hidden');
+            }
+        }
+
+        sim2Btn.addEventListener('click', () => {
+            if (sim2Running) {
+                clearInterval(sim2Interval);
+                sim2Running = false;
+                sim2Btn.innerHTML = '<i class="fas fa-play mr-2"></i> Tiếp tục';
+                sim2Btn.classList.replace('bg-red-500', 'bg-orange-500');
+            } else {
+                sim2Running = true;
+                sim2Btn.innerHTML = '<i class="fas fa-pause mr-2"></i> Tạm dừng';
+                sim2Btn.classList.replace('bg-orange-500', 'bg-red-500');
+                
+                // Tick mỗi 100ms
+                sim2Interval = setInterval(() => {
+                    if (timeTai >= 60) {
+                        clearInterval(sim2Interval);
+                        sim2Running = false;
+                        sim2Btn.innerHTML = '<i class="fas fa-flag-checkered mr-2"></i> Hoàn thành 1 phút';
+                        sim2Btn.disabled = true;
+                        return;
+                    }
+
+                    // 1 tick = 0.1s thực tế
+                    timeTai += 0.1; 
+                    // Mặt trời quay chậm hơn (chỉ cộng 0.08s thay vì 0.1s, phóng đại để thấy lỗi nhanh)
+                    timeSolar += 0.08; 
+
+                    if (isLeapSecondActive) {
+                        // UTC đang bị đóng băng để chờ Mặt trời
+                        leapTimer -= 0.1;
+                        if (leapTimer <= 0) {
+                            isLeapSecondActive = false; // Hết 1 giây nhuận
+                            leapAlert.classList.add('hidden');
+                        }
+                    } else {
+                        // Bình thường UTC chạy bằng TAI
+                        timeUtc += 0.1;
+                    }
+
+                    updateSim2UI();
+                }, 100);
+            }
+        });
+
+        sim2Reset.addEventListener('click', () => {
+            clearInterval(sim2Interval);
+            sim2Running = false;
+            sim2Btn.disabled = false;
+            sim2Btn.innerHTML = '<i class="fas fa-play mr-2"></i> Bắt đầu Cuộc đua';
+            sim2Btn.classList.replace('bg-red-500', 'bg-orange-500');
+            
+            timeTai = 0; timeSolar = 0; timeUtc = 0;
+            isLeapSecondActive = false; leapTimer = 0;
+            leapAlert.classList.add('hidden');
+            updateSim2UI();
+        });
     </script>
 </body>
 </html>
