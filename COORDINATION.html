@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài 1: Điều phối & Đồng bộ thời gian</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .code-font { font-family: 'Fira Code', monospace; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        
+        /* Animation for clock tick */
+        @keyframes pulse-light {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .tick-colon { animation: pulse-light 1s infinite; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased pb-20">
+
+    <!-- Header -->
+    <header class="bg-indigo-700 text-white p-8 shadow-lg">
+        <div class="max-w-5xl mx-auto">
+            <h1 class="text-3xl font-bold mb-2"><i class="fas fa-network-wired mr-3"></i>Hệ Thống Phân Tán</h1>
+            <p class="text-indigo-200 text-lg">Chương 5: Điều phối (Coordination) - 5.1 Đồng bộ hóa Thời gian</p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto mt-8 px-4 space-y-12">
+
+        <!-- 1. Lý thuyết Cơ bản -->
+        <section class="glass-panel rounded-2xl p-8">
+            <h2 class="text-2xl font-bold text-indigo-700 mb-6 border-b pb-2"><i class="fas fa-book-open mr-2"></i>1. Khái quát về Điều phối & Đồng bộ</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-gray-700">Các khái niệm cốt lõi:</h3>
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+                            <div>
+                                <strong class="text-gray-900">Đồng bộ hóa tiến trình (Process Synchronization):</strong> 
+                                Đảm bảo một tiến trình A phải đợi tiến trình B hoàn thành một thao tác nào đó rồi mới được chạy tiếp (ví dụ: cấp quyền truy cập độc quyền vào một file dùng chung).
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-database text-blue-500 mt-1 mr-3"></i>
+                            <div>
+                                <strong class="text-gray-900">Đồng bộ hóa dữ liệu (Data Synchronization):</strong> 
+                                Đảm bảo hai tập dữ liệu ở hai nơi khác nhau phải giống hệt nhau.
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-sitemap text-purple-500 mt-1 mr-3"></i>
+                            <div>
+                                <strong class="text-gray-900">Điều phối (Coordination):</strong> 
+                                Khái niệm rộng nhất. Là việc quản lý các tương tác và sự phụ thuộc giữa các hoạt động trong hệ thống phân tán. Nó bao trùm cả Đồng bộ hóa.
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                    <h3 class="text-lg font-semibold mb-3 text-indigo-800"><i class="fas fa-exclamation-triangle mr-2"></i>Tại sao Hệ phân tán lại khó?</h3>
+                    <p class="mb-3 text-gray-700">Trong một máy tính đơn (Centralized system), thời gian là <strong>rõ ràng và duy nhất (unambiguous)</strong>. Nếu tiến trình A hỏi giờ, sau đó B hỏi giờ, thời gian của B nhận được chắc chắn lớn hơn hoặc bằng A.</p>
+                    <p class="text-gray-700">Nhưng trong Hệ phân tán, mỗi máy (node) có một bộ đếm thời gian (clock) bằng thạch anh riêng lẻ. Chuyển động của thạch anh thay đổi theo nhiệt độ, môi trường, dẫn đến hiện tượng <strong>Clock Drift (Trôi dạt đồng hồ)</strong>. Kết quả: <strong>Không tồn tại một thời gian toàn cục (No global time)</strong>.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Vấn đề thực tế: Lệnh Make -->
+        <section class="glass-panel rounded-2xl p-8 border-l-4 border-l-orange-500">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">2. Ví dụ kinh điển: Lỗi biên dịch với lệnh <code>make</code></h2>
+            <p class="mb-4 text-gray-700">Sách đưa ra ví dụ về chương trình <code>make</code> trên Unix. Lệnh này giúp biên dịch mã nguồn nhanh hơn bằng cách chỉ biên dịch lại các file bị thay đổi. Cụ thể:</p>
+            <ul class="list-disc pl-6 mb-6 text-gray-700 space-y-2">
+                <li>Nếu thời gian sửa đổi của <code class="bg-gray-100 px-1 rounded">output.c</code> (mã nguồn) <strong>mới hơn</strong> <code class="bg-gray-100 px-1 rounded">output.o</code> (file đã biên dịch) &rarr; Cần biên dịch lại.</li>
+                <li>Nếu <code class="bg-gray-100 px-1 rounded">output.c</code> <strong>cũ hơn</strong> <code class="bg-gray-100 px-1 rounded">output.o</code> &rarr; Không cần biên dịch.</li>
+            </ul>
+            <p class="text-gray-700"><strong>Thảm họa xảy ra khi:</strong> Lập trình viên sửa <code class="bg-gray-100 px-1 rounded">output.c</code> trên Máy Editor, nhưng lệnh <code class="bg-gray-100 px-1 rounded">make</code> lại chạy trên Máy Compiler. Nếu đồng hồ của Máy Editor chạy <em>chậm hơn</em> Máy Compiler, lệnh Make sẽ bị lừa! Hãy thử nghiệm trực tiếp bên dưới.</p>
+        </section>
+
+        <!-- 3. Mô phỏng tương tác -->
+        <section class="glass-panel rounded-2xl p-8 bg-white shadow-xl">
+            <h2 class="text-2xl font-bold text-indigo-700 mb-2"><i class="fas fa-gamepad mr-2"></i>Mô phỏng Tương tác: Figure 5.1</h2>
+            <p class="text-sm text-gray-500 mb-6">Tái hiện lại vấn đề lệch đồng hồ. Hãy thử làm đồng hồ của máy Editor chạy chậm hơn (số âm) và xem điều gì xảy ra.</p>
+
+            <!-- Bảng điều khiển Clock Skew -->
+            <div class="mb-8 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Cài đặt độ lệch đồng hồ cho Máy Editor (giây): 
+                    <span id="skew-value" class="text-indigo-600 font-bold">0</span> giây
+                </label>
+                <input type="range" id="skew-slider" min="-10" max="10" value="0" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between text-xs text-gray-500 mt-2">
+                    <span>-10s (Chạy rất chậm)</span>
+                    <span>0s (Đồng bộ hoàn hảo)</span>
+                    <span>+10s (Chạy nhanh hơn)</span>
+                </div>
+            </div>
+
+            <!-- Các máy tính -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                
+                <!-- Máy Compiler -->
+                <div class="border-2 border-blue-200 rounded-xl p-5 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-blue-500 text-white text-xs px-3 py-1 rounded-bl-lg font-semibold">Máy Compiler</div>
+                    <div class="text-center mb-4 mt-2">
+                        <i class="fas fa-server text-4xl text-blue-400 mb-2"></i>
+                        <h3 class="font-bold text-gray-800">Máy tính Biên dịch</h3>
+                    </div>
+                    <div class="bg-gray-900 rounded-lg p-3 text-center mb-4 shadow-inner">
+                        <span class="text-green-400 code-font text-2xl" id="clock-compiler">2144<span class="tick-colon">:</span>00</span>
+                    </div>
+                    <button id="btn-compile" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="fas fa-cogs mr-2"></i> Chạy Make (Tạo output.o)
+                    </button>
+                    <p class="text-xs text-gray-500 mt-2 text-center">Thời gian thật (Real-time)</p>
+                </div>
+
+                <!-- Máy Editor -->
+                <div class="border-2 border-orange-200 rounded-xl p-5 relative overflow-hidden bg-orange-50/30">
+                    <div class="absolute top-0 right-0 bg-orange-500 text-white text-xs px-3 py-1 rounded-bl-lg font-semibold">Máy Editor</div>
+                    <div class="text-center mb-4 mt-2">
+                        <i class="fas fa-laptop-code text-4xl text-orange-400 mb-2"></i>
+                        <h3 class="font-bold text-gray-800">Máy tính Viết Code</h3>
+                    </div>
+                    <div class="bg-gray-900 rounded-lg p-3 text-center mb-4 shadow-inner">
+                        <span class="text-orange-400 code-font text-2xl" id="clock-editor">2144<span class="tick-colon">:</span>00</span>
+                    </div>
+                    <button id="btn-edit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="fas fa-keyboard mr-2"></i> Lưu file code (output.c)
+                    </button>
+                    <p class="text-xs text-gray-500 mt-2 text-center">Bị ảnh hưởng bởi độ lệch (Skew)</p>
+                </div>
+
+            </div>
+
+            <!-- Kết quả kiểm tra Make -->
+            <div id="make-status" class="hidden rounded-xl p-4 mb-6 border font-semibold text-center text-lg shadow-sm">
+                <!-- Nội dung trạng thái Make sẽ được JS bơm vào đây -->
+            </div>
+
+            <!-- Timeline Sự kiện -->
+            <div>
+                <div class="flex justify-between items-center mb-3 border-b pb-2">
+                    <h3 class="font-bold text-gray-700"><i class="fas fa-list-ul mr-2"></i>Nhật ký File (File System Logs)</h3>
+                    <button id="btn-reset" class="text-sm text-gray-500 hover:text-red-500 transition-colors"><i class="fas fa-trash mr-1"></i> Xóa log</button>
+                </div>
+                <div class="bg-gray-900 rounded-xl p-4 min-h-[150px] shadow-inner font-mono text-sm">
+                    <ul id="log-list" class="space-y-2">
+                        <li class="text-gray-500 italic">// Hệ thống sẵn sàng... Hãy thử biên dịch, sau đó sửa code.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Kiến thức Mở rộng (Cực kỳ quan trọng) -->
+        <section class="glass-panel rounded-2xl p-8 border-t-4 border-t-green-500">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb text-yellow-400 mr-2"></i>Mở rộng: Giải quyết vấn đề này như thế nào?</h2>
+            <p class="mb-4 text-gray-700">Cuốn sách dừng lại ở câu hỏi: <em>"Liệu có thể đồng bộ mọi đồng hồ không? Câu trả lời là phức tạp"</em>. Vậy trong thực tế ngành công nghiệp phần mềm, chúng ta giải quyết thế nào?</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div class="bg-white p-5 rounded-xl border shadow-sm">
+                    <h4 class="font-bold text-blue-700 mb-2">Cách 1: Đồng bộ Đồng hồ Vật lý (Physical Clocks)</h4>
+                    <p class="text-sm text-gray-600 mb-3">Sử dụng các thuật toán để ép các máy tính phải có cùng thời gian (với một sai số cho phép).</p>
+                    <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                        <li><strong>NTP (Network Time Protocol):</strong> Giao thức phổ biến nhất Internet. Nó tính toán độ trễ đường truyền mạng (network delay) để đồng bộ giờ máy bạn với các máy chủ thời gian nguyên tử (Atomic clocks).</li>
+                        <li><strong>Google TrueTime:</strong> Sử dụng phần cứng GPS và Đồng hồ nguyên tử gắn trực tiếp trong Data Center để đảm bảo sai số thời gian tối đa chỉ vài mili-giây (Dùng trong database Spanner).</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white p-5 rounded-xl border shadow-sm">
+                    <h4 class="font-bold text-purple-700 mb-2">Cách 2: Đồng hồ Logic (Logical Clocks)</h4>
+                    <p class="text-sm text-gray-600 mb-3">Đôi khi chúng ta <strong>không cần biết mấy giờ</strong>, chúng ta chỉ cần biết sự kiện nào xảy ra <strong>TRƯỚC</strong> sự kiện nào (Causality).</p>
+                    <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                        <li><strong>Lamport Timestamps:</strong> Đánh số thứ tự các sự kiện. Khi máy A gửi tin nhắn cho máy B, nó gửi kèm số đếm. Máy B cập nhật số đếm của mình lớn hơn số của máy A.</li>
+                        <li><strong>Vector Clocks:</strong> Nâng cấp của Lamport, giúp phát hiện chính xác các sự kiện xảy ra đồng thời (concurrent events) như trong Amazon DynamoDB.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- JavaScript logic cho Mô phỏng -->
+    <script>
+        // State variables
+        let realTimeSeconds = 2144; // Starting arbitrary time
+        let skew = 0;
+        let timerInterval;
+        let outputOTime = null;
+        let outputCTime = null;
+
+        // DOM Elements
+        const elClockCompiler = document.getElementById('clock-compiler');
+        const elClockEditor = document.getElementById('clock-editor');
+        const sliderSkew = document.getElementById('skew-slider');
+        const valSkew = document.getElementById('skew-value');
+        const btnCompile = document.getElementById('btn-compile');
+        const btnEdit = document.getElementById('btn-edit');
+        const btnReset = document.getElementById('btn-reset');
+        const logList = document.getElementById('log-list');
+        const makeStatus = document.getElementById('make-status');
+
+        // Format time function
+        function formatTime(seconds) {
+            return `<span class="text-gray-300">T=</span>${seconds}`;
+        }
+
+        // Add log entry
+        function addLog(message, isError = false, isSuccess = false) {
+            const li = document.createElement('li');
+            let colorClass = 'text-gray-300';
+            if (isError) colorClass = 'text-red-400 font-bold';
+            if (isSuccess) colorClass = 'text-green-400 font-bold';
+            
+            li.className = colorClass;
+            li.innerHTML = `> ${message}`;
+            logList.prepend(li); // Thêm lên đầu danh sách
+        }
+
+        // Update Clocks
+        function updateClocks() {
+            realTimeSeconds++;
+            
+            // Compiler is source of truth in this simulation (Real time)
+            elClockCompiler.innerHTML = formatTime(realTimeSeconds);
+            
+            // Editor time is affected by skew
+            let editorTime = realTimeSeconds + skew;
+            elClockEditor.innerHTML = formatTime(editorTime);
+        }
+
+        // Evaluate Make condition
+        function checkMakeStatus() {
+            if (outputOTime === null || outputCTime === null) return;
+
+            makeStatus.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'border-green-300', 'bg-red-100', 'text-red-800', 'border-red-300');
+            
+            if (outputCTime > outputOTime) {
+                // Correct behavior: .c is newer than .o
+                makeStatus.classList.add('bg-green-100', 'text-green-800', 'border-green-300');
+                makeStatus.innerHTML = `<i class="fas fa-check-circle mr-2"></i> Lệnh Make chạy đúng! (Thời gian output.c [${outputCTime}] > output.o [${outputOTime}]). Sẽ biên dịch lại.`;
+            } else if (outputCTime < outputOTime) {
+                // BUG: .c is older than .o, even though we just saved it!
+                makeStatus.classList.add('bg-red-100', 'text-red-800', 'border-red-300');
+                makeStatus.innerHTML = `<i class="fas fa-bug mr-2"></i> LỖI THẢM HỌA! (Thời gian output.c [${outputCTime}] < output.o [${outputOTime}]). <br> <span class="text-sm font-normal">Mặc dù code vừa được sửa, chương trình Make tưởng file cũ và <strong>KHÔNG BIÊN DỊCH LẠI</strong>.</span>`;
+            } else {
+                makeStatus.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
+                makeStatus.innerHTML = `Bằng thời gian. Make có thể bỏ qua biên dịch.`;
+            }
+        }
+
+        // Event Listeners
+        sliderSkew.addEventListener('input', (e) => {
+            skew = parseInt(e.target.value);
+            valSkew.textContent = skew;
+            
+            // Immediately update display
+            let editorTime = realTimeSeconds + skew;
+            elClockEditor.innerHTML = formatTime(editorTime);
+        });
+
+        btnCompile.addEventListener('click', () => {
+            outputOTime = realTimeSeconds; // Gets compiler's time
+            addLog(`[Máy Compiler] Đã chạy make, sinh ra file <span class="text-blue-300">output.o</span> lúc thời gian: T=${outputOTime}`, false, true);
+            checkMakeStatus();
+        });
+
+        btnEdit.addEventListener('click', () => {
+            outputCTime = realTimeSeconds + skew; // Gets editor's skewed time
+            addLog(`[Máy Editor] Lập trình viên lưu file code <span class="text-orange-300">output.c</span> lúc thời gian: T=${outputCTime}`, false, true);
+            checkMakeStatus();
+        });
+
+        btnReset.addEventListener('click', () => {
+            outputOTime = null;
+            outputCTime = null;
+            makeStatus.classList.add('hidden');
+            logList.innerHTML = '<li class="text-gray-500 italic">// Hệ thống đã được làm sạch.</li>';
+        });
+
+        // Start simulation
+        timerInterval = setInterval(updateClocks, 1000);
+
+    </script>
+</body>
+</html>
