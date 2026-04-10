@@ -68,6 +68,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             display: flex;
             flex-direction: column;
+            max-height: 650px; /* Khóa cứng chiều cao của card để không bị đẩy trang */
         }
 
         .styled-card.blue-border { border-left-color: var(--accent-blue); }
@@ -141,11 +142,37 @@
         .cb-label input { cursor: pointer; }
         .cb-label input:checked + span { color: var(--accent-pink); font-weight: bold; }
 
+        /* --- CẬP NHẬT: LOG CONTAINER --- */
         .log-container {
-            flex-grow: 1; background-color: #1e1e22; border-radius: 8px; padding: 1rem;
-            overflow-y: auto; min-height: 400px; font-family: 'Consolas', monospace;
-            font-size: 0.85rem; line-height: 1.5; border: 1px solid #333;
+            flex-grow: 1; 
+            background-color: #1e1e22; 
+            border-radius: 8px; 
+            padding: 1rem;
+            overflow-y: auto;       /* Bật cuộn dọc */
+            height: 450px;          /* Cố định chiều cao thay vì để phình ra */
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem; 
+            line-height: 1.5; 
+            border: 1px solid #333;
         }
+        
+        /* Custom Scrollbar cho Log */
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-container::-webkit-scrollbar-track {
+            background: #1e1e22; 
+            border-radius: 8px;
+        }
+        .log-container::-webkit-scrollbar-thumb {
+            background: #555; 
+            border-radius: 8px;
+        }
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #777; 
+        }
+        /* ------------------------------ */
+
         .log-entry { border-bottom: 1px solid #2a2a2e; padding: 0.4rem 0; display: flex; flex-direction: column;}
         .log-time { color: #666; font-size: 0.75rem; margin-bottom: 2px;}
         .log-info { color: var(--text-body); }
@@ -390,6 +417,8 @@
                 el.className = `log-entry`;
                 el.innerHTML = `<div class="log-time">[${time}]</div><div class="${typeClass}" style="color: ${colorStyle || ''}">${message}</div>`;
                 panel.appendChild(el);
+                
+                // Tự động cuộn xuống dưới cùng khi có log mới
                 panel.scrollTop = panel.scrollHeight;
             }
 
