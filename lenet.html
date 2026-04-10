@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeNet-5: Khởi nguyên của Mạng Tích Chập</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Layer Card Styles */
+        .layer-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative; }
+        .layer-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+        
+        /* Specific Layer Themes */
+        .theme-input { background: linear-gradient(135deg, #f8fafc, #f1f5f9); border-color: #cbd5e1; }
+        .theme-conv { background: linear-gradient(135deg, #eff6ff, #dbeafe); border-color: #93c5fd; }
+        .theme-pool { background: linear-gradient(135deg, #fef2f2, #fee2e2); border-color: #fca5a5; }
+        .theme-flatten { background: linear-gradient(135deg, #fdf4ff, #fae8ff); border-color: #f0abfc; }
+        .theme-dense { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-color: #86efac; }
+        .theme-output { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fcd34d; }
+
+        /* Animation for Data Flow Arrow */
+        @keyframes flow {
+            0% { transform: translateX(0); opacity: 0.2; }
+            50% { opacity: 1; }
+            100% { transform: translateX(10px); opacity: 0.2; }
+        }
+        .arrow-flow { animation: flow 1.5s infinite; }
+
+        /* Detail Panel transition */
+        #detailPanel { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased pb-20">
+
+<div class="max-w-7xl mx-auto p-4 lg:p-8 bg-white shadow-2xl rounded-2xl my-8">
+    
+    <!-- HEADER -->
+    <header class="mb-10 text-center border-b pb-6">
+        <h1 class="text-4xl font-extrabold text-slate-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">
+            Kiến trúc LeNet-5 (1998)
+        </h1>
+        <p class="text-lg text-slate-600">Tuyệt tác kết hợp Tích chập và Fully Connected Layers</p>
+    </header>
+
+    <!-- 1. LÝ THUYẾT: HAI BÁN CẦU CỦA CNN -->
+    <section class="mb-12">
+        <div class="prose max-w-none text-slate-700 leading-relaxed text-center max-w-4xl mx-auto">
+            <p>Mọi mạng CNN hiện đại (kể cả LeNet) đều chia làm <strong>2 phần cốt lõi</strong> được nối tiếp nhau:</p>
+        </div>
+        
+        <div class="grid md:grid-cols-2 gap-6 mt-6 max-w-5xl mx-auto">
+            <!-- Khối 1 -->
+            <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Phần 1</div>
+                <h3 class="text-xl font-bold text-blue-800 mb-2">Feature Extractor (Bộ Trích xuất Đặc trưng)</h3>
+                <p class="text-sm text-slate-700 mb-3">Là sự xen kẽ giữa các lớp <strong>Convolution</strong> và <strong>Pooling</strong>.</p>
+                <ul class="text-sm list-disc pl-4 text-blue-900 space-y-1">
+                    <li><strong>Mục đích:</strong> Tự động tìm ra các hình mẫu từ ảnh (Cạnh \(\rightarrow\) Góc \(\rightarrow\) Hình khối).</li>
+                    <li><strong>Xu hướng kích thước:</strong> Chiều Không gian (Cao x Rộng) <em>nhỏ dần lại</em>, nhưng Chiều Sâu (Số Kênh) <em>tăng dần lên</em>. Ảnh ban đầu bẹt, về sau biến thành một khối hộp hẹp nhưng cực sâu.</li>
+                </ul>
+            </div>
+
+            <!-- Khối 2 -->
+            <div class="bg-green-50 border-2 border-green-200 rounded-xl p-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Phần 2</div>
+                <h3 class="text-xl font-bold text-green-800 mb-2">Classifier (Bộ Phân loại)</h3>
+                <p class="text-sm text-slate-700 mb-3">Là mạng MLP truyền thống gồm các lớp <strong>Dense (Fully Connected)</strong>.</p>
+                <ul class="text-sm list-disc pl-4 text-green-900 space-y-1">
+                    <li><strong>Thao tác chốt chặn (Flatten):</strong> Phải đập dẹt khối hộp 3D ở phần 1 thành một Vector 1D duy nhất để nhét vào MLP.</li>
+                    <li><strong>Mục đích:</strong> Dùng các đặc trưng đã trích xuất để suy luận và tính toán xác suất (Ví dụ: 90% là áo thun, 10% là cái quần).</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. SA BÀN TƯƠNG TÁC (INTERACTIVE PIPELINE) -->
+    <section class="mb-12 bg-slate-900 p-6 lg:p-8 rounded-2xl shadow-xl border border-slate-700">
+        <div class="flex justify-between items-end mb-6">
+            <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                Trình Theo Dõi Hình Dạng Tensor (Shape Tracker)
+            </h2>
+            <div class="bg-slate-800 p-3 rounded-lg border border-slate-600 flex items-center gap-3">
+                <label class="text-sm font-bold text-slate-300">Kích thước Ảnh (H \(\times\) W):</label>
+                <input type="number" id="inputSize" value="28" min="20" max="64" class="w-16 bg-slate-900 text-yellow-400 border border-slate-600 rounded px-2 py-1 font-mono text-center outline-none focus:border-yellow-400 transition">
+            </div>
+        </div>
+
+        <p class="text-slate-400 text-sm mb-8 italic text-center">👇 Chạm (Hover/Click) vào từng khối Layer bên dưới để xem sự thay đổi hình dạng của dữ liệu khi đi qua mạng.</p>
+
+        <!-- PIPELINE DIAGRAM -->
+        <div class="relative w-full overflow-x-auto pb-8">
+            <div class="flex items-center justify-between min-w-[900px] px-4 gap-2">
+                
+                <!-- 1. Input -->
+                <div class="layer-card theme-input border-2 rounded-lg p-3 w-32 text-center" onmouseenter="showDetail(0)">
+                    <div class="font-bold text-slate-800 mb-1">Input</div>
+                    <div class="text-[10px] text-slate-500">Image (1 Channel)</div>
+                    <div class="mt-2 text-xs font-mono font-bold bg-white/60 py-1 rounded" id="shape-0"></div>
+                </div>
+
+                <div class="text-slate-500 font-bold arrow-flow">&rarr;</div>
+
+                <!-- 2. Conv 1 -->
+                <div class="layer-card theme-conv border-2 rounded-lg p-3 w-32 text-center" onmouseenter="showDetail(1)">
+                    <div class="font-bold text-blue-900 mb-1">Conv2D (1)</div>
+                    <div class="text-[10px] text-blue-700">k=5, p=same<br>6 Filters</div>
+                    <div class="mt-2 text-xs font-mono font-bold bg-white/60 py-1 rounded text-blue-800" id="shape-1"></div>
+                </div>
+
+                <div class="text-slate-500 font-bold arrow-flow">&rarr;</div>
+
+                <!-- 3. Pool 1 -->
+                <div class="layer-card theme-pool border-2 rounded-lg p-3 w-32 text-center" onmouseenter="showDetail(2)">
+                    <div class="font-bold text-red-900 mb-1">AvgPool (1)</div>
+                    <div class="text-[10px] text-red-700">k=2, s=2</div>
+                    <div class="mt-2 text-xs font-mono font-bold bg-white/60 py-1 rounded text-red-800" id="shape-2"></div>
+                </div>
+
+                <div class="text-slate-500 font-bold arrow-flow">&rarr;</div>
+
+                <!-- 4. Conv 2 -->
+                <div class="layer-card theme-conv border-2 rounded-lg p-3 w-32 text-center" onmouseenter="showDetail(3)">
+                    <div class="font-bold text-blue-900 mb-1">Conv2D (2)</div>
+                    <div class="text-[10px] text-blue-700">k=5, p=valid<br>16 Filters</div>
+                    <div class="mt-2 text-xs font-mono font-bold bg-white/60 py-1 rounded text-blue-800" id="shape-3"></div>
+                </div>
+
+                <div class="text-slate-500 font-bold arrow-flow">&rarr;</div>
+
+                <!-- 5. Pool 2 -->
+                <div class="layer-card theme-pool border-2 rounded-lg p-3 w-32 text-center" onmouseenter="showDetail(4)">
+                    <div class="font-bold text-red-900 mb-1">AvgPool (2)</div>
+                    <div class="text-[10px] text-red-700">k=2, s=2</div>
+                    <div class="mt-2 text-xs font-mono font-bold bg-white/60 py-1 rounded text-red-800" id="shape-4"></div>
+                </div>
+
+                <div class="text-slate-500 font-bold arrow-flow">&rarr;</div>
+
+                <!-- 6. Flatten -->
+                <div class="layer-card theme-flatten border-2 rounded-lg p-3 w-32 text-center" onmouseenter="showDetail(5)">
+                    <div class="font-bold text-purple-900 mb-1">Flatten</div>
+                    <div class="text-[10px] text-purple-700">3D &rarr; 1D</div>
+                    <div class="mt-2 text-xs font-mono font-bold bg-white/60 py-1 rounded text-purple-800" id="shape-5"></div>
+                </div>
+
+                <div class="text-slate-500 font-bold arrow-flow">&rarr;</div>
+
+                <!-- 7. FC Layers Group -->
+                <div class="layer-card theme-dense border-2 rounded-lg p-3 w-40 text-center" onmouseenter="showDetail(6)">
+                    <div class="font-bold text-green-900 mb-1">Dense Block</div>
+                    <div class="text-[10px] text-green-700">120 &rarr; 84 &rarr; 10</div>
+                    <div class="mt-2 flex flex-col gap-1">
+                        <div class="text-[10px] font-mono font-bold bg-white/60 py-0.5 rounded text-green-800" id="shape-6a"></div>
+                        <div class="text-[10px] font-mono font-bold bg-white/60 py-0.5 rounded text-green-800" id="shape-6b"></div>
+                        <div class="text-[10px] font-mono font-bold bg-white/60 py-0.5 rounded text-green-800" id="shape-6c"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DETAIL PANEL -->
+        <div id="detailPanel" class="mt-4 bg-slate-800 rounded-xl p-5 border border-slate-600 min-h-[140px] flex items-center justify-center text-center opacity-0 transform translate-y-4">
+            <!-- JS Inject Content Here -->
+        </div>
+
+    </section>
+
+    <!-- 3. PHÂN TÍCH CHI TIẾT CODE TENSORFLOW -->
+    <section>
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-indigo-500 pl-4 mb-4">Ghi chú về Triển khai Thực tế (TensorFlow/Keras)</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed">
+            <p>Dựa trên đoạn code trong tài liệu của bạn, có một vài điểm thú vị trong cách D2L (Dive into Deep Learning) thiết lập LeNet:</p>
+            <ul class="list-disc pl-6 space-y-2">
+                <li><strong>Ảnh 28x28 vs 32x32:</strong> Mạng LeNet gốc của Yann LeCun thiết kế cho ảnh 32x32. Tuy nhiên, dataset Fashion-MNIST lại là 28x28. Thay vì phóng to ảnh, tác giả dùng <code>padding='same'</code> ở lớp Conv đầu tiên để duy trì kích thước \(28 \times 28\). Các lớp sau tính toán bình thường. Bạn có thể tự mình kiểm chứng điều này bằng cách nhập số <strong>28</strong> vào Shape Tracker ở trên.</li>
+                <li><strong>Hàm kích hoạt (Activation):</strong> LeNet gốc dùng <strong>Sigmoid</strong> (vì lúc đó ReLU chưa phổ biến). Tác giả giữ nguyên Sigmoid để tôn trọng lịch sử, nhưng trong thực tế hiện nay, ta sẽ luôn thay thế bằng <code>activation='relu'</code> để học nhanh và tránh lỗi vanishing gradient.</li>
+                <li><strong>Output Layer:</strong> Đoạn code không dùng hàm kích hoạt ở lớp Dense cuối (chỉ có 10 nodes). Lý do là hàm <code>CrossEntropyLoss</code> trong TensorFlow/PyTorch thường tự động tính toán Softmax bên trong nó (dùng raw logits) để đảm bảo độ chính xác về mặt số học.</li>
+            </ul>
+        </div>
+    </section>
+</div>
+
+<script>
+    // State
+    let inputW = 28; // Default Fashion-MNIST size
+
+    // DOM Elements for Shapes
+    const s0 = document.getElementById('shape-0');
+    const s1 = document.getElementById('shape-1');
+    const s2 = document.getElementById('shape-2');
+    const s3 = document.getElementById('shape-3');
+    const s4 = document.getElementById('shape-4');
+    const s5 = document.getElementById('shape-5');
+    const s6a = document.getElementById('shape-6a');
+    const s6b = document.getElementById('shape-6b');
+    const s6c = document.getElementById('shape-6c');
+    
+    const sizeInput = document.getElementById('inputSize');
+    const detailPanel = document.getElementById('detailPanel');
+
+    // Layer Data structures
+    let layersData = [];
+
+    function calculateShapes() {
+        let w = parseInt(sizeInput.value);
+        if(isNaN(w) || w < 10) { w = 28; sizeInput.value = 28; }
+        
+        let shapes = [];
+        
+        // 0: Input
+        shapes.push({ w: w, c: 1, type: 'Input',
+            formula: `Kích thước ban đầu: ${w}x${w}. Một kênh màu (Grayscale).`,
+            code: `Input(shape=(${w}, ${w}, 1))`
+        });
+
+        // 1: Conv1 (filters=6, k=5, padding='same')
+        // padding same = output size is same as input
+        let w1 = w; 
+        shapes.push({ w: w1, c: 6, type: 'Conv2D',
+            formula: `Padding 'same' giữ nguyên không gian: ${w1}x${w1}.<br>Số kênh tăng từ 1 \(\rightarrow\) 6.`,
+            code: `Conv2D(6, kernel_size=5, padding='same')`
+        });
+
+        // 2: AvgPool1 (k=2, s=2)
+        let w2 = Math.floor(w1 / 2);
+        shapes.push({ w: w2, c: 6, type: 'AvgPool2D',
+            formula: `Stride = 2 giảm một nửa kích thước: \(${w1}/2 = ${w2}\).<br>Kênh giữ nguyên.`,
+            code: `AvgPool2D(pool_size=2, strides=2)`
+        });
+
+        // 3: Conv2 (filters=16, k=5, padding='valid')
+        // padding valid (default) = (w - k + 1)
+        let w3 = w2 - 5 + 1;
+        shapes.push({ w: w3, c: 16, type: 'Conv2D',
+            formula: `Không padding (valid). Kích thước: \(${w2} - 5 + 1 = ${w3}\).<br>Số kênh tăng mạnh: 6 \(\rightarrow\) 16.`,
+            code: `Conv2D(16, kernel_size=5)`
+        });
+
+        // 4: AvgPool2 (k=2, s=2)
+        let w4 = Math.floor(w3 / 2);
+        shapes.push({ w: w4, c: 16, type: 'AvgPool2D',
+            formula: `Stride = 2 tiếp tục cắt nửa ảnh: \(\lfloor${w3}/2\rfloor = ${w4}\).`,
+            code: `AvgPool2D(pool_size=2, strides=2)`
+        });
+
+        // 5: Flatten
+        let flatSize = w4 * w4 * 16;
+        shapes.push({ w: flatSize, type: 'Flatten',
+            formula: `Đập dẹt khối 3D thành Vector 1D: \(${w4} \\times ${w4} \\times 16 = ${flatSize}\).<br>Sẵn sàng đưa vào Mạng MLP.`,
+            code: `Flatten()`
+        });
+
+        // 6: Dense Block
+        shapes.push({ type: 'Dense',
+            formula: `Mạng Fully Connected truyền thống.<br>Thu hẹp thông tin từ ${flatSize} đặc trưng xuống 120, rồi 84, và cuối cùng xuất ra 10 xác suất (tương ứng 10 class của dataset).`,
+            code: `Dense(120) &rarr; Dense(84) &rarr; Dense(10)`
+        });
+
+        layersData = shapes;
+        updateUI(shapes);
+    }
+
+    function updateUI(shapes) {
+        s0.textContent = `(${shapes[0].w}, ${shapes[0].w}, 1)`;
+        s1.textContent = `(${shapes[1].w}, ${shapes[1].w}, 6)`;
+        s2.textContent = `(${shapes[2].w}, ${shapes[2].w}, 6)`;
+        s3.textContent = `(${shapes[3].w}, ${shapes[3].w}, 16)`;
+        s4.textContent = `(${shapes[4].w}, ${shapes[4].w}, 16)`;
+        
+        s5.textContent = `(${shapes[5].w})`;
+        
+        s6a.textContent = `(120)`;
+        s6b.textContent = `(84)`;
+        s6c.textContent = `(10)`;
+    }
+
+    function showDetail(index) {
+        const data = layersData[index];
+        
+        detailPanel.innerHTML = `
+            <div class="w-full text-left">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">${data.type}</span>
+                    <span class="text-indigo-300 font-mono text-sm">${data.code}</span>
+                </div>
+                <div class="text-slate-300 text-base" id="dynamicFormula">
+                    ${data.formula}
+                </div>
+            </div>
+        `;
+        
+        detailPanel.classList.remove('opacity-0', 'translate-y-4');
+        detailPanel.classList.add('opacity-100', 'translate-y-0');
+
+        // Re-render MathJax
+        if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+            MathJax.typesetPromise([document.getElementById('dynamicFormula')]).catch((err) => console.log(err));
+        }
+    }
+
+    // Event listener for input change
+    sizeInput.addEventListener('input', () => {
+        calculateShapes();
+        // Hide detail panel on size change to avoid confusion, user can re-hover
+        detailPanel.classList.remove('opacity-100', 'translate-y-0');
+        detailPanel.classList.add('opacity-0', 'translate-y-4');
+    });
+
+    // Initial render
+    calculateShapes();
+
+</script>
+</body>
+</html>
