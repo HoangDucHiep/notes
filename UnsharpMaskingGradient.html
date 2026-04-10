@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sharpening: Unsharp Masking & Gradient</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    [data-lucide] { display: inline-block; }
+    .matrix-grid { display: inline-grid; gap: 4px; padding: 8px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .matrix-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid #cbd5e1; font-weight: 600; color: #334155; }
+    .matrix-cell.zero { color: #94a3b8; }
+    .matrix-cell.neg { color: #e11d48; background: #fff1f2; border-color: #fecdd3; }
+    .matrix-cell.pos { color: #0284c7; background: #eff6ff; border-color: #bae6fd; }
+  </style>
+</head>
+<body class="bg-slate-50 pb-20 font-sans text-slate-800 leading-relaxed">
+
+  <!-- HEADER -->
+  <header class="bg-gradient-to-br from-rose-900 via-slate-800 to-orange-900 text-white py-16 px-6 shadow-xl relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="max-w-4xl mx-auto relative z-10">
+      <span class="text-rose-300 font-bold tracking-widest uppercase text-sm mb-2 block">Chương 3 - Section 3.6 (Tiếp theo)</span>
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-rose-100 to-orange-200">
+        Unsharp Masking & The Gradient
+      </h1>
+      <p class="text-xl text-rose-100 font-light max-w-3xl">
+        Khám phá kỹ thuật "Mặt nạ mờ" có từ ngành in ấn thập niên 1930 và sức mạnh của Đạo hàm bậc 1 (Sobel, Roberts) trong việc dò tìm biên ảnh.
+      </p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6">
+    
+    <!-- PHẦN 1: UNSHARP MASKING & HIGHBOOST -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        1. Unsharp Masking và Highboost Filtering
+      </h2>
+      <p class="mb-4">
+        Một phương pháp làm sắc nét ảnh cực kỳ nổi tiếng, được sử dụng trong ngành công nghiệp in ấn từ những năm 1930, là trừ đi một phiên bản "làm mờ" (unsharp) của bức ảnh khỏi chính bức ảnh gốc. Quá trình này gọi là <strong>Unsharp Masking (Tạo mặt nạ mờ)</strong>, gồm 3 bước cơ bản:
+      </p>
+      
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm my-6">
+        <ol class="list-decimal ml-5 space-y-4 text-slate-700">
+          <li>
+            <strong class="text-slate-900">Làm mờ ảnh gốc:</strong> Gọi ảnh gốc là $f(x,y)$ và ảnh đã làm mờ (bằng Gaussian chẳng hạn) là $\bar{f}(x,y)$.
+          </li>
+          <li>
+            <strong class="text-slate-900">Tạo Mặt nạ (Mask):</strong> Trừ ảnh mờ khỏi ảnh gốc. Phần chênh lệch này chính là mặt nạ chứa các chi tiết sắc nét (cạnh, nhiễu).
+            <div class="font-serif text-center my-3 bg-slate-50 py-2 rounded">
+              g<sub>mask</sub>(x,y) = f(x,y) - $\bar{f}$(x,y)
+              <span class="text-sm font-sans text-slate-400 block mt-1">(Eq. 3-55)</span>
+            </div>
+          </li>
+          <li>
+            <strong class="text-slate-900">Cộng Mặt nạ vào ảnh gốc:</strong> Cộng một lượng có trọng số ($k$) của mặt nạ trở lại ảnh gốc để làm sắc nét nó.
+            <div class="font-serif text-center my-3 bg-slate-50 py-2 rounded text-rose-700 font-bold">
+              g(x,y) = f(x,y) + k · g<sub>mask</sub>(x,y)
+              <span class="text-sm font-sans text-slate-400 font-normal block mt-1">(Eq. 3-56)</span>
+            </div>
+          </li>
+        </ol>
+      </div>
+
+      <div class="flex gap-4 mb-8">
+        <div class="flex-1 bg-rose-50 p-4 border-l-4 border-rose-500 rounded">
+          <h4 class="font-bold text-rose-900">Nếu k = 1</h4>
+          <p class="text-sm text-rose-800">Quá trình được gọi là chuẩn <strong>Unsharp Masking</strong>.</p>
+        </div>
+        <div class="flex-1 bg-orange-50 p-4 border-l-4 border-orange-500 rounded">
+          <h4 class="font-bold text-orange-900">Nếu k > 1</h4>
+          <p class="text-sm text-orange-800">Quá trình được gọi là <strong>Highboost Filtering</strong>. Cường độ làm sắc nét mạnh hơn rất nhiều.</p>
+        </div>
+      </div>
+
+      <!-- SIMULATOR: 1D Unsharp Masking -->
+      <div class="bg-slate-900 text-white p-6 rounded-xl shadow-lg my-8">
+        <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+          <h4 class="font-bold text-lg flex items-center gap-2 text-rose-300">
+            <i data-lucide="activity" class="w-5 h-5"></i> Mô phỏng Hình 3.48 (1-D Unsharp Masking)
+          </h4>
+          <div class="flex items-center gap-3">
+            <label class="text-sm font-semibold text-slate-300">Hệ số k: <span id="k-value" class="text-white">1.0</span></label>
+            <input type="range" id="k-slider" min="0" max="4" step="0.1" value="1" class="w-32 accent-rose-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Cột Đồ thị -->
+          <div class="space-y-4">
+            <!-- (a) Original & (b) Blurred -->
+            <div class="relative bg-black rounded p-2 border border-slate-700">
+              <span class="absolute top-2 left-2 text-xs font-bold text-slate-400">f(x) Gốc & $\bar{f}$(x) Mờ</span>
+              <svg id="svg-orig-blur" width="100%" height="100" viewBox="0 0 400 100" class="overflow-visible">
+                <polyline id="line-orig" fill="none" stroke="#e2e8f0" stroke-width="2" />
+                <polyline id="line-blur" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="4 4" />
+              </svg>
+            </div>
+            <!-- (c) Mask -->
+            <div class="relative bg-black rounded p-2 border border-slate-700">
+              <span class="absolute top-2 left-2 text-xs font-bold text-rose-400">Mask = Gốc - Mờ</span>
+              <svg id="svg-mask" width="100%" height="100" viewBox="0 0 400 100" class="overflow-visible">
+                <line x1="0" y1="50" x2="400" y2="50" stroke="#334155" stroke-width="1" />
+                <polyline id="line-mask" fill="none" stroke="#fb7185" stroke-width="2" />
+              </svg>
+            </div>
+            <!-- (d) Final -->
+            <div class="relative bg-black rounded p-2 border border-slate-700">
+              <span class="absolute top-2 left-2 text-xs font-bold text-orange-400">g(x) = Gốc + k*Mask</span>
+              <svg id="svg-final" width="100%" height="100" viewBox="0 0 400 100" class="overflow-visible">
+                <polyline id="line-final" fill="none" stroke="#fdba74" stroke-width="2.5" />
+              </svg>
+            </div>
+          </div>
+          
+          <!-- Cột Giải thích -->
+          <div class="flex flex-col justify-center space-y-4 text-sm text-slate-300">
+            <p><i data-lucide="info" class="w-4 h-4 inline text-blue-400"></i> Kéo thanh trượt <strong>k</strong> để xem ảnh hưởng lên tín hiệu kết quả.</p>
+            <div id="sim-note-1" class="bg-slate-800 p-3 rounded border-l-2 border-rose-500">
+              <strong>Unsharp Masking (k=1):</strong> Tín hiệu được làm sắc nét, mép dốc đứng hơn. Khôi phục lại viền bị mờ.
+            </div>
+            <div id="sim-note-2" class="bg-slate-800 p-3 rounded border-l-2 border-orange-500 hidden">
+              <strong>Highboost Filtering (k>1):</strong> Làm sắc nét cực mạnh. Tuy nhiên, ⚠️ Chú ý phần "rốn" (blip) bị đẩy xuống dưới 0. Khi hiển thị, phần âm này bị cắt thành màu đen kịt, tạo ra các <em>vầng hào quang đen (dark halos)</em> quanh cạnh (Xem giải thích Hình 3.49e).
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 2: GRADIENT BẬC 1 -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        2. Đạo hàm bậc 1: The Gradient
+      </h2>
+      <p class="mb-4">
+        Trong khi Laplacian là đạo hàm bậc 2 (đẳng hướng), đạo hàm bậc 1 trong xử lý ảnh được triển khai bằng <strong>độ lớn của Gradient (Gradient Magnitude)</strong>. Gradient của một hàm hình ảnh $f(x,y)$ là một Vector hai chiều:
+      </p>
+
+      <div class="bg-white p-4 rounded-lg overflow-x-auto flex justify-center font-serif text-lg italic text-slate-800 mb-6 border border-slate-200 shadow-sm">
+        <div class="flex items-center gap-4">
+          <span>∇f = grad(f) = </span>
+          <div class="flex flex-col items-center justify-center border-l-2 border-r-2 border-slate-800 px-2 rounded-sm bg-slate-50">
+            <span>g<sub>x</sub></span>
+            <span>g<sub>y</sub></span>
+          </div>
+          <span>=</span>
+          <div class="flex flex-col items-center justify-center border-l-2 border-r-2 border-slate-800 px-2 rounded-sm bg-slate-50">
+            <span>∂f / ∂x</span>
+            <span>∂f / ∂y</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="mb-4 text-slate-700">
+        Vector Gradient có tính chất hình học quan trọng: Nó <strong>chỉ về hướng có tốc độ thay đổi cường độ sáng lớn nhất</strong> tại điểm $(x,y)$.
+      </p>
+
+      <h3 class="text-xl font-bold text-slate-700 mt-6 mb-3">Độ lớn (Magnitude) của Gradient</h3>
+      <p class="mb-4">Để hiển thị dưới dạng một hình ảnh (ảnh gradient), ta tính độ lớn (chiều dài) của vector này:</p>
+      
+      <div class="grid md:grid-cols-2 gap-6 my-6">
+        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <p class="text-sm font-bold text-blue-900 mb-2">Công thức chuẩn (Eq. 3-58)</p>
+          <div class="font-serif text-center text-lg">
+            M(x,y) = ||∇f|| = √(g<sub>x</sub>² + g<sub>y</sub>²)
+          </div>
+          <p class="text-xs mt-2 text-slate-600">Đảm bảo tính đẳng hướng (isotropic), không phụ thuộc góc quay.</p>
+        </div>
+        <div class="bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <p class="text-sm font-bold text-amber-900 mb-2">Công thức tính nhanh (Eq. 3-59)</p>
+          <div class="font-serif text-center text-lg">
+            M(x,y) ≈ |g<sub>x</sub>| + |g<sub>y</sub>|
+          </div>
+          <p class="text-xs mt-2 text-slate-600">Dùng trị tuyệt đối để tiết kiệm chi phí tính toán (bỏ bình phương và căn bậc 2). Rất phổ biến trong thực tế.</p>
+        </div>
+      </div>
+      <p class="text-sm italic text-rose-700 bg-rose-50 p-3 rounded border-l-2 border-rose-500">
+        *Lưu ý: Mặc dù các đạo hàm thành phần ($g_x, g_y$) là toán tử tuyến tính, nhưng việc tính <strong>Độ lớn Gradient ($M(x,y)$) lại là phi tuyến tính</strong> do có chứa căn bậc hai / bình phương / trị tuyệt đối.
+      </p>
+    </section>
+
+    <!-- PHẦN 3: KERNELS - ROBERTS & SOBEL -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        3. Các Toán Tử Gradient Rời Rạc (Kernels)
+      </h2>
+      <p class="mb-6 text-slate-700">Để tính các đạo hàm thành phần $\partial f / \partial x$ và $\partial f / \partial y$, ta chập ảnh với các mặt nạ (kernels) tương ứng. Hình 3.50 giới thiệu hai toán tử nổi tiếng nhất:</p>
+
+      <!-- Roberts -->
+      <div class="mb-10">
+        <h3 class="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+          <i data-lucide="grid" class="w-5 h-5 text-indigo-500"></i> Toán tử chéo Roberts (Roberts cross-gradient)
+        </h3>
+        <p class="text-sm text-slate-600 mb-4">Được giới thiệu vào năm 1965, đây là một trong những bộ lọc phát hiện biên đầu tiên. Nó dùng ma trận 2x2 để tính sai phân theo đường chéo.</p>
+        <div class="flex gap-8 justify-center">
+          <div class="text-center">
+            <p class="text-sm font-semibold mb-2">Tính g<sub>x</sub></p>
+            <div class="matrix-grid grid-cols-2">
+              <div class="matrix-cell neg">-1</div><div class="matrix-cell zero">0</div>
+              <div class="matrix-cell zero">0</div><div class="matrix-cell pos">1</div>
+            </div>
+          </div>
+          <div class="text-center">
+            <p class="text-sm font-semibold mb-2">Tính g<sub>y</sub></p>
+            <div class="matrix-grid grid-cols-2">
+              <div class="matrix-cell zero">0</div><div class="matrix-cell neg">-1</div>
+              <div class="matrix-cell pos">1</div><div class="matrix-cell zero">0</div>
+            </div>
+          </div>
+        </div>
+        <p class="text-center text-xs text-slate-500 mt-2">Điểm trừ: Kernel 2x2 không có tâm đối xứng rõ ràng (tâm rơi vào giữa các pixel).</p>
+      </div>
+
+      <!-- Sobel -->
+      <div class="mb-8">
+        <h3 class="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+          <i data-lucide="box-select" class="w-5 h-5 text-rose-500"></i> Toán tử Sobel (Sobel operators)
+        </h3>
+        <p class="text-sm text-slate-600 mb-4">Sử dụng kernel 3x3 tâm đối xứng. Điểm đặc biệt là <strong>hệ số trung tâm bằng 2</strong>, điều này tạo ra một chút hiệu ứng "làm mờ" (smoothing) giúp nó ít nhạy cảm với nhiễu hơn so với các phương pháp đạo hàm đơn thuần.</p>
+        
+        <div class="flex flex-wrap gap-8 justify-center">
+          <div class="text-center">
+            <p class="text-sm font-semibold text-slate-700 mb-2">Kernel tính g<sub>x</sub> (Sai phân dọc theo trục x)</p>
+            <div class="matrix-grid grid-cols-3">
+              <div class="matrix-cell neg">-1</div><div class="matrix-cell neg">-2</div><div class="matrix-cell neg">-1</div>
+              <div class="matrix-cell zero">0</div><div class="matrix-cell zero">0</div><div class="matrix-cell zero">0</div>
+              <div class="matrix-cell pos">1</div><div class="matrix-cell pos">2</div><div class="matrix-cell pos">1</div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">(Phát hiện Cạnh Ngang - Horizontal edges)</p>
+          </div>
+          
+          <div class="text-center">
+            <p class="text-sm font-semibold text-slate-700 mb-2">Kernel tính g<sub>y</sub> (Sai phân dọc theo trục y)</p>
+            <div class="matrix-grid grid-cols-3">
+              <div class="matrix-cell neg">-1</div><div class="matrix-cell zero">0</div><div class="matrix-cell pos">1</div>
+              <div class="matrix-cell neg">-2</div><div class="matrix-cell zero">0</div><div class="matrix-cell pos">2</div>
+              <div class="matrix-cell neg">-1</div><div class="matrix-cell zero">0</div><div class="matrix-cell pos">1</div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">(Phát hiện Cạnh Dọc - Vertical edges)</p>
+          </div>
+        </div>
+      </div>
+      <div class="bg-slate-100 p-4 rounded text-sm italic border-l-4 border-slate-300">
+        Giống như Laplacian, tổng các hệ số trong toán tử Sobel cũng bằng 0. Vùng có cường độ sáng không đổi sẽ cho kết quả đạo hàm bằng 0 (màu đen).
+      </div>
+    </section>
+
+    <!-- PHẦN 4: ỨNG DỤNG GRADIENT -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-rose-500 pb-2 inline-block">
+        4. Ứng dụng: Kiểm tra khuyết tật công nghiệp
+      </h2>
+      <p class="mb-4 text-slate-700">
+        Gradient rất xuất sắc trong việc <strong>tăng cường cạnh (edge enhancement)</strong> và loại bỏ nền xám không đổi. 
+      </p>
+      
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-6">
+        <div class="flex-1">
+          <h4 class="font-bold text-slate-800 text-lg mb-2 flex items-center gap-2">
+             <i data-lucide="microscope" class="w-5 h-5 text-blue-600"></i> Ví dụ 3.20: Kính áp tròng (Hình 3.51)
+          </h4>
+          <p class="text-slate-600 text-sm mb-4">
+            Hình ảnh quang học của một kính áp tròng có khuyết tật (mẻ viền ở vị trí 4 giờ và 5 giờ). Khi áp dụng Gradient (Toán tử Sobel):
+          </p>
+          <ul class="list-disc ml-5 space-y-1 text-sm text-slate-700">
+            <li>Nền trơn màu xám bên trong và ngoài kính bị <strong>khử hoàn toàn về màu đen (0)</strong>. Giảm thiểu khối lượng tính toán cho các hệ thống kiểm tra tự động.</li>
+            <li>Các cạnh (viền kính) và đặc biệt là <strong>các vết xước/mẻ nhỏ xíu bừng sáng lên</strong>, hiển thị rõ ràng trên nền đen sẫm.</li>
+          </ul>
+        </div>
+        <div class="shrink-0 flex gap-2">
+          <div class="w-32 h-32 bg-slate-200 rounded flex items-center justify-center text-xs text-slate-500 border border-slate-300 shadow-inner">
+            [Ảnh Gốc - Có Nền]
+          </div>
+          <div class="w-32 h-32 bg-slate-900 rounded flex items-center justify-center text-xs text-slate-400 border border-slate-700 shadow-inner">
+            <div class="w-24 h-24 rounded-full border-2 border-white flex items-end justify-end pb-2 pr-1">✨</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-24 py-10 bg-slate-900 text-slate-400 text-center text-sm border-t border-slate-800">
+    <div class="max-w-xl mx-auto">
+      <p class="mb-2 text-slate-300 font-semibold">Tài liệu tương tác: Digital Image Processing (Chương 3)</p>
+      <p>Unsharp Masking, Highboost Filtering & First-Order Derivatives (The Gradient).</p>
+    </div>
+  </footer>
+
+  <!-- Scripts Logic -->
+  <script>
+    lucide.createIcons();
+
+    // --- UNSHARP MASKING SIMULATOR ---
+    const unsharpSim = {
+      points: 200,
+      orig: [],
+      blur: [],
+      
+      init() {
+        // 1. Tạo tín hiệu gốc (Original Signal)
+        // 1/3 đầu: phẳng thấp. 1/3 giữa: dốc (ramp). 1/3 cuối: phẳng cao.
+        for (let i = 0; i <= this.points; i++) {
+          if (i < 60) this.orig.push(20);
+          else if (i > 140) this.orig.push(80);
+          else {
+             // Ramp từ 20 -> 80 trong khoảng 60 -> 140 (80 steps)
+             const val = 20 + ((i - 60) / 80) * 60;
+             this.orig.push(val);
+          }
+        }
+
+        // 2. Tạo tín hiệu mờ (Blurred) bằng Moving Average
+        const windowSize = 25;
+        const half = Math.floor(windowSize / 2);
+        for (let i = 0; i <= this.points; i++) {
+          let sum = 0;
+          let count = 0;
+          for (let j = -half; j <= half; j++) {
+            let idx = i + j;
+            if (idx >= 0 && idx <= this.points) {
+              sum += this.orig[idx];
+              count++;
+            }
+          }
+          this.blur.push(sum / count);
+        }
+
+        // Khởi tạo các SVG tĩnh
+        this.drawCurve('line-orig', this.orig, 0, 100);
+        this.drawCurve('line-blur', this.blur, 0, 100);
+
+        // Gắn event listener cho slider
+        const slider = document.getElementById('k-slider');
+        slider.addEventListener('input', (e) => this.renderDynamic(e.target.value));
+        
+        // Render lần đầu
+        this.renderDynamic(slider.value);
+      },
+
+      renderDynamic(kStr) {
+        const k = parseFloat(kStr);
+        document.getElementById('k-value').textContent = k.toFixed(1);
+
+        // Cập nhật text note
+        if (k > 1.2) {
+          document.getElementById('sim-note-1').classList.add('hidden');
+          document.getElementById('sim-note-2').classList.remove('hidden');
+        } else {
+          document.getElementById('sim-note-1').classList.remove('hidden');
+          document.getElementById('sim-note-2').classList.add('hidden');
+        }
+
+        // 3. Tính Mask = Orig - Blur
+        const mask = [];
+        for (let i = 0; i <= this.points; i++) {
+          mask.push(this.orig[i] - this.blur[i]);
+        }
+        // Vẽ mask (trục 0 nằm ở giữa, dải giá trị mask cỡ -20 đến 20)
+        // Map: Y=50 là 0. val=20 -> Y=20. val=-20 -> Y=80
+        this.drawCurve('line-mask', mask, -35, 35);
+
+        // 4. Tính Final = Orig + k * Mask
+        const final = [];
+        for (let i = 0; i <= this.points; i++) {
+          final.push(this.orig[i] + k * mask[i]);
+        }
+        // Vẽ Final (dải giá trị 0-100 giống orig, nhưng có thể tràn giới hạn nếu k lớn)
+        this.drawCurve('line-final', final, 0, 100);
+      },
+
+      drawCurve(elementId, dataArray, minY, maxY) {
+        const width = 400;
+        const height = 100;
+        const yRange = maxY - minY;
+        
+        const pts = dataArray.map((val, idx) => {
+          const x = (idx / this.points) * width;
+          // Trục Y của SVG hướng xuống
+          const y = height - ((val - minY) / yRange) * height;
+          return `${x},${y}`;
+        }).join(' ');
+
+        document.getElementById(elementId).setAttribute('points', pts);
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      unsharpSim.init();
+    });
+  </script>
+</body>
+</html>
