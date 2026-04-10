@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>So sánh Bão thông điệp - Bully vs Ring</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* CSS Variables - Dark Theme */
+        :root {
+            --bg-main: #242429;
+            --bg-card: #3a3a3e;
+            --text-heading: #ecd3de;
+            --text-body: #d4d4d4;
+            --accent-pink: #f4a8a8;
+            --accent-blue: #a5c8ff;
+            --node-border: #d4d4d4;
+            --line-color: rgba(136, 136, 136, 0.2);
+            
+            --msg-election: #ef4444;
+            --msg-ok: #3b82f6;
+            --msg-ring: #f59e0b;
+            --msg-coordinator: #10b981;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-body);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, .mono-text {
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: var(--text-heading);
+            font-weight: normal;
+        }
+
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; text-align: center; }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            flex-grow: 1;
+            width: 100%;
+        }
+
+        .top-panel {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 4px solid var(--accent-pink);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .scenario-desc {
+            font-size: 1.1rem;
+            font-family: 'Consolas', monospace;
+            color: var(--accent-blue);
+        }
+
+        .btn {
+            background-color: transparent; border: 2px solid var(--text-heading);
+            color: var(--text-heading); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;
+            font-family: 'Consolas', monospace; font-size: 1.1rem; transition: all 0.2s;
+            display: flex; align-items: center; gap: 0.5rem; font-weight: bold;
+        }
+        .btn:hover { background-color: var(--text-heading); color: var(--bg-main); }
+        .btn-primary { background-color: var(--accent-blue); border-color: var(--accent-blue); color: var(--bg-main); }
+        .btn-primary:hover { background-color: #8ab4f8; border-color: #8ab4f8; transform: scale(1.05); }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 1024px) { .comparison-grid { grid-template-columns: 1fr; } }
+
+        .styled-card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .card-bully { border-top: 6px solid #ef4444; }
+        .card-ring { border-top: 6px solid #10b981; }
+
+        .canvas-container {
+            background-color: var(--bg-main);
+            border-radius: 12px;
+            position: relative;
+            height: 400px;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1rem;
+            border: 1px solid #444;
+        }
+
+        svg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 1;
+        }
+
+        .mesh-line { stroke: rgba(239, 68, 68, 0.1); stroke-width: 1; }
+        .ring-line { stroke: rgba(16, 185, 129, 0.3); stroke-width: 2; stroke-dasharray: 5, 5; }
+
+        .node {
+            position: absolute; width: 44px; height: 44px;
+            border-radius: 50%; border: 3px solid var(--node-border);
+            background-color: var(--bg-main); display: flex; justify-content: center; align-items: center;
+            color: var(--text-body); font-family: 'Consolas', monospace; font-size: 1.1rem;
+            z-index: 10; transition: all 0.3s ease;
+        }
+
+        .node.dead { border-color: #555; color: #555; background-color: #2a2a2a; opacity: 0.6; }
+        .node.initiator { box-shadow: 0 0 15px #f59e0b; border-color: #f59e0b; }
+        .node.coordinator { background-color: var(--accent-blue); border-color: var(--accent-blue); color: var(--bg-main); font-weight: bold; }
+
+        .message {
+            position: absolute; width: 12px; height: 12px; border-radius: 50%;
+            z-index: 20; transition: all 0.6s linear; 
+        }
+
+        .stats-panel {
+            margin-top: 1rem;
+            background-color: #1e1e22;
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #444;
+        }
+
+        .counter {
+            font-size: 2.5rem;
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+
+        .counter.danger { color: #ef4444; animation: shake 0.5s infinite; }
+        .counter.safe { color: #10b981; }
+
+        .complexity-formula {
+            font-size: 1.2rem;
+            color: var(--accent-pink);
+            font-family: 'Consolas', monospace;
+            background: rgba(244, 168, 168, 0.1);
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-3px); }
+            50% { transform: translateX(3px); }
+            75% { transform: translateX(-3px); }
+            100% { transform: translateX(0); }
+        }
+
+        .legend {
+            display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem;
+            font-size: 0.85rem; font-family: 'Consolas', monospace;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1><i class="fa-solid fa-cloud-showers-heavy text-accent-pink"></i> Trực quan hóa: Hiện tượng "Bão thông điệp"</h1>
+        
+        <div class="top-panel">
+            <div class="scenario-desc">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i> 
+                <b>Kịch bản (Trường hợp xấu nhất):</b> Hệ thống có 6 Node. Node lớn nhất (Node 5 - Leader) vừa sập.<br>
+                Node nhỏ nhất (Node 0) phát hiện lỗi đầu tiên và phát động bầu cử.
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="resetSim()"><i class="fa-solid fa-rotate-right"></i> Đặt lại</button>
+                <button class="btn btn-primary" onclick="startComparison()"><i class="fa-solid fa-play"></i> Chạy So sánh</button>
+            </div>
+        </div>
+
+        <div class="comparison-grid">
+            <!-- BULLY ALGORITHM -->
+            <div class="styled-card card-bully">
+                <h2 style="color: #ef4444;"><i class="fa-solid fa-fire"></i> Bully Algorithm</h2>
+                <p>Mọi node giao tiếp với các node lớn hơn. Dẫn đến phản ứng dây chuyền.</p>
+                
+                <div class="canvas-container" id="bully-canvas">
+                    <svg id="bully-svg"></svg>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item"><div class="dot" style="background: #ef4444; box-shadow: 0 0 5px #ef4444;"></div> ELECTION</div>
+                    <div class="legend-item"><div class="dot" style="background: #3b82f6; box-shadow: 0 0 5px #3b82f6;"></div> OK</div>
+                    <div class="legend-item"><div class="dot" style="background: #10b981; box-shadow: 0 0 5px #10b981;"></div> COORDINATOR</div>
+                </div>
+
+                <div class="stats-panel">
+                    <div>
+                        <div style="color: #888; font-size: 0.9rem;">TỔNG SỐ TIN NHẮN MẠNG</div>
+                        <div class="complexity-formula">Độ phức tạp: O(N²)</div>
+                    </div>
+                    <div class="counter" id="bully-counter" style="color: #d4d4d4;">0</div>
+                </div>
+            </div>
+
+            <!-- RING ALGORITHM -->
+            <div class="styled-card card-ring">
+                <h2 style="color: #10b981;"><i class="fa-solid fa-circle-notch"></i> Ring Algorithm</h2>
+                <p>Tin nhắn truyền tuần tự theo vòng, bypass các node chết một cách gọn gàng.</p>
+                
+                <div class="canvas-container" id="ring-canvas">
+                    <svg id="ring-svg"></svg>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item"><div class="dot" style="background: #f59e0b; box-shadow: 0 0 5px #f59e0b;"></div> ELECTION (Gom ID)</div>
+                    <div class="legend-item"><div class="dot" style="background: #10b981; box-shadow: 0 0 5px #10b981;"></div> COORDINATOR</div>
+                </div>
+
+                <div class="stats-panel">
+                    <div>
+                        <div style="color: #888; font-size: 0.9rem;">TỔNG SỐ TIN NHẮN MẠNG</div>
+                        <div class="complexity-formula" style="color: #10b981; background: rgba(16,185,129,0.1);">Độ phức tạp: O(N)</div>
+                    </div>
+                    <div class="counter safe" id="ring-counter">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const NUM_NODES = 6;
+        let bullyNodes = [];
+        let ringNodes = [];
+        let bullyMsgCount = 0;
+        let ringMsgCount = 0;
+        let isRunning = false;
+
+        function initNetwork(containerId, svgId, nodeArray, topologyType) {
+            const container = document.getElementById(containerId);
+            const svg = document.getElementById(svgId);
+            
+            // Clear old
+            Array.from(container.children).forEach(c => { if(c.tagName !== 'svg' && c.tagName !== 'SVG') c.remove(); });
+            svg.innerHTML = '';
+            nodeArray.length = 0; // clear array
+
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 2 - 40;
+
+            // Create DOM Nodes
+            for (let i = 0; i < NUM_NODES; i++) {
+                const angle = (Math.PI * 2 * i) / NUM_NODES - Math.PI / 2;
+                const x = centerX + radius * Math.cos(angle) - 22;
+                const y = centerY + radius * Math.sin(angle) - 22;
+
+                const nodeEl = document.createElement('div');
+                // Node 5 is dead initially
+                const isDead = (i === 5);
+                nodeEl.className = `node ${isDead ? 'dead' : ''}`;
+                nodeEl.innerHTML = i;
+                nodeEl.style.left = `${x}px`;
+                nodeEl.style.top = `${y}px`;
+
+                container.appendChild(nodeEl);
+                nodeArray.push({ id: i, el: nodeEl, x: x + 22, y: y + 22, isAlive: !isDead });
+            }
+
+            // Draw Lines
+            if (topologyType === 'mesh') {
+                for (let i = 0; i < NUM_NODES; i++) {
+                    for (let j = i + 1; j < NUM_NODES; j++) {
+                        drawLine(svg, nodeArray[i], nodeArray[j], 'mesh-line');
+                    }
+                }
+            } else if (topologyType === 'ring') {
+                for (let i = 0; i < NUM_NODES; i++) {
+                    const next = (i + 1) % NUM_NODES;
+                    drawLine(svg, nodeArray[i], nodeArray[next], 'ring-line');
+                }
+            }
+        }
+
+        function drawLine(svg, n1, n2, className) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', n1.x);
+            line.setAttribute('y1', n1.y);
+            line.setAttribute('x2', n2.x);
+            line.setAttribute('y2', n2.y);
+            line.setAttribute('class', className);
+            svg.appendChild(line);
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function animateMessage(containerId, fromNode, toNode, color, duration = 600) {
+            return new Promise(resolve => {
+                const container = document.getElementById(containerId);
+                const msg = document.createElement('div');
+                msg.className = 'message';
+                msg.style.backgroundColor = color;
+                msg.style.boxShadow = `0 0 8px ${color}`;
+                msg.style.left = `${fromNode.x - 6}px`;
+                msg.style.top = `${fromNode.y - 6}px`;
+                msg.style.transitionDuration = `${duration}ms`;
+
+                container.appendChild(msg);
+                void msg.offsetWidth; // Force reflow
+
+                msg.style.left = `${toNode.x - 6}px`;
+                msg.style.top = `${toNode.y - 6}px`;
+
+                setTimeout(() => {
+                    msg.remove();
+                    resolve();
+                }, duration);
+            });
+        }
+
+        function updateCounter(id, value, isBully) {
+            const el = document.getElementById(id);
+            el.innerText = value;
+            if (isBully && value > 12) {
+                el.classList.add('danger');
+            } else {
+                el.classList.remove('danger');
+            }
+        }
+
+        // ================= BULLY LOGIC =================
+        async function executeBullyStorm() {
+            let active = [0, 1, 2, 3, 4]; // Node 5 is dead
+            bullyNodes[0].el.classList.add('initiator');
+
+            // Bully cascading logic: 
+            // 0 sends to 1,2,3,4
+            // 1,2,3,4 send OK to 0
+            // 1 sends to 2,3,4 -> OKs to 1
+            // 2 sends to 3,4 -> OKs to 2
+            // 3 sends to 4 -> OK to 3
+            
+            for (let i = 0; i < active.length - 1; i++) {
+                let initiatorId = active[i];
+                let higherNodes = active.slice(i + 1);
+
+                // Send Elections
+                let promises = [];
+                bullyNodes[initiatorId].el.classList.add('initiator');
+                
+                higherNodes.forEach(targetId => {
+                    promises.push(animateMessage('bully-canvas', bullyNodes[initiatorId], bullyNodes[targetId], '#ef4444', 800));
+                    bullyMsgCount++; updateCounter('bully-counter', bullyMsgCount, true);
+                });
+                
+                // Also send to Node 5 (dead) to show it tries, then fails (no OK)
+                promises.push(animateMessage('bully-canvas', bullyNodes[initiatorId], bullyNodes[5], '#ef4444', 800));
+                bullyMsgCount++; updateCounter('bully-counter', bullyMsgCount, true);
+
+                await Promise.all(promises);
+                bullyNodes[initiatorId].el.classList.remove('initiator');
+
+                // Send OKs back
+                promises = [];
+                higherNodes.forEach(senderId => {
+                    promises.push(animateMessage('bully-canvas', bullyNodes[senderId], bullyNodes[initiatorId], '#3b82f6', 800));
+                    bullyMsgCount++; updateCounter('bully-counter', bullyMsgCount, true);
+                });
+                await Promise.all(promises);
+            }
+
+            // Node 4 wins, sends Coordinator
+            let winnerId = 4;
+            bullyNodes[winnerId].el.classList.add('coordinator');
+            let others = [0, 1, 2, 3];
+            let promises = [];
+            others.forEach(targetId => {
+                promises.push(animateMessage('bully-canvas', bullyNodes[winnerId], bullyNodes[targetId], '#10b981', 800));
+                bullyMsgCount++; updateCounter('bully-counter', bullyMsgCount, true);
+            });
+            await Promise.all(promises);
+        }
+
+        // ================= RING LOGIC =================
+        async function executeRingCalm() {
+            let active = [0, 1, 2, 3, 4]; // 5 is dead
+            let current = 0;
+            ringNodes[0].el.classList.add('initiator');
+
+            // Phase 1: Election circulating
+            for (let i = 0; i < active.length; i++) {
+                let nextIdx = (active.indexOf(current) + 1) % active.length;
+                let next = active[nextIdx];
+
+                // If going from 4 to 0, it bypasses 5 visually
+                await animateMessage('ring-canvas', ringNodes[current], ringNodes[next], '#f59e0b', 1200); // Slower, calmer animation
+                ringMsgCount++; updateCounter('ring-counter', ringMsgCount, false);
+                current = next;
+            }
+            ringNodes[0].el.classList.remove('initiator');
+
+            // Phase 2: Coordinator circulating
+            let winnerId = 4;
+            ringNodes[winnerId].el.classList.add('coordinator');
+            current = winnerId;
+            
+            for (let i = 0; i < active.length - 1; i++) {
+                let nextIdx = (active.indexOf(current) + 1) % active.length;
+                let next = active[nextIdx];
+
+                await animateMessage('ring-canvas', ringNodes[current], ringNodes[next], '#10b981', 1200);
+                ringMsgCount++; updateCounter('ring-counter', ringMsgCount, false);
+                current = next;
+            }
+        }
+
+        async function startComparison() {
+            if (isRunning) return;
+            isRunning = true;
+            
+            // Reset state
+            bullyMsgCount = 0; ringMsgCount = 0;
+            updateCounter('bully-counter', 0, true);
+            updateCounter('ring-counter', 0, false);
+            
+            // Clean coordinator styles
+            bullyNodes.forEach(n => n.el.classList.remove('coordinator', 'initiator'));
+            ringNodes.forEach(n => n.el.classList.remove('coordinator', 'initiator'));
+
+            // Run side-by-side
+            await Promise.all([
+                executeBullyStorm(),
+                executeRingCalm()
+            ]);
+
+            isRunning = false;
+        }
+
+        function resetSim() {
+            if (isRunning) return;
+            initNetwork('bully-canvas', 'bully-svg', bullyNodes, 'mesh');
+            initNetwork('ring-canvas', 'ring-svg', ringNodes, 'ring');
+            
+            bullyMsgCount = 0; ringMsgCount = 0;
+            updateCounter('bully-counter', 0, false);
+            updateCounter('ring-counter', 0, false);
+        }
+
+        window.onload = () => {
+            resetSim();
+            // Handle window resize properly
+            window.addEventListener('resize', resetSim);
+        };
+    </script>
+</body>
+</html>
