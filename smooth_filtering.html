@@ -91,10 +91,6 @@
              </div>
          </div>
       </div>
-
-      <p class="mb-4 text-slate-700">
-        <strong>Đánh giá:</strong> Box filters cực kỳ phù hợp để làm mờ nhanh và có tính "thô". Tuy nhiên, chúng tạo ra kết quả rất kém trong nhiều ứng dụng phức tạp (ví dụ: mô phỏng sự mất nét của ống kính camera). Chúng có xu hướng ưu tiên làm mờ dọc theo các hướng vuông góc (trục x y), gây ra hiện tượng méo dạng tuyến tính.
-      </p>
     </section>
 
     <!-- PHẦN 3: GAUSSIAN FILTERS -->
@@ -212,15 +208,13 @@
               Lọc Gaussian (Smooth)
             </button>
 
-            <div id="edge-note" class="mt-4 text-xs text-slate-400">
-              <!-- Note sẽ được JS cập nhật -->
-            </div>
+            <div id="edge-note" class="mt-4 text-xs text-slate-400"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- PHẦN 5: PADDING -->
+    <!-- PHẦN 5: PADDING (ĐÃ KHÔI PHỤC ĐẦY ĐỦ) -->
     <section>
       <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-indigo-500 pb-2 inline-block">
         5. Vấn đề Xử lý Viền Ảnh (Padding)
@@ -230,40 +224,91 @@
       </p>
 
       <!-- Padding Simulator -->
-      <div class="bg-white border border-slate-200 p-6 rounded-xl shadow-sm my-6">
+      <div class="bg-white border border-slate-200 p-6 rounded-xl shadow-sm my-6 overflow-x-auto">
          <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
           <i data-lucide="waves" class="w-5 h-5 text-blue-500"></i>
           Minh họa 3 phương pháp Padding (Đệm viền)
         </h4>
+        <p class="text-sm text-slate-600 mb-6">Giả sử chúng ta có một mảng 1D (đại diện cho rìa của bức ảnh). Khi kernel trượt ra ngoài rìa, ta phải đệm thêm dữ liệu ảo (ví dụ padding size = 3).</p>
 
-        <div class="space-y-6">
+        <div class="space-y-6 min-w-max">
+          <!-- Original -->
+          <div>
+            <div class="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Mảng Gốc (Image Boundary)</div>
+            <div class="flex gap-1 justify-start">
+               <div class="w-10 h-10"></div><div class="w-10 h-10"></div><div class="w-10 h-10"></div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">10</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">40</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">80</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">90</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">50</div>
+               <div class="w-10 h-10"></div><div class="w-10 h-10"></div><div class="w-10 h-10"></div>
+            </div>
+          </div>
+
           <!-- Zero Padding -->
           <div class="pt-4 border-t border-slate-100">
             <div class="text-sm font-bold text-slate-700 mb-1">1. Zero Padding (Đệm số 0)</div>
             <div class="text-xs text-slate-500 mb-2">Gây ra viền đen (dark borders) do trung bình với các điểm ảnh màu đen (0).</div>
-            <div class="flex gap-1 justify-center max-w-md mx-auto">
+            <div class="flex gap-1 justify-start">
+               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
+               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
                <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">10</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">40</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">80</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">90</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">50</div>
                <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
+               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
+               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
+            </div>
+          </div>
+
+          <!-- Replicate Padding -->
+          <div class="pt-4 border-t border-slate-100">
+            <div class="text-sm font-bold text-slate-700 mb-1">2. Replicate Padding (Lặp lại biên)</div>
+            <div class="text-xs text-slate-500 mb-2">Tốt nhất khi các khu vực gần viền có cường độ đồng nhất (hằng số).</div>
+            <div class="flex gap-1 justify-start">
+               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">10</div>
+               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">10</div>
+               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">10</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">10</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">40</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">80</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">90</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">50</div>
+               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">50</div>
+               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">50</div>
+               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">50</div>
             </div>
           </div>
 
           <!-- Mirror Padding -->
           <div class="pt-4 border-t border-slate-100">
-            <div class="text-sm font-bold text-slate-700 mb-1">2. Mirror Padding (Đệm đối xứng / Phản chiếu)</div>
+            <div class="text-sm font-bold text-slate-700 mb-1">3. Mirror Padding (Đệm đối xứng / Phản chiếu)</div>
             <div class="text-xs text-slate-500 mb-2">Tốt nhất khi vùng gần viền có chứa nhiều chi tiết phức tạp. Triệt tiêu được viền đen.</div>
-            <div class="flex gap-1 justify-center max-w-md mx-auto">
+            <div class="flex gap-1 justify-start">
+               <!-- Đối xứng của [10, 40, 80] là [80, 40, 10] khi nhìn ngược từ mép -->
+               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">90</div>
+               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">80</div>
                <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">40</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">10</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">40</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">80</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">90</div>
+               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">50</div>
+               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">90</div>
+               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">80</div>
                <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">40</div>
             </div>
           </div>
         </div>
       </div>
+
+      <p class="text-slate-700 mt-4 bg-slate-100 p-4 rounded text-sm italic">
+        *Bạn sẽ thấy các viền đen dày xuất hiện xung quanh ảnh ở Hình 3.33 do việc áp dụng Zero Padding với các Kernel có kích thước lớn. Việc dùng Mirror Padding (Hình 3.39) sẽ loại bỏ hoàn toàn dải viền đen này và mang lại kết quả thẩm mỹ cao hơn.
+      </p>
     </section>
 
     <!-- PHẦN 6: ORDER-STATISTIC FILTERS -->
@@ -302,7 +347,7 @@
           <div class="flex flex-col items-center">
             <p class="font-bold text-slate-500 text-sm mb-2 uppercase">Vùng lân cận (3x3)</p>
             <div id="median-grid" class="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded">
-              <!-- Sẽ được JS render: [10, 20, 20, 20, 15, 20, 20, 25, 100] -->
+              <!-- Sẽ được JS render -->
             </div>
             <div class="mt-4 flex items-center gap-2 text-xs text-slate-500">
                <span class="w-3 h-3 bg-red-100 border border-red-400 inline-block rounded-sm"></span> Pixel nhiễu (Outlier)
@@ -503,12 +548,11 @@
 
     // --- MEDIAN FILTER SIMULATOR ---
     const medianSim = {
-      data: [10, 20, 20, 20, 15, 20, 20, 25, 100], // Ví dụ chuẩn trong sách
+      data: [10, 20, 20, 20, 15, 20, 20, 25, 100],
       init() {
         this.render();
       },
       render() {
-        // Render lưới 3x3
         let gridHTML = '';
         this.data.forEach(val => {
           const isOutlier = val === 100;
@@ -517,22 +561,19 @@
         });
         document.getElementById('median-grid').innerHTML = gridHTML;
 
-        // Tính Mean
         const sum = this.data.reduce((a, b) => a + b, 0);
         const mean = (sum / 9).toFixed(2);
         document.getElementById('median-mean-result').textContent = `~${mean}`;
 
-        // Tính Median
         const sortedArray = [...this.data].sort((a, b) => a - b);
-        const median = sortedArray[4]; // Vị trí thứ 5 (index 4)
+        const median = sortedArray[4];
         document.getElementById('median-median-result').textContent = median;
 
-        // Render sorted array (nhấn mạnh phần tử ở giữa và phần tử outlier)
         let sortedHTML = '[ ';
         sortedArray.forEach((val, idx) => {
           let style = 'text-slate-600';
-          if (idx === 4) style = 'text-purple-700 font-bold bg-purple-200 px-1 rounded'; // Center
-          if (val === 100) style = 'text-red-600 line-through'; // Outlier
+          if (idx === 4) style = 'text-purple-700 font-bold bg-purple-200 px-1 rounded';
+          if (val === 100) style = 'text-red-600 line-through';
           sortedHTML += `<span class="${style}">${val}</span>`;
           if (idx < 8) sortedHTML += ', ';
         });
