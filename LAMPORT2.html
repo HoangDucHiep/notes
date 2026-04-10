@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chương 5.2: Ứng dụng Đồng hồ Lamport</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            chtml: { displayAlign: 'center' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.8; }
+        .textbook { font-family: 'Lora', serif; font-size: 1.1rem; color: #334155; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); padding: 2.5rem; margin-bottom: 2rem; }
+        .math-box { background: #f1f5f9; border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; overflow-x: auto;}
+        
+        /* Queue visualizer styles */
+        .queue-box { border: 2px solid #cbd5e1; border-radius: 8px; min-height: 60px; padding: 0.5rem; display: flex; gap: 0.5rem; overflow-x: auto; background: #f8fafc; }
+        .q-item { background: white; border: 2px solid #3b82f6; border-radius: 6px; padding: 0.5rem; min-width: 100px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: center; transition: all 0.3s;}
+        .q-item.ack { border-color: #10b981; background: #ecfdf5; }
+        .q-item-header { font-size: 0.75rem; font-weight: bold; color: #64748b; border-bottom: 1px solid #e2e8f0; margin-bottom: 0.25rem; padding-bottom: 0.25rem;}
+        .q-item-val { font-family: 'JetBrains Mono', monospace; font-weight: bold; color: #0f172a; font-size: 1rem;}
+        
+        .db-cylinder { width: 80px; height: 100px; background: linear-gradient(to right, #94a3b8 0%, #cbd5e1 20%, #f1f5f9 50%, #cbd5e1 80%, #94a3b8 100%); border-radius: 50% / 15px; position: relative; border: 2px solid #475569; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'JetBrains Mono', monospace;}
+        .db-cylinder::before { content: ''; position: absolute; top: -15px; left: -2px; width: 80px; height: 30px; background: #f8fafc; border-radius: 50%; border: 2px solid #475569; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <header class="bg-slate-900 text-white p-10 shadow-2xl border-b-4 border-indigo-500 relative overflow-hidden">
+        <i class="fas fa-layer-group absolute -right-10 -top-10 text-9xl opacity-10"></i>
+        <div class="max-w-4xl mx-auto relative z-10">
+            <div class="text-indigo-400 font-bold tracking-widest text-sm mb-2 uppercase">Chương 5.2 (Tiếp theo)</div>
+            <h1 class="text-4xl font-extrabold mb-3">Ứng dụng Đồng hồ Lamport:<br>Multicast & Mutual Exclusion</h1>
+            <p class="text-indigo-200 text-lg">Giải quyết bài toán bất đồng bộ CSDL nhân bản và chia sẻ tài nguyên.</p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto mt-12 px-4">
+
+        <!-- ==========================================
+             PHẦN 1: BÀI TOÁN CSDL NHÂN BẢN
+             ========================================== -->
+        <div class="card textbook">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-blue-500 pb-2">1. Vấn đề: CSDL Nhân bản (Figure 5.9)</h2>
+            <p>Sách đặt ra một bài toán kinh điển: Một ngân hàng có CSDL tài khoản được nhân bản (replicated) ở New York và San Francisco để tăng tốc độ truy vấn. Khách hàng hiện có 1,000 USD.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div class="bg-blue-50 p-5 rounded-lg border border-blue-200">
+                    <h3 class="font-bold text-blue-800 mb-2"><i class="fas fa-user mr-2"></i>Sự kiện 1 (Tại San Francisco)</h3>
+                    <p class="text-sm">Khách hàng gửi thêm 100 USD vào tài khoản. <br><code class="bg-white px-1 border rounded">Update 1: Balance += 100</code></p>
+                </div>
+                <div class="bg-emerald-50 p-5 rounded-lg border border-emerald-200">
+                    <h3 class="font-bold text-emerald-800 mb-2"><i class="fas fa-university mr-2"></i>Sự kiện 2 (Tại New York)</h3>
+                    <p class="text-sm">Nhân viên ngân hàng cộng 1% tiền lãi. <br><code class="bg-white px-1 border rounded">Update 2: Balance *= 1.01</code></p>
+                </div>
+            </div>
+
+            <div class="bg-red-50 border-l-4 border-red-500 p-5 my-6 rounded-r">
+                <h4 class="font-bold font-sans text-red-800 mb-2">Thảm họa Bất đồng bộ (Inconsistent State)</h4>
+                <p class="text-slate-700 mb-2">Do trễ mạng (Network delays), hai Update này bay qua lại và đến các CSDL theo <strong>thứ tự khác nhau</strong>:</p>
+                <ul class="list-disc pl-6 text-sm space-y-2">
+                    <li><strong>Tại SF:</strong> Cập nhật 100 USD trước, lãi 1% sau. <br>Toán: \((1000 + 100) \times 1.01 = \mathbf{1,111}\) USD.</li>
+                    <li><strong>Tại NY:</strong> Lãi 1% đến trước, cập nhật 100 USD đến sau. <br>Toán: \((1000 \times 1.01) + 100 = \mathbf{1,110}\) USD.</li>
+                </ul>
+                <p class="mt-2 font-bold text-red-700">Kết quả: Cùng một tài khoản, hai chi nhánh báo số dư khác nhau. Hệ thống sụp đổ!</p>
+            </div>
+            
+            <p><strong>Giải pháp: Totally Ordered Multicast.</strong> Hệ thống không quan tâm thao tác nào xảy ra trước về mặt thời gian thực. Hệ thống chỉ cần đảm bảo <strong>cả hai nơi phải thực thi theo đúng một thứ tự giống hệt nhau</strong> (dù là thứ tự nào đi nữa). Điều này được gọi là <em>State Machine Replication</em>.</p>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 2: THUẬT TOÁN MULTICAST CÓ THỨ TỰ TOÀN PHẦN
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-purple-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-purple-500 pb-2">2. Giải pháp bằng Đồng hồ Lamport</h2>
+            <p>Làm sao để mọi máy đều đồng ý một thứ tự? Ta dùng Đồng hồ Lamport kết hợp với <strong>Hàng đợi cục bộ (Local Queues)</strong>.</p>
+
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">Quy trình hoạt động:</h3>
+            <ol class="list-decimal pl-6 space-y-3 mb-6">
+                <li>Khi một process có một lệnh cập nhật, nó gán Timestamp Lamport hiện tại vào lệnh (Ví dụ: <code>Update1, ts=10, id=1</code>), thả vào hàng đợi của chính nó, và Multicast (gửi cho TẤT CẢ mọi người).</li>
+                <li>Khi một process nhận được tin nhắn cập nhật, nó ném vào hàng đợi cục bộ của nó. Hàng đợi này <strong>luôn được sắp xếp (sorted)</strong> theo Timestamp.</li>
+                <li>Để mọi người biết mình đã nhận, process đó Multicast một tin nhắn <strong>ACK</strong> (Acknowledgement) cho toàn mạng. (Tin ACK này cũng mang timestamp mới hơn theo thuật toán Lamport).</li>
+                <li><strong class="text-purple-700">Điều kiện sinh tử để thực thi:</strong> Một lệnh cập nhật chỉ được lôi ra khỏi hàng đợi và áp dụng vào CSDL khi thỏa mãn ĐỒNG THỜI 2 điều kiện:
+                    <ul class="list-disc pl-6 mt-1 text-slate-600">
+                        <li>Nó đang đứng ở <strong>đầu hàng đợi (head of the queue)</strong>.</li>
+                        <li>Đã nhận được <strong>ACK từ TẤT CẢ</strong> các process khác cho tin nhắn đó (hoặc tin nhắn có timestamp lớn hơn).</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <!-- MÔ PHỎNG 1: TOTALLY ORDERED MULTICAST -->
+            <div class="bg-white border-2 border-purple-100 rounded-xl p-6 mt-8 shadow-sm font-sans">
+                <h3 class="font-bold text-purple-800 mb-2"><i class="fas fa-play-circle mr-2"></i>Mô phỏng 1: Sắp xếp Hàng đợi Ngân hàng</h3>
+                <p class="text-sm text-slate-600 mb-6">Giả sử SF gửi Lệnh $+100$ (Timestamp=10, ID=1). NY gửi Lệnh $\times 1.01$ (Timestamp=8, ID=2). Hãy xem Hàng đợi ở hai nơi tự động sắp xếp lại để đồng nhất thứ tự trước khi ghi vào Database.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                    <!-- SF Node -->
+                    <div class="bg-slate-50 p-4 rounded-lg border">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-bold text-blue-700">San Francisco ($P_1$)</h4>
+                            <div class="db-cylinder" id="db-sf">1000</div>
+                        </div>
+                        <div class="text-xs font-bold text-slate-500 mb-1">Local Queue (Sắp xếp theo TS):</div>
+                        <div class="queue-box" id="q-sf">
+                            <!-- Items go here -->
+                        </div>
+                    </div>
+                    
+                    <!-- NY Node -->
+                    <div class="bg-slate-50 p-4 rounded-lg border">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-bold text-emerald-700">New York ($P_2$)</h4>
+                            <div class="db-cylinder" id="db-ny">1000</div>
+                        </div>
+                        <div class="text-xs font-bold text-slate-500 mb-1">Local Queue (Sắp xếp theo TS):</div>
+                        <div class="queue-box" id="q-ny">
+                            <!-- Items go here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button id="sim1-btn-send" class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded font-bold shadow transition">Gửi tín hiệu & Đưa vào Queue</button>
+                    <button id="sim1-btn-apply" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded font-bold shadow transition opacity-50 cursor-not-allowed" disabled>Áp dụng vào CSDL</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 3: MUTUAL EXCLUSION (LOẠI TRỪ TƯƠNG HỖ)
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-orange-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-orange-500 pb-2">3. Note 5.3: Loại trừ tương hỗ (Mutual Exclusion)</h2>
+            <p>Sách giáo khoa (trang 261-262, Figure 5.10) nâng cấp bài toán trên thành việc xin cấp quyền truy cập vào <strong>Critical Region</strong> (Ví dụ: Một file dùng chung chỉ cho 1 máy viết vào tại 1 thời điểm).</p>
+            <p>Thay vì Update CSDL, các tiến trình gửi tin nhắn <strong>ENTER</strong> (xin vào). Thuật toán gần như giống hệt phần trên.</p>
+
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">Phân tích Logic Code (Figure 5.10)</h3>
+            <ul class="list-disc pl-6 space-y-3 mb-6">
+                <li><code class="bg-slate-100 px-1 rounded text-orange-700 font-bold">requestToEnter</code>: Tăng clock, tạo tin nhắn ENTER có $(C_i, i)$, thả vào hàng đợi, sắp xếp queue, và Multicast.</li>
+                <li><code class="bg-slate-100 px-1 rounded text-orange-700 font-bold">receive (ENTER)</code>: Khi nhận lệnh xin vào của người khác, Tự động gửi lại tin nhắn ACK cho họ, và thả tin ENTER của họ vào queue của mình.</li>
+                <li><code class="bg-slate-100 px-1 rounded text-orange-700 font-bold">allowedToEnter</code>: Tiến trình tự liên tục kiểm tra 2 điều kiện: 
+                    <br>1. Tin nhắn ENTER của chính mình có đang đứng TOP 1 (head of queue) không?
+                    <br>2. Mình đã nhận được tin phản hồi (ACK hoặc tin khác) từ <em>Tất cả</em> mọi người chưa?
+                    <br>Nếu CÓ, tiến trình được quyền truy cập Critical Region.
+                </li>
+                <li><code class="bg-slate-100 px-1 rounded text-orange-700 font-bold">release</code>: Dùng xong thì xóa tin ENTER của mình khỏi queue, và gửi tin nhắn RELEASE cho mọi người để họ cũng xóa tin ENTER đó khỏi queue của họ (dọn chỗ cho người thứ 2 lên TOP 1).</li>
+            </ul>
+
+            <div class="math-box bg-orange-50 border-orange-500">
+                <h4 class="font-bold text-orange-800 mb-2">Vấn đề Tie Breaking (Trùng giờ) & Deadlock Cleanup</h4>
+                <p><strong>1. Trùng giờ:</strong> Nếu 2 máy cùng xin vào ở mốc thời gian $C=15$. Hàng đợi sẽ phân xử dựa vào Process ID ($i$). Bộ Tuple $(15, 1)$ sẽ luôn nhỏ hơn và xếp trước $(15, 2)$. Máy 1 sẽ được vào trước.</p>
+                <p class="mt-2"><strong>2. Dọn rác (Cleanup Queue):</strong> Trang 262 nhấn mạnh một lỗi chết người. Nếu không dọn dẹp các tin nhắn ACK hoặc ALLOW cũ, hàng đợi sẽ bị kẹt. Mã nguồn <code>release()</code> phải loại bỏ toàn bộ các ACK cũ: <code class="text-sm bg-white p-1 rounded">tmp = [r for r in queue if r[2] == ENTER]</code> để tránh Deadlock.</p>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        /* MÔ PHỎNG: TOTALLY ORDERED MULTICAST (BANKING) */
+        const btnSend = document.getElementById('sim1-btn-send');
+        const btnApply = document.getElementById('sim1-btn-apply');
+        const qSF = document.getElementById('q-sf');
+        const qNY = document.getElementById('q-ny');
+        const dbSF = document.getElementById('db-sf');
+        const dbNY = document.getElementById('db-ny');
+
+        let queueData = []; // Mảng chung chứa dữ liệu để gen UI
+
+        function renderQueues() {
+            // Sort queue by TS (Lamport clock logic)
+            queueData.sort((a, b) => a.ts - b.ts);
+            
+            let html = '';
+            queueData.forEach(item => {
+                html += `
+                    <div class="q-item">
+                        <div class="q-item-header">TS: ${item.ts} | P${item.id}</div>
+                        <div class="q-item-val">${item.op}</div>
+                    </div>
+                `;
+            });
+            // Vì là Totally Ordered Multicast, Queue ở 2 nơi sẽ GIỐNG HỆT NHAU sau khi nhận đủ tin nhắn
+            qSF.innerHTML = html;
+            qNY.innerHTML = html;
+        }
+
+        btnSend.addEventListener('click', () => {
+            // SF gửi +100 (TS=10, id=1)
+            // NY gửi *1.01 (TS=8, id=2)
+            queueData = [
+                { ts: 10, id: 1, op: "+ 100 USD" },
+                { ts: 8, id: 2, op: "* 1.01" }
+            ];
+            
+            // Hiện ra chưa sort (giả lập lúc mới nhận)
+            qSF.innerHTML = `<div class="q-item"><div class="q-item-header">TS: 10 | P1</div><div class="q-item-val">+ 100 USD</div></div>
+                             <div class="q-item"><div class="q-item-header">TS: 8 | P2</div><div class="q-item-val">* 1.01</div></div>`;
+            
+            qNY.innerHTML = `<div class="q-item"><div class="q-item-header">TS: 8 | P2</div><div class="q-item-val">* 1.01</div></div>
+                             <div class="q-item"><div class="q-item-header">TS: 10 | P1</div><div class="q-item-val">+ 100 USD</div></div>`;
+
+            setTimeout(() => {
+                // Sau đó tự động sắp xếp theo TS
+                renderQueues();
+                
+                btnSend.disabled = true;
+                btnSend.classList.add('opacity-50', 'cursor-not-allowed');
+                btnApply.disabled = false;
+                btnApply.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, 1000);
+        });
+
+        btnApply.addEventListener('click', () => {
+            // Áp dụng tuần tự theo Queue đã sort (TS: 8 trước, TS: 10 sau)
+            // Lệnh 1: * 1.01
+            // Lệnh 2: + 100
+            
+            let balSF = 1000;
+            let balNY = 1000;
+
+            // Apply TS=8 (* 1.01)
+            balSF *= 1.01; balNY *= 1.01;
+            
+            // Apply TS=10 (+ 100)
+            balSF += 100; balNY += 100;
+
+            dbSF.innerText = balSF;
+            dbNY.innerText = balNY;
+
+            dbSF.style.background = "linear-gradient(to right, #10b981 0%, #34d399 20%, #ecfdf5 50%, #34d399 80%, #10b981 100%)";
+            dbNY.style.background = "linear-gradient(to right, #10b981 0%, #34d399 20%, #ecfdf5 50%, #34d399 80%, #10b981 100%)";
+
+            btnApply.innerText = "Đã nhất quán (Consistent)";
+            btnApply.disabled = true;
+            btnApply.classList.add('opacity-50', 'cursor-not-allowed');
+        });
+    </script>
+</body>
+</html>
