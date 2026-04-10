@@ -17,12 +17,12 @@
   <header class="bg-gradient-to-br from-indigo-900 via-slate-800 to-indigo-950 text-white py-16 px-6 shadow-xl relative overflow-hidden">
     <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
     <div class="max-w-4xl mx-auto relative z-10">
-      <span class="text-indigo-300 font-bold tracking-widest uppercase text-sm mb-2 block">Chương 3 - Section 3.5</span>
+      <span class="text-indigo-300 font-bold tracking-widest uppercase text-sm mb-2 block">Chương 3 - Section 3.5 & 3.6</span>
       <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-blue-100 to-indigo-200">
-        Smoothing (Lowpass) Spatial Filters
+        Smoothing (Lowpass) & Nonlinear Filters
       </h1>
       <p class="text-xl text-indigo-100 font-light max-w-3xl">
-        Tìm hiểu chi tiết về các bộ lọc làm mờ không gian: Box Filter và Gaussian Filter, cùng với những đặc tính toán học giúp chúng khử nhiễu và bảo toàn cạnh.
+        Tìm hiểu chi tiết về các bộ lọc làm mờ không gian: Box, Gaussian (Tuyến tính) và Bộ lọc Trung vị (Phi tuyến tính) cùng sức mạnh khử nhiễu muối tiêu của chúng.
       </p>
     </div>
   </header>
@@ -93,7 +93,7 @@
       </div>
 
       <p class="mb-4 text-slate-700">
-        <strong>Đánh giá:</strong> Box filters cực kỳ phù hợp để làm mờ nhanh và có tính "thô". Tuy nhiên, chúng tạo ra kết quả rất kém trong nhiều ứng dụng phức tạp (ví dụ: mô phỏng sự mất nét của ống kính camera). Chúng có xu hướng ưu tiên làm mờ dọc theo các hướng vuông góc (trục x và y), gây ra hiện tượng méo dạng tuyến tính.
+        <strong>Đánh giá:</strong> Box filters cực kỳ phù hợp để làm mờ nhanh và có tính "thô". Tuy nhiên, chúng tạo ra kết quả rất kém trong nhiều ứng dụng phức tạp (ví dụ: mô phỏng sự mất nét của ống kính camera). Chúng có xu hướng ưu tiên làm mờ dọc theo các hướng vuông góc (trục x y), gây ra hiện tượng méo dạng tuyến tính.
       </p>
     </section>
 
@@ -167,21 +167,6 @@
           </div>
         </div>
       </div>
-
-      <div class="bg-indigo-50 border-l-4 border-indigo-500 p-5 rounded-r mt-6">
-        <h4 class="font-bold text-indigo-900 mb-2">Tính chất tuyệt vời của Gaussian</h4>
-        <ul class="list-disc ml-5 space-y-2 text-indigo-800 text-sm">
-          <li>
-            <strong>Cách lấy mẫu (Sampling):</strong> Để tạo kernel Gaussian ma trận rời rạc, bạn chỉ cần thay tọa độ (s,t) vào công thức, lấy giá trị mẫu và sau cùng chia cho tổng tất cả các phần tử để chuẩn hóa.
-          </li>
-          <li>
-            <strong>Cắt đuôi (Truncation):</strong> Giá trị của Gaussian giảm cực nhanh. Ở khoảng cách lớn hơn <span class="font-serif italic">3σ</span> từ tâm, giá trị của nó gần như bằng 0. Do đó, kích thước kernel thực tế lớn nhất cần dùng chỉ là <strong>⌈6σ⌉ × ⌈6σ⌉</strong>. Dùng kích thước lớn hơn mức này sẽ lãng phí tài nguyên mà không tạo ra sự khác biệt (Đã được chứng minh ở Ví dụ 3.12 trong sách).
-          </li>
-          <li>
-            <strong>Tích chập sinh ra Gaussian:</strong> Tích (Product) hoặc Tích chập (Convolution) của hai hàm Gaussian cũng sẽ sinh ra một hàm Gaussian mới!
-          </li>
-        </ul>
-      </div>
     </section>
 
     <!-- PHẦN 4: SO SÁNH -->
@@ -233,12 +218,6 @@
           </div>
         </div>
       </div>
-
-      <p class="text-slate-700">
-        <strong>Kết luận (Ví dụ 3.13):</strong> 
-        <br>Dùng <span class="text-indigo-700 font-semibold bg-indigo-50 px-1.5 py-0.5 rounded">Box Filter</span> khi bạn muốn bảo toàn phần nào đó của cấu trúc góc cạnh (ít làm mờ cạnh hơn). 
-        <br>Dùng <span class="text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded">Gaussian Filter</span> khi bạn muốn ảnh được làm mờ trơn tru, đồng nhất, mượt mà hoàn toàn không để lại vết nối. Tuy nhiên, yếu điểm của Gaussian là cần ma trận kích thước lớn hơn Box để đạt cùng độ mờ, và làm mất chi tiết nhỏ diện rộng.
-      </p>
     </section>
 
     <!-- PHẦN 5: PADDING -->
@@ -248,7 +227,6 @@
       </h2>
       <p class="mb-4 text-slate-700">
         Khi tâm của Kernel nằm ở viền của bức ảnh, các phần tử rìa của Kernel sẽ "rơi ra ngoài" mảng dữ liệu. Để phép toán không bị lỗi, ta phải mở rộng (pad) bức ảnh.
-        Sách giới thiệu 3 phương pháp Padding. Đặc biệt với Zero-padding (mặc định), nó sẽ sinh ra một hiệu ứng phụ không mong muốn gọi là <strong>Dark borders (Viền đen)</strong>.
       </p>
 
       <!-- Padding Simulator -->
@@ -257,114 +235,142 @@
           <i data-lucide="waves" class="w-5 h-5 text-blue-500"></i>
           Minh họa 3 phương pháp Padding (Đệm viền)
         </h4>
-        <p class="text-sm text-slate-600 mb-6">Giả sử chúng ta có một mảng 1D (đại diện cho rìa của bức ảnh). Khi kernel trượt ra ngoài rìa, ta phải đệm thêm dữ liệu ảo (padding size = 3).</p>
 
         <div class="space-y-6">
-          <!-- Original -->
-          <div>
-            <div class="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Mảng Gốc (Image Boundary)</div>
-            <div class="flex gap-1 justify-center max-w-md mx-auto">
-               <div class="w-10 h-10"></div><div class="w-10 h-10"></div><div class="w-10 h-10"></div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">10</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">40</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">80</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">90</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800 bg-slate-50">50</div>
-               <div class="w-10 h-10"></div><div class="w-10 h-10"></div><div class="w-10 h-10"></div>
-            </div>
-          </div>
-
           <!-- Zero Padding -->
           <div class="pt-4 border-t border-slate-100">
             <div class="text-sm font-bold text-slate-700 mb-1">1. Zero Padding (Đệm số 0)</div>
             <div class="text-xs text-slate-500 mb-2">Gây ra viền đen (dark borders) do trung bình với các điểm ảnh màu đen (0).</div>
             <div class="flex gap-1 justify-center max-w-md mx-auto">
                <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
-               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
-               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">10</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">40</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">80</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">90</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">50</div>
                <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
-               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
-               <div class="w-10 h-10 flex items-center justify-center text-slate-400 border border-dashed border-slate-300 bg-slate-100">0</div>
-            </div>
-          </div>
-
-          <!-- Replicate Padding -->
-          <div class="pt-4 border-t border-slate-100">
-            <div class="text-sm font-bold text-slate-700 mb-1">2. Replicate Padding (Lặp lại biên)</div>
-            <div class="text-xs text-slate-500 mb-2">Tốt nhất khi các khu vực gần viền có cường độ đồng nhất (hằng số).</div>
-            <div class="flex gap-1 justify-center max-w-md mx-auto">
-               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">10</div>
-               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">10</div>
-               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">10</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">10</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">40</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">80</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">90</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">50</div>
-               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">50</div>
-               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">50</div>
-               <div class="w-10 h-10 flex items-center justify-center text-emerald-600 font-semibold border border-dashed border-emerald-300 bg-emerald-50">50</div>
             </div>
           </div>
 
           <!-- Mirror Padding -->
           <div class="pt-4 border-t border-slate-100">
-            <div class="text-sm font-bold text-slate-700 mb-1">3. Mirror Padding (Đệm đối xứng / Phản chiếu)</div>
-            <div class="text-xs text-slate-500 mb-2">Tốt nhất khi vùng gần viền có chứa nhiều chi tiết phức tạp.</div>
+            <div class="text-sm font-bold text-slate-700 mb-1">2. Mirror Padding (Đệm đối xứng / Phản chiếu)</div>
+            <div class="text-xs text-slate-500 mb-2">Tốt nhất khi vùng gần viền có chứa nhiều chi tiết phức tạp. Triệt tiêu được viền đen.</div>
             <div class="flex gap-1 justify-center max-w-md mx-auto">
-               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">90</div>
-               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">80</div>
                <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">40</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">10</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">40</div>
                <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">80</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">90</div>
-               <div class="w-10 h-10 flex items-center justify-center font-bold text-slate-800 border-2 border-slate-800">50</div>
-               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">90</div>
-               <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">80</div>
                <div class="w-10 h-10 flex items-center justify-center text-amber-600 font-semibold border border-dashed border-amber-300 bg-amber-50">40</div>
             </div>
           </div>
         </div>
       </div>
-      
-      <p class="text-slate-700 mt-4 bg-slate-100 p-4 rounded text-sm italic">
-        *Bạn sẽ thấy các viền đen dày xuất hiện xung quanh ảnh ở Hình 3.33 do việc áp dụng Zero Padding với các Kernel có kích thước lớn. Việc dùng Mirror Padding (Hình 3.39) sẽ loại bỏ hoàn toàn dải viền đen này và mang lại kết quả thẩm mỹ cao hơn.
-      </p>
     </section>
 
-    <!-- PHẦN 6: ỨNG DỤNG -->
+    <!-- PHẦN 6: ORDER-STATISTIC FILTERS -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-purple-500 pb-2 inline-block text-purple-900">
+        6. Bộ Lọc Thống Kê Thứ Tự (Order-Statistic / Nonlinear Filters)
+      </h2>
+      <p class="mb-4">
+        Các bộ lọc thống kê thứ tự là các bộ lọc <strong>phi tuyến tính (nonlinear)</strong>. Thay vì dùng công thức nhân cộng (convolution), chúng thay thế giá trị pixel trung tâm dựa trên kết quả <strong>sắp xếp thứ hạng (ranking/ordering)</strong> các pixel nằm trong vùng lân cận (neighborhood).
+      </p>
+
+      <div class="bg-purple-50 p-6 rounded-xl border border-purple-200 shadow-sm my-6">
+        <h3 class="text-xl font-bold text-purple-900 mb-3 flex items-center gap-2">
+          <i data-lucide="list-ordered" class="w-6 h-6"></i> Bộ lọc Trung Vị (Median Filter)
+        </h3>
+        <p class="text-slate-700 mb-4">
+          Bộ lọc nổi tiếng và hữu dụng nhất trong nhóm này là <span class="text-purple-700 font-semibold bg-purple-100 px-1.5 py-0.5 rounded">Median Filter</span>. Đúng như tên gọi, nó thay thế giá trị của pixel trung tâm bằng <strong>giá trị trung vị (median)</strong> của tất cả các điểm ảnh trong vùng lân cận.
+        </p>
+        
+        <ul class="list-disc ml-5 space-y-2 text-slate-700">
+          <li><strong>Ưu điểm vượt trội:</strong> Khả năng khử nhiễu ngẫu nhiên cực tốt với <em>mức độ làm mờ ít hơn đáng kể</em> so với các bộ lọc tuyến tính có cùng kích thước.</li>
+          <li><strong>Kẻ thù của Nhiễu Xung (Impulse Noise):</strong> Bộ lọc này đặc biệt hiệu quả trong việc xử lý <span class="font-semibold text-red-600">Nhiễu Muối Tiêu (Salt-and-pepper noise)</span> — những hạt nhiễu có màu trắng hoặc đen kịt rơi rải rác trên ảnh.</li>
+        </ul>
+      </div>
+
+      <!-- Median vs Box Simulator -->
+      <div class="bg-white border border-slate-200 p-6 rounded-xl shadow-sm my-6">
+        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <i data-lucide="calculator" class="w-5 h-5 text-blue-500"></i>
+          Trình mô phỏng: Tại sao Median lại diệt được Nhiễu Muối Tiêu? (Ví dụ trong sách)
+        </h4>
+        <p class="text-sm text-slate-600 mb-6">Giả sử ta xét một vùng lân cận 3x3. Mọi điểm ảnh đều có màu xám đậm (từ 10 đến 25), nhưng vô tình có một đốm nhiễu "muối" chói lóa (giá trị 100) rơi vào.</p>
+
+        <div class="flex flex-col md:flex-row gap-8 items-start">
+          <!-- Cột trái: Lưới 3x3 -->
+          <div class="flex flex-col items-center">
+            <p class="font-bold text-slate-500 text-sm mb-2 uppercase">Vùng lân cận (3x3)</p>
+            <div id="median-grid" class="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded">
+              <!-- Sẽ được JS render: [10, 20, 20, 20, 15, 20, 20, 25, 100] -->
+            </div>
+            <div class="mt-4 flex items-center gap-2 text-xs text-slate-500">
+               <span class="w-3 h-3 bg-red-100 border border-red-400 inline-block rounded-sm"></span> Pixel nhiễu (Outlier)
+            </div>
+          </div>
+
+          <!-- Cột phải: So sánh tính toán -->
+          <div class="flex-1 w-full space-y-6">
+            
+            <!-- Box Filter (Mean) -->
+            <div class="bg-slate-50 p-4 border border-slate-200 rounded-lg">
+               <h5 class="font-bold text-slate-700 flex justify-between items-center">
+                 1. Lọc Box (Tính Trung Bình / Mean)
+                 <span class="text-2xl text-red-600 font-extrabold" id="median-mean-result"></span>
+               </h5>
+               <p class="text-sm text-slate-600 mt-2">Tổng = 250. Lấy 250 ÷ 9 = 27.78</p>
+               <p class="text-xs text-red-600 font-medium mt-1">⚠️ Giá trị 100 đã kéo vống giá trị trung bình lên, khiến đốm nhiễu bị làm nhòe ra chứ không biến mất.</p>
+            </div>
+
+            <!-- Median Filter -->
+            <div class="bg-purple-50 p-4 border border-purple-200 rounded-lg shadow-sm">
+               <h5 class="font-bold text-purple-900 flex justify-between items-center">
+                 2. Lọc Trung Vị (Tính Median)
+                 <span class="text-2xl text-purple-700 font-extrabold" id="median-median-result"></span>
+               </h5>
+               <p class="text-sm text-slate-700 mt-2 font-mono" id="median-sorted-array"></p>
+               <p class="text-xs text-purple-700 font-medium mt-2">✅ Do được sắp xếp, giá trị dị biệt (100) bị đẩy ra cuối hàng và bị loại bỏ hoàn toàn. Trả lại giá trị trung tâm là 20 (cực kỳ sát với nền)!</p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <p class="mb-4 text-slate-700">
+        Bên cạnh Median, còn có các bộ lọc phi tuyến tính khác như:
+      </p>
+      <ul class="list-disc ml-5 space-y-2 text-slate-700">
+        <li><span class="font-semibold text-slate-900">Max filter (Percentile 100th):</span> Chọn giá trị lớn nhất. Dùng để tìm các điểm sáng nhất (hoặc làm xói mòn vùng tối).</li>
+        <li><span class="font-semibold text-slate-900">Min filter (Percentile 0th):</span> Chọn giá trị nhỏ nhất. Dùng cho mục đích ngược lại.</li>
+      </ul>
+      
+      <div class="bg-slate-100 p-4 rounded text-sm italic mt-6 border-l-4 border-slate-300">
+        *<strong>Ví dụ 3.17 (Hình 3.43)</strong>: Khi quét X-ray một bảng mạch bị nhiễu muối tiêu nặng nề. Lọc Lowpass (Gaussian) chỉ làm mờ ảnh và biến nhiễu thành các đốm xám lốm đốm. Trong khi đó, Lọc Trung Vị (Median Filter) đã quét sạch hoàn toàn các hạt nhiễu và bảo toàn độ sắc nét của bảng mạch một cách đáng kinh ngạc.
+      </div>
+    </section>
+
+    <!-- PHẦN 7: ỨNG DỤNG KHÁC -->
     <section>
       <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-indigo-500 pb-2 inline-block">
-        6. Các Ứng dụng Thực Tế Khác
+        7. Các Ứng dụng Thực Tế Khác (Lowpass)
       </h2>
       <div class="grid md:grid-cols-2 gap-8 my-6">
-        
-        <!-- Thresholding -->
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
           <h4 class="font-bold text-slate-800 text-lg mb-3 flex items-center gap-2">
              <i data-lucide="image" class="w-5 h-5 text-blue-500"></i> Trích xuất vùng (Region Extraction)
           </h4>
           <p class="text-slate-600 text-sm mb-4 flex-1">
-            (Ví dụ 3.15) Để cô lập một số đốm sáng khổng lồ trong dải thiên hà Hubble và bỏ qua các ngôi sao nhỏ. Bạn có thể chập ảnh với Gaussian kích thước rất lớn (che lấp các sao nhỏ). Sau đó áp dụng một ngưỡng (Thresholding) cắt bỏ cường độ thấp. Kết quả: Chỉ còn lại các vùng mây lớn cực sáng!
+            (Ví dụ 3.15) Để cô lập một số đốm sáng khổng lồ trong thiên hà Hubble, chập ảnh với Gaussian kích thước rất lớn (làm mờ sao nhỏ). Sau đó áp dụng một ngưỡng (Thresholding) cắt bỏ cường độ thấp.
           </p>
         </div>
-
-        <!-- Shading Correction -->
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
           <h4 class="font-bold text-slate-800 text-lg mb-3 flex items-center gap-2">
-             <i data-lucide="image" class="w-5 h-5 text-emerald-500"></i> Sửa lỗi bóng mờ (Shading Correction)
+             <i data-lucide="image" class="w-5 h-5 text-emerald-500"></i> Sửa bóng mờ (Shading Correction)
           </h4>
           <p class="text-slate-600 text-sm mb-4 flex-1">
-            (Ví dụ 3.16) Khi chụp ảnh dưới nguồn sáng không đều, ảnh có thể bị tối ở góc. Giải pháp đơn giản: Dùng bộ lọc Lowpass rất mạnh để "nhòe" đi toàn bộ chi tiết, chỉ giữ lại mô hình bóng mờ. Cuối cùng, <strong>chia ảnh gốc cho ảnh vừa làm mờ</strong>, bạn sẽ có một bức ảnh được bù sáng hoàn hảo.
+            (Ví dụ 3.16) Dùng bộ lọc Lowpass rất mạnh để "nhòe" đi chi tiết, chỉ giữ lại mô hình bóng sáng không đều. Cuối cùng, <strong>chia ảnh gốc cho ảnh vừa làm mờ</strong> để có bức ảnh bù sáng hoàn hảo.
           </p>
         </div>
-
       </div>
     </section>
 
@@ -374,7 +380,7 @@
   <footer class="mt-24 py-10 bg-slate-900 text-slate-400 text-center text-sm border-t border-slate-800">
     <div class="max-w-xl mx-auto">
       <p class="mb-2 text-slate-300 font-semibold">Tài liệu tương tác: Digital Image Processing (Chương 3)</p>
-      <p>Mô phỏng 1D Edge Profile và Padding giúp hiểu sâu sắc sự khác biệt về mặt bản chất của các bộ lọc thông thấp trong miền không gian.</p>
+      <p>Bao gồm cơ chế Lọc Tuyến tính (Box, Gaussian) và Lọc Phi Tuyến (Median).</p>
     </div>
   </footer>
 
@@ -414,9 +420,6 @@
         const ptsStr = points.join(' ');
         document.getElementById('gauss-path').setAttribute('d', `M 0,${height} L ${ptsStr} L ${width},${height} Z`);
         document.getElementById('gauss-line').setAttribute('points', ptsStr);
-        
-        document.getElementById('gauss-lbl-l').textContent = `-${Math.floor(kernelSize/2)}`;
-        document.getElementById('gauss-lbl-r').textContent = `+${Math.floor(kernelSize/2)}`;
       }
     };
 
@@ -447,7 +450,6 @@
         return result;
       },
       render() {
-        // Cập nhật giao diện nút
         const btnNone = document.getElementById('btn-none');
         const btnBox = document.getElementById('btn-box');
         const btnGauss = document.getElementById('btn-gauss');
@@ -459,7 +461,6 @@
         btnBox.className = `px-4 py-3 rounded text-left font-medium transition ${this.filterType === 'box' ? 'bg-emerald-600 text-white' : inactiveClass}`;
         btnGauss.className = `px-4 py-3 rounded text-left font-medium transition ${this.filterType === 'gaussian' ? 'bg-amber-600 text-white' : inactiveClass}`;
 
-        // Cập nhật ghi chú
         const noteDiv = document.getElementById('edge-note');
         if (this.filterType === 'box') {
           noteDiv.innerHTML = "Chú ý: Lọc Box tạo ra dốc thẳng (linear smoothing) với các điểm gấp khúc cứng ở hai đầu.";
@@ -475,26 +476,20 @@
           document.getElementById('edge-blur-gauss').classList.add('hidden');
         }
 
-        // Tạo kernels & tính convolution
         let displaySignal = this.origSignal;
-        
         if (this.filterType === 'box') {
-          const boxSize = 21;
-          const boxKernel = Array(boxSize).fill(1 / boxSize);
+          const boxKernel = Array(21).fill(1 / 21);
           displaySignal = this.convolve(this.origSignal, boxKernel);
         } else if (this.filterType === 'gaussian') {
-          const gSize = 21, sigma = 3.5;
-          let gKernel = [], sumG = 0, gHalf = Math.floor(gSize / 2);
+          let gKernel = [], sumG = 0, gHalf = 10;
           for (let i = -gHalf; i <= gHalf; i++) {
-            const val = Math.exp(-(i * i) / (2 * sigma * sigma));
-            gKernel.push(val);
-            sumG += val;
+            const val = Math.exp(-(i * i) / (2 * 3.5 * 3.5));
+            gKernel.push(val); sumG += val;
           }
           gKernel = gKernel.map(v => v / sumG);
           displaySignal = this.convolve(this.origSignal, gKernel);
         }
 
-        // Vẽ đồ thị
         const width = 400, height = 150;
         const points = displaySignal.map((val, idx) => {
           const x = (idx / (this.signalLength - 1)) * width;
@@ -506,10 +501,51 @@
       }
     };
 
+    // --- MEDIAN FILTER SIMULATOR ---
+    const medianSim = {
+      data: [10, 20, 20, 20, 15, 20, 20, 25, 100], // Ví dụ chuẩn trong sách
+      init() {
+        this.render();
+      },
+      render() {
+        // Render lưới 3x3
+        let gridHTML = '';
+        this.data.forEach(val => {
+          const isOutlier = val === 100;
+          const classes = `w-12 h-12 flex items-center justify-center font-bold text-lg rounded border ${isOutlier ? 'bg-red-100 border-red-400 text-red-700' : 'bg-white border-slate-300 text-slate-800'}`;
+          gridHTML += `<div class="${classes}">${val}</div>`;
+        });
+        document.getElementById('median-grid').innerHTML = gridHTML;
+
+        // Tính Mean
+        const sum = this.data.reduce((a, b) => a + b, 0);
+        const mean = (sum / 9).toFixed(2);
+        document.getElementById('median-mean-result').textContent = `~${mean}`;
+
+        // Tính Median
+        const sortedArray = [...this.data].sort((a, b) => a - b);
+        const median = sortedArray[4]; // Vị trí thứ 5 (index 4)
+        document.getElementById('median-median-result').textContent = median;
+
+        // Render sorted array (nhấn mạnh phần tử ở giữa và phần tử outlier)
+        let sortedHTML = '[ ';
+        sortedArray.forEach((val, idx) => {
+          let style = 'text-slate-600';
+          if (idx === 4) style = 'text-purple-700 font-bold bg-purple-200 px-1 rounded'; // Center
+          if (val === 100) style = 'text-red-600 line-through'; // Outlier
+          sortedHTML += `<span class="${style}">${val}</span>`;
+          if (idx < 8) sortedHTML += ', ';
+        });
+        sortedHTML += ' ]';
+        document.getElementById('median-sorted-array').innerHTML = sortedHTML;
+      }
+    }
+
     // Khởi tạo
     document.addEventListener('DOMContentLoaded', () => {
       gaussCalc.init();
       edgeSim.init();
+      medianSim.init();
     });
   </script>
 </body>
