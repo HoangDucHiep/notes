@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thực hành Tích chập & Vùng Cảm Nhận</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* General Grid Cell Styles */
+        .grid-cell { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border-width: 1px; }
+        .cell-dimmed { opacity: 0.15; filter: grayscale(100%); transform: scale(0.95); }
+
+        /* Edge Detection Sim Styles */
+        .val-1 { background-color: #ffffff; color: #333; } /* White pixel */
+        .val-0 { background-color: #1e293b; color: #fff; } /* Black pixel */
+        .out-0 { background-color: #f1f5f9; color: #94a3b8; } /* No edge */
+        .out-pos { background-color: #fca5a5; color: #991b1b; font-weight: bold; border-color: #ef4444; border-width: 2px;} /* Edge 1 */
+        .out-neg { background-color: #bfdbfe; color: #1e40af; font-weight: bold; border-color: #3b82f6; border-width: 2px;} /* Edge -1 */
+        
+        .highlight-edge { transform: scale(1.15); z-index: 20; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+
+        /* Receptive Field Sim Styles */
+        .rf-cell { border-color: rgba(255,255,255,0.2); background-color: rgba(255,255,255,0.05); }
+        .rf-hover:hover { background-color: #4ade80; border-color: #16a34a; transform: scale(1.2); z-index: 30; cursor: pointer; color: #064e3b; font-weight: bold; box-shadow: 0 0 15px #4ade80;}
+        
+        .rf-active-l2 { background-color: #4ade80 !important; color: #064e3b; border-color: #16a34a; box-shadow: 0 0 15px #4ade80; z-index: 20;}
+        .rf-active-l1 { background-color: #60a5fa !important; color: #1e3a8a; border-color: #2563eb; box-shadow: 0 0 10px #60a5fa; z-index: 10; transform: scale(1.05);}
+        .rf-active-in { background-color: #fcd34d !important; color: #78350f; border-color: #d97706; box-shadow: 0 0 10px #fcd34d; z-index: 5;}
+
+        .math-box { overflow-x: auto; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased pb-20">
+
+<div class="max-w-6xl mx-auto p-4 lg:p-8 bg-white shadow-xl rounded-2xl my-8">
+    
+    <!-- HEADER -->
+    <header class="mb-10 text-center border-b pb-6">
+        <h1 class="text-4xl font-extrabold text-slate-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600">
+            Ứng dụng Thực tế & Vùng Cảm Nhận (Receptive Field)
+        </h1>
+        <p class="text-lg text-slate-600">Khám phá cách CNN dò tìm biên vật thể và cách nó nhìn nhận thế giới</p>
+    </header>
+
+    <!-- PHẦN 1: TÍCH CHẬP VÀ TƯƠNG QUAN CHÉO -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-emerald-500 pl-4 mb-4">1. Tích chập (Convolution) vs Tương quan chéo (Cross-Correlation)</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed">
+            <p>Mặc dù chúng ta liên tục gọi nó là "Mạng nơ-ron Tích chập", nhưng phép toán thực sự chạy dưới nền tảng TensorFlow hay PyTorch lại là <strong>Tương quan chéo (Cross-Correlation)</strong>.</p>
+            <ul class="list-disc pl-6 space-y-2">
+                <li><strong>Khác biệt:</strong> Theo toán học thuần túy, để làm phép <em>Tích chập</em>, bạn phải lật ngược (flip) ma trận Kernel cả theo chiều ngang và dọc trước khi trượt nó trên ảnh. Phép <em>Tương quan chéo</em> thì không cần lật.</li>
+                <li><strong>Tại sao Deep Learning không quan tâm?</strong> Bởi vì các giá trị trong Kernel không phải do chúng ta viết tay, mà là do mạng lưới <strong>tự học (learn)</strong> từ dữ liệu. Nếu hệ thống cần một kernel bị "lật" để giải quyết bài toán, nó sẽ tự động học các trọng số ở trạng thái đã lật đó!</li>
+            </ul>
+            <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-lg mt-4 text-center shadow-sm text-emerald-900">
+                <strong>Công thức tính kích thước Đầu ra (Output Shape):</strong><br>
+                Nếu ảnh đầu vào có kích thước \( (n_h \times n_w) \) và Kernel có kích thước \( (k_h \times k_w) \), thì đầu ra sẽ có kích thước:
+                <div class="text-xl font-bold mt-2">
+                    \( (n_h - k_h + 1) \times (n_w - k_w + 1) \)
+                </div>
+                <span class="text-sm italic">(Giả sử Stride = 1 và không có Padding)</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- PHẦN 2: DÒ BIÊN (EDGE DETECTION) -->
+    <section class="bg-slate-900 text-white p-6 lg:p-8 rounded-2xl shadow-2xl mb-12 relative overflow-hidden">
+        <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            Mô phỏng 1: Dò tìm biên (Edge Detection)
+        </h2>
+        <p class="text-slate-300 text-sm mb-6">
+            Dò biên là bài toán tìm sự thay đổi đột ngột về màu sắc (ví dụ: từ trắng sang đen). Ta có thể dùng Kernel như một <em>đạo hàm rời rạc</em> để đo sự chênh lệch giữa các pixel kề nhau. Kernel <code>[1, -1]</code> lấy pixel bên trái trừ đi pixel bên phải.
+        </p>
+
+        <!-- Edge Sim UI -->
+        <div class="flex flex-col lg:flex-row items-center justify-center gap-8 bg-slate-800 p-6 rounded-xl border border-slate-700">
+            
+            <!-- Input -->
+            <div class="flex flex-col items-center">
+                <h3 class="mb-2 text-sm font-semibold text-slate-400 tracking-wide uppercase">Ảnh gốc (6x8)</h3>
+                <div id="edgeInput" class="grid grid-cols-8 gap-0.5 border-2 border-slate-500 bg-slate-500 p-0.5 rounded">
+                    <!-- JS Gen -->
+                </div>
+                <p class="mt-2 text-xs text-slate-400">Trắng (1), Đen (0)</p>
+            </div>
+
+            <!-- Kernel Control -->
+            <div class="flex flex-col items-center gap-4">
+                <div class="flex flex-col items-center bg-slate-700 p-4 rounded-lg border border-slate-600">
+                    <h3 class="mb-3 text-sm font-semibold text-blue-300 uppercase">Chọn Bộ lọc</h3>
+                    <button id="btnVertical" class="mb-2 w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded shadow transition">
+                        Dò biên DỌC<br><span class="font-mono font-normal">[1, -1]</span>
+                    </button>
+                    <button id="btnHorizontal" class="w-full px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm font-bold rounded shadow transition">
+                        Dò biên NGANG<br><span class="font-mono font-normal">[[1], [-1]]</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Output -->
+            <div class="flex flex-col items-center">
+                <h3 id="edgeOutputTitle" class="mb-2 text-sm font-semibold text-green-400 tracking-wide uppercase">Đầu ra (6x7)</h3>
+                <div id="edgeOutput" class="gap-0.5 border-2 border-slate-500 bg-slate-500 p-0.5 rounded">
+                    <!-- JS Gen -->
+                </div>
+                <p class="mt-2 text-xs text-slate-400 text-center max-w-[200px]">Màu khác 0 chỉ xuất hiện ở nơi có sự chuyển giao màu sắc.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- PHẦN 3: HỌC KERNEL (LEARNING A KERNEL) -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-amber-500 pl-4 mb-4">3. Mạng nơ-ron "tự học" Kernel như thế nào?</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed">
+            <p>Trong thực tế, trừ những bài toán xử lý ảnh cơ bản, chúng ta <strong>không bao giờ tự thiết kế Kernel</strong> (kiểu như ngồi nghĩ xem số mấy thì nhận diện được mắt mèo). Thay vào đó, ta để máy học:</p>
+            <ol class="list-decimal pl-6 space-y-2">
+                <li>Khởi tạo một Kernel với các con số ngẫu nhiên.</li>
+                <li>Chạy ảnh qua lớp Tích chập để lấy đầu ra dự đoán (\( \hat{Y} \)).</li>
+                <li>So sánh \( \hat{Y} \) với đáp án thực tế (\( Y \)) bằng một Hàm mất mát (Loss Function).</li>
+                <li>Sử dụng <strong>Gradient Descent (Lan truyền ngược - Backpropagation)</strong> để tính toán đạo hàm và từ từ điều chỉnh các con số bên trong Kernel sao cho sai số giảm dần.</li>
+            </ol>
+            <p>Sau nhiều vòng lặp (epochs), Kernel sẽ tự động hội tụ về các cấu trúc có ý nghĩa (ví dụ: tự biến thành ma trận dò biên <code>[1.006, -0.954]</code> gần giống <code>[1, -1]</code> như trong tài liệu).</p>
+        </div>
+    </section>
+
+    <!-- PHẦN 4: RECEPTIVE FIELD -->
+    <section class="bg-indigo-950 text-white p-6 lg:p-8 rounded-2xl shadow-2xl relative overflow-hidden">
+        <!-- Decoration -->
+        <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0ibm9uZSI+PC9yZWN0Pgo8Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSIxLjUiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiPjwvY2lyY2xlPgo8L3N2Zz4=')] opacity-50 pointer-events-none"></div>
+
+        <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-2 relative z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+            Mô phỏng 2: Vùng Cảm Nhận (Receptive Field)
+        </h2>
+        <div class="prose max-w-none text-slate-300 mb-6 text-sm relative z-10">
+            <p>
+                <strong>Vùng cảm nhận (Receptive Field)</strong> của một nơ-ron (một pixel ở Đầu ra) là <em>toàn bộ khu vực trên Ảnh Gốc</em> có ảnh hưởng đến giá trị của nơ-ron đó.
+            </p>
+            <p class="bg-indigo-900/50 p-3 rounded border border-indigo-700/50">
+                💡 <strong>Bí mật của Deep Learning:</strong> Một lớp tích chập với Kernel 3x3 chỉ nhìn thấy vùng 3x3. Nhưng nếu ta xếp lớp 3x3 thứ hai lên trên lớp đầu tiên, một nơ-ron ở lớp thứ 2 sẽ nhìn thấy vùng 5x5 của ảnh gốc! Đây là lý do tại sao các mạng nơ-ron "Sâu" có thể nắm bắt được bức tranh toàn cảnh.
+            </p>
+        </div>
+
+        <div class="text-center mb-4 relative z-10">
+            <span class="inline-block bg-green-500 text-green-950 font-bold px-4 py-1.5 rounded-full text-sm animate-pulse">
+                👉 Di chuột vào ma trận Lớp 2 (dưới cùng) để xem Receptive Field mở rộng!
+            </span>
+        </div>
+
+        <!-- Receptive Field UI -->
+        <div class="flex flex-col items-center gap-8 relative z-10">
+            
+            <!-- Input Image (7x7) -->
+            <div class="flex flex-col items-center">
+                <h3 class="mb-2 text-sm font-bold text-yellow-400 uppercase tracking-widest">Ảnh gốc (Input - 7x7)</h3>
+                <div id="rfInput" class="grid grid-cols-7 gap-1 bg-slate-800 p-2 rounded-xl border border-slate-700">
+                    <!-- JS -->
+                </div>
+            </div>
+
+            <div class="text-indigo-400 flex flex-col items-center">
+                <span class="text-xs font-mono bg-indigo-900 px-2 rounded mb-1">Conv Layer 1 (Kernel 3x3)</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+            </div>
+
+            <!-- Hidden Layer 1 (5x5) -->
+            <div class="flex flex-col items-center">
+                <h3 class="mb-2 text-sm font-bold text-blue-400 uppercase tracking-widest">Đầu ra Lớp 1 (5x5)</h3>
+                <div id="rfHL1" class="grid grid-cols-5 gap-1 bg-slate-800 p-2 rounded-xl border border-slate-700">
+                    <!-- JS -->
+                </div>
+            </div>
+
+            <div class="text-indigo-400 flex flex-col items-center">
+                <span class="text-xs font-mono bg-indigo-900 px-2 rounded mb-1">Conv Layer 2 (Kernel 3x3)</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+            </div>
+
+            <!-- Output Layer 2 (3x3) -->
+            <div class="flex flex-col items-center">
+                <h3 class="mb-2 text-sm font-bold text-green-400 uppercase tracking-widest">Đầu ra Lớp 2 (3x3)</h3>
+                <div id="rfHL2" class="grid grid-cols-3 gap-1 bg-slate-800 p-2 rounded-xl border border-green-700 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                    <!-- JS -->
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+
+<script>
+    // ==========================================
+    // MÔ PHỎNG 1: DÒ BIÊN (EDGE DETECTION)
+    // ==========================================
+    const edgeInputEl = document.getElementById('edgeInput');
+    const edgeOutputEl = document.getElementById('edgeOutput');
+    const edgeOutputTitle = document.getElementById('edgeOutputTitle');
+    const btnVertical = document.getElementById('btnVertical');
+    const btnHorizontal = document.getElementById('btnHorizontal');
+
+    // Tạo Input 6x8 (Cột giữa đen, còn lại trắng)
+    const inH = 6, inW = 8;
+    let inputImg = [];
+    for (let i = 0; i < inH; i++) {
+        let row = [];
+        for (let j = 0; j < inW; j++) {
+            // Cột 2,3,4,5 là màu đen (0), còn lại trắng (1)
+            row.push((j >= 2 && j <= 5) ? 0 : 1);
+        }
+        inputImg.push(row);
+    }
+
+    let currentMode = 'vertical'; // 'vertical' or 'horizontal'
+
+    function renderEdgeSim() {
+        // Render Input
+        edgeInputEl.innerHTML = '';
+        for (let i = 0; i < inH; i++) {
+            for (let j = 0; j < inW; j++) {
+                const cell = document.createElement('div');
+                cell.className = `w-6 h-6 md:w-8 md:h-8 flex items-center justify-center text-xs font-mono grid-cell ${inputImg[i][j] === 1 ? 'val-1' : 'val-0'}`;
+                cell.textContent = inputImg[i][j];
+                cell.id = `edge-in-${i}-${j}`;
+                edgeInputEl.appendChild(cell);
+            }
+        }
+
+        // Render Output
+        edgeOutputEl.innerHTML = '';
+        let outH, outW, kH, kW;
+        if (currentMode === 'vertical') {
+            kH = 1; kW = 2;
+            outH = inH; outW = inW - 1; // 6x7
+            edgeOutputEl.className = `grid grid-cols-7 gap-0.5 border-2 border-slate-500 bg-slate-500 p-0.5 rounded`;
+            edgeOutputTitle.textContent = 'Đầu ra (6x7)';
+        } else {
+            kH = 2; kW = 1;
+            outH = inH - 1; outW = inW; // 5x8
+            edgeOutputEl.className = `grid grid-cols-8 gap-0.5 border-2 border-slate-500 bg-slate-500 p-0.5 rounded`;
+            edgeOutputTitle.textContent = 'Đầu ra (5x8)';
+        }
+
+        for (let i = 0; i < outH; i++) {
+            for (let j = 0; j < outW; j++) {
+                const cell = document.createElement('div');
+                
+                // Calculate cross-correlation
+                let val = 0;
+                if (currentMode === 'vertical') {
+                    // Kernel [1, -1]
+                    val = inputImg[i][j]*1 + inputImg[i][j+1]*(-1);
+                } else {
+                    // Kernel [[1], [-1]]
+                    val = inputImg[i][j]*1 + inputImg[i+1][j]*(-1);
+                }
+
+                let colorClass = 'out-0';
+                if (val === 1) colorClass = 'out-pos';
+                if (val === -1) colorClass = 'out-neg';
+
+                cell.className = `w-6 h-6 md:w-8 md:h-8 flex items-center justify-center text-xs font-mono grid-cell ${colorClass} cursor-pointer`;
+                cell.textContent = val;
+                
+                // Hover effect
+                cell.addEventListener('mouseenter', () => edgeHighlight(i, j, currentMode));
+                cell.addEventListener('mouseleave', edgeClear);
+
+                edgeOutputEl.appendChild(cell);
+            }
+        }
+    }
+
+    function edgeHighlight(outI, outJ, mode) {
+        // Dim all input
+        for(let i=0; i<inH; i++) {
+            for(let j=0; j<inW; j++) {
+                document.getElementById(`edge-in-${i}-${j}`).classList.add('cell-dimmed');
+            }
+        }
+        // Highlight involved input
+        document.getElementById(`edge-in-${outI}-${outJ}`).classList.remove('cell-dimmed');
+        document.getElementById(`edge-in-${outI}-${outJ}`).classList.add('highlight-edge');
+        
+        if (mode === 'vertical') {
+            document.getElementById(`edge-in-${outI}-${outJ+1}`).classList.remove('cell-dimmed');
+            document.getElementById(`edge-in-${outI}-${outJ+1}`).classList.add('highlight-edge');
+        } else {
+            document.getElementById(`edge-in-${outI+1}-${outJ}`).classList.remove('cell-dimmed');
+            document.getElementById(`edge-in-${outI+1}-${outJ}`).classList.add('highlight-edge');
+        }
+    }
+
+    function edgeClear() {
+        for(let i=0; i<inH; i++) {
+            for(let j=0; j<inW; j++) {
+                let el = document.getElementById(`edge-in-${i}-${j}`);
+                el.classList.remove('cell-dimmed', 'highlight-edge');
+            }
+        }
+    }
+
+    btnVertical.addEventListener('click', () => {
+        currentMode = 'vertical';
+        btnVertical.classList.replace('bg-slate-600', 'bg-blue-600');
+        btnHorizontal.classList.replace('bg-blue-600', 'bg-slate-600');
+        renderEdgeSim();
+    });
+
+    btnHorizontal.addEventListener('click', () => {
+        currentMode = 'horizontal';
+        btnHorizontal.classList.replace('bg-slate-600', 'bg-blue-600');
+        btnVertical.classList.replace('bg-blue-600', 'bg-slate-600');
+        renderEdgeSim();
+    });
+
+    renderEdgeSim();
+
+
+    // ==========================================
+    // MÔ PHỎNG 2: RECEPTIVE FIELD
+    // ==========================================
+    const rfInSize = 7;
+    const rfHL1Size = 5; // After 3x3 kernel
+    const rfHL2Size = 3; // After 3x3 kernel
+
+    const elRfIn = document.getElementById('rfInput');
+    const elRfHL1 = document.getElementById('rfHL1');
+    const elRfHL2 = document.getElementById('rfHL2');
+
+    // Build Grids
+    function buildRF() {
+        // Input
+        for(let i=0; i<rfInSize; i++) {
+            for(let j=0; j<rfInSize; j++) {
+                const cell = document.createElement('div');
+                cell.className = `w-5 h-5 md:w-8 md:h-8 grid-cell rf-cell rounded-sm text-[8px] flex items-center justify-center text-slate-500 font-mono`;
+                // cell.textContent = `${i},${j}`;
+                cell.id = `rf-in-${i}-${j}`;
+                elRfIn.appendChild(cell);
+            }
+        }
+        // HL 1
+        for(let i=0; i<rfHL1Size; i++) {
+            for(let j=0; j<rfHL1Size; j++) {
+                const cell = document.createElement('div');
+                cell.className = `w-6 h-6 md:w-10 md:h-10 grid-cell rf-cell rounded-md text-[10px] flex items-center justify-center text-slate-500 font-mono`;
+                // cell.textContent = `${i},${j}`;
+                cell.id = `rf-hl1-${i}-${j}`;
+                elRfHL1.appendChild(cell);
+            }
+        }
+        // HL 2 (Interactive)
+        for(let i=0; i<rfHL2Size; i++) {
+            for(let j=0; j<rfHL2Size; j++) {
+                const cell = document.createElement('div');
+                cell.className = `w-8 h-8 md:w-12 md:h-12 grid-cell rf-cell rounded-lg text-xs flex items-center justify-center text-slate-300 font-bold rf-hover transition-colors`;
+                cell.textContent = `Nơ-ron`;
+                cell.id = `rf-hl2-${i}-${j}`;
+                
+                cell.addEventListener('mouseenter', () => calcReceptiveField(i, j));
+                cell.addEventListener('mouseleave', clearReceptiveField);
+
+                elRfHL2.appendChild(cell);
+            }
+        }
+    }
+
+    function calcReceptiveField(l2_i, l2_j) {
+        // 1. Highlight the current cell in Layer 2
+        document.getElementById(`rf-hl2-${l2_i}-${l2_j}`).classList.add('rf-active-l2');
+
+        // 2. Find and highlight corresponding 3x3 in Layer 1
+        for(let ki=0; ki<3; ki++) {
+            for(let kj=0; kj<3; kj++) {
+                let l1_i = l2_i + ki;
+                let l1_j = l2_j + kj;
+                let elL1 = document.getElementById(`rf-hl1-${l1_i}-${l1_j}`);
+                elL1.classList.add('rf-active-l1');
+
+                // 3. For EACH activated cell in Layer 1, highlight 3x3 in Input
+                // (This naturally forms a 5x5 area in the input)
+                for(let kki=0; kki<3; kki++) {
+                    for(let kkj=0; kkj<3; kkj++) {
+                        let in_i = l1_i + kki;
+                        let in_j = l1_j + kkj;
+                        document.getElementById(`rf-in-${in_i}-${in_j}`).classList.add('rf-active-in');
+                    }
+                }
+            }
+        }
+
+        // Dim non-active cells for better contrast
+        document.querySelectorAll('.rf-cell').forEach(cell => {
+            if(!cell.classList.contains('rf-active-l2') && 
+               !cell.classList.contains('rf-active-l1') && 
+               !cell.classList.contains('rf-active-in')) {
+                cell.classList.add('opacity-20');
+            }
+        });
+    }
+
+    function clearReceptiveField() {
+        document.querySelectorAll('.rf-cell').forEach(cell => {
+            cell.classList.remove('rf-active-l2', 'rf-active-l1', 'rf-active-in', 'opacity-20');
+        });
+    }
+
+    buildRF();
+
+</script>
+</body>
+</html>
