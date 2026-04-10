@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chương 5: NTP, RBS và Google TrueTime</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            chtml: { displayAlign: 'center' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.8; }
+        .textbook { font-family: 'Lora', serif; font-size: 1.1rem; color: #334155; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); padding: 2.5rem; margin-bottom: 2rem; }
+        .math-box { background: #f1f5f9; border-left: 4px solid #3b82f6; padding: 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; overflow-x: auto;}
+        
+        /* Animations */
+        @keyframes movePacketReq {
+            0% { top: 100%; left: 0%; opacity: 1; }
+            100% { top: 0%; left: 100%; opacity: 1; }
+        }
+        @keyframes movePacketRes {
+            0% { top: 0%; left: 0%; opacity: 1; }
+            100% { top: 100%; left: 100%; opacity: 1; }
+        }
+        .anim-req { animation: movePacketReq 2s linear forwards; }
+        .anim-res { animation: movePacketRes 2s linear forwards; }
+        
+        @keyframes rbsWave {
+            0% { transform: scale(0.1); opacity: 1; }
+            100% { transform: scale(4); opacity: 0; }
+        }
+        .anim-wave { animation: rbsWave 1s ease-out forwards; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <header class="bg-slate-900 text-white p-10 shadow-2xl border-b-4 border-indigo-500 relative overflow-hidden">
+        <i class="fas fa-network-wired absolute -right-10 -top-10 text-9xl opacity-10"></i>
+        <div class="max-w-4xl mx-auto relative z-10">
+            <h1 class="text-4xl font-extrabold mb-3">NTP, RBS & Google TrueTime</h1>
+            <p class="text-indigo-200 text-lg">Phân tích chuyên sâu trang 255 - 260: Làm thế nào thế giới thực đồng bộ hóa thời gian?</p>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto mt-12 px-4">
+
+        <!-- ==========================================
+             PHẦN 1: NTP
+             ========================================== -->
+        <div class="card textbook">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-blue-500 pb-2"><i class="fas fa-server text-blue-500 mr-2"></i>1. Network Time Protocol (NTP)</h2>
+            
+            <p>Phương pháp phổ biến nhất (do Cristian đề xuất năm 1989) là Client hỏi giờ Server. Vấn đề là: <strong>Thời gian di chuyển của gói tin qua mạng (network delay) làm cho thời gian Server báo về bị cũ đi.</strong></p>
+            
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">Trao đổi 4 mốc thời gian (Figure 5.5)</h3>
+            <p>Để khử được độ trễ mạng, NTP sử dụng 4 mốc thời gian. Giả sử thời gian gói tin bay từ A tới B xấp xỉ bằng từ B về A ($\delta T_{req} \approx \delta T_{res}$).</p>
+            
+            <div class="math-box text-lg">
+                <p>Khách A ước lượng độ lệch (Offset $\theta$) của mình so với Máy chủ B:</p>
+                $$ \theta = T_3 + \frac{(T_2 - T_1) + (T_4 - T_3)}{2} - T_4 = \frac{(T_2 - T_1) + (T_3 - T_4)}{2} $$
+                <p class="mt-4">Đồng thời, tính được độ trễ mạng tổng cộng (Delay $\delta$):</p>
+                $$ \delta = \frac{(T_4 - T_1) - (T_3 - T_2)}{2} $$
+            </div>
+
+            <div class="bg-red-50 border-l-4 border-red-500 p-5 my-6 rounded-r">
+                <h4 class="font-bold font-sans text-red-800 mb-2">Quy tắc sinh tử: Không vặn ngược đồng hồ!</h4>
+                <p>Nếu tính ra $\theta < 0$, nghĩa là đồng hồ A đang chạy nhanh hơn (nằm ở tương lai). <strong>Sách nhấn mạnh: Tuyệt đối không được chỉnh ngược thời gian lùi lại</strong> vì sẽ gây lỗi biên dịch lệnh <code>make</code> và hỏng thứ tự sự kiện.</p>
+                <p class="mt-2 font-bold text-slate-800">Giải pháp của HĐH: Can thiệp hàm Ngắt (Interrupt routine)</p>
+                <p>Bình thường mỗi clock tick, HĐH cộng <code class="bg-white px-1 border rounded text-red-600">10 msec</code>. Để đồng hồ chạy chậm lại (chờ chuẩn đuổi kịp), HĐH chỉ cộng <code class="bg-white px-1 border rounded text-red-600">9 msec</code> mỗi tick. Để chạy nhanh lên, cộng <code class="bg-white px-1 border rounded text-red-600">11 msec</code>.</p>
+            </div>
+
+            <p class="mb-4">Ngoài ra, NTP phân chia máy chủ thành các tầng <strong>strata</strong>. Stratum-1 là máy kết nối trực tiếp với đồng hồ nguyên tử. Khi máy A kết nối với máy B ở stratum-$k$, A sẽ tự động thành stratum-($k+1$).</p>
+
+            <!-- MÔ PHỎNG 1: NTP -->
+            <div class="bg-slate-900 rounded-xl p-6 font-sans shadow-xl text-white mt-8 relative overflow-hidden">
+                <h3 class="font-bold text-blue-400 mb-2 border-b border-slate-700 pb-2"><i class="fas fa-exchange-alt mr-2"></i>Mô phỏng 1: Giao thức NTP & Lệnh cho HĐH</h3>
+                <p class="text-sm text-slate-400 mb-6">Nhấn "Bắt đầu Đồng bộ" để theo dõi đường đi của gói tin. Chú ý các mốc $T_1, T_2, T_3, T_4$ và phán quyết cuối cùng của HĐH.</p>
+                
+                <div class="relative h-48 bg-slate-800 rounded-lg border border-slate-600 mb-6 overflow-hidden flex">
+                    <!-- Client Side -->
+                    <div class="w-1/2 h-full border-r border-slate-600 p-4 flex flex-col justify-between relative">
+                        <div class="text-orange-400 font-bold">Client A (Lệch giờ)</div>
+                        <div class="code-font text-sm">
+                            <div id="sim1-t1" class="text-slate-500">T1 (Gửi): --</div>
+                            <div id="sim1-t4" class="text-slate-500">T4 (Nhận): --</div>
+                        </div>
+                    </div>
+                    <!-- Server Side -->
+                    <div class="w-1/2 h-full p-4 flex flex-col justify-between relative text-right">
+                        <div class="text-emerald-400 font-bold">Server B (Chuẩn UTC)</div>
+                        <div class="code-font text-sm">
+                            <div id="sim1-t2" class="text-slate-500">T2 (Nhận): --</div>
+                            <div id="sim1-t3" class="text-slate-500">T3 (Gửi): --</div>
+                        </div>
+                    </div>
+
+                    <!-- Animation Canvas -->
+                    <div class="absolute inset-0 pointer-events-none">
+                        <!-- Packet -->
+                        <div id="sim1-packet" class="absolute w-4 h-4 bg-yellow-400 rounded-full shadow-[0_0_10px_yellow] opacity-0" style="top: 100%; left:0%; margin-top:-8px; margin-left:-8px;"></div>
+                        <!-- Path lines -->
+                        <svg class="w-full h-full absolute inset-0">
+                            <line x1="0%" y1="100%" x2="50%" y2="0%" stroke="#475569" stroke-width="2" stroke-dasharray="4,4" />
+                            <line x1="50%" y1="0%" x2="100%" y2="100%" stroke="#475569" stroke-width="2" stroke-dasharray="4,4" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-4 items-center">
+                    <button id="sim1-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-bold transition w-full md:w-auto flex-shrink-0">
+                        Bắt đầu Đồng bộ
+                    </button>
+                    <div id="sim1-result" class="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-600 hidden w-full">
+                        <div class="grid grid-cols-2 gap-2 text-sm font-mono mb-2">
+                            <div>$\theta$ (Offset): <span id="sim1-offset" class="text-blue-400 font-bold"></span></div>
+                            <div>$\delta$ (Delay): <span id="sim1-delay" class="text-yellow-400 font-bold"></span></div>
+                        </div>
+                        <div class="text-sm bg-slate-900 p-2 rounded text-emerald-400 font-mono" id="sim1-action"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 2: RBS
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-purple-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-purple-500 pb-2"><i class="fas fa-broadcast-tower text-purple-500 mr-2"></i>2. Mạng không dây & RBS Algorithm</h2>
+            
+            <p>Mạng cảm biến không dây (Sensor networks) gặp vấn đề lớn: định tuyến đa chặng đắt đỏ và <strong>giao thức tranh chấp (contention protocol)</strong> khiến thời gian gửi tin nhắn không thể đoán trước.</p>
+
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">Phân tích Figure 5.6 (Critical Path)</h3>
+            <p>Sách chia độ trễ gửi nhận thành các phần: <em>Message preparation</em>, <em>Time spent in NIC (Card mạng)</em>, và <em>Delivery time (Thời gian bay)</em>. <br>
+            Ở NTP, quá trình đồng bộ dính toàn bộ các khoảng trễ này. Đặc biệt <em>Time spent in NIC</em> trong mạng không dây vô cùng hỗn loạn vì phải chờ kênh rảnh mới được phát.</p>
+            
+            <div class="bg-purple-50 border border-purple-200 p-5 rounded-lg my-4">
+                <p class="font-bold text-purple-800">Giải pháp RBS (Reference Broadcast Synchronization):</p>
+                <p>Loại bỏ hoàn toàn người gửi (Sender) khỏi phương trình! Một máy chỉ phát một tín hiệu Broadcast (không mang timestamp). Mọi máy nhận (Receivers) sẽ nhận tín hiệu này cùng một lúc (vì thời gian bay trong không khí là không đổi). Do đó, những nguồn gây trễ bất định ở đầu phát (NIC, Preparation) bị triệt tiêu hoàn toàn.</p>
+            </div>
+
+            <div class="math-box text-lg">
+                <p>Hai máy $p$ và $q$ ghi nhận lại giờ địa phương khi nhận được sóng. Để đối phó với hiện tượng trôi đồng hồ (clocks drift apart), trung bình cộng là không đủ. Sách áp dụng <strong>Hồi quy tuyến tính (Standard linear regression)</strong> để dự đoán độ lệch:</p>
+                $$ Offset[p, q](t) = \alpha t + \beta $$
+                <p class="text-sm mt-2 text-slate-600">Với hằng số $\alpha$ và $\beta$ được tính từ các cặp thời điểm nhận $(T_{p,k}, T_{q,k})$ trong quá khứ.</p>
+            </div>
+
+            <!-- MÔ PHỎNG 2: RBS -->
+            <div class="bg-white rounded-xl p-6 font-sans border-2 border-purple-100 shadow-sm mt-8">
+                <h3 class="font-bold text-purple-700 mb-4 border-b pb-2"><i class="fas fa-chart-line mr-2"></i>Mô phỏng 2: RBS & Hồi quy tuyến tính</h3>
+                <p class="text-sm text-slate-600 mb-6">Mô phỏng 5 lần Broadcast. Máy P và Q ghi nhận thời gian. Sau đó thuật toán vẽ đường hồi quy để dự đoán độ lệch ở tương lai.</p>
+                
+                <div class="relative h-48 bg-slate-50 border rounded-lg mb-4 overflow-hidden flex flex-col justify-center items-center">
+                    <div class="absolute w-12 h-12 bg-purple-500 rounded-full top-4 text-white flex items-center justify-center shadow-lg z-10"><i class="fas fa-wifi"></i></div>
+                    <div class="text-xs font-bold text-slate-500 absolute top-16">Sender (Không màng thời gian)</div>
+                    
+                    <div id="sim2-wave" class="absolute top-10 w-4 h-4 border-4 border-purple-400 rounded-full opacity-0 pointer-events-none"></div>
+
+                    <div class="absolute bottom-4 left-1/4 w-10 h-10 bg-blue-500 rounded-lg text-white flex items-center justify-center shadow-lg">P</div>
+                    <div class="absolute bottom-4 right-1/4 w-10 h-10 bg-orange-500 rounded-lg text-white flex items-center justify-center shadow-lg">Q</div>
+                </div>
+
+                <div class="flex gap-4 items-center">
+                    <button id="sim2-btn" class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-bold transition w-full md:w-auto">
+                        Phát Broadcast (0/5)
+                    </button>
+                    <div id="sim2-log" class="flex-1 bg-slate-100 p-2 rounded text-xs font-mono h-24 overflow-y-auto border border-slate-300">
+                        // Chờ tín hiệu Reference...
+                    </div>
+                </div>
+
+                <div id="sim2-chart-container" class="hidden mt-6 bg-white p-4 border rounded-lg text-center">
+                    <div class="font-bold text-purple-800 text-sm mb-2">Đường Hồi Quy (Linear Regression): $Offset = \alpha t + \beta$</div>
+                    <svg class="w-full h-32" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <!-- Chart axes -->
+                        <line x1="10" y1="90" x2="100" y2="90" stroke="black" stroke-width="1"/>
+                        <line x1="10" y1="10" x2="10" y2="90" stroke="black" stroke-width="1"/>
+                        <!-- Points will be injected here -->
+                        <g id="sim2-points"></g>
+                        <!-- Regression line -->
+                        <line id="sim2-reg-line" x1="10" y1="90" x2="100" y2="10" stroke="purple" stroke-width="2" stroke-dasharray="4"/>
+                    </svg>
+                    <div class="text-xs text-slate-500 mt-2">Dựa vào đường này, P có thể đoán chính xác giờ của Q ở bất kỳ lúc nào mà không cần Sender!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             PHẦN 3: GOOGLE TRUETIME
+             ========================================== -->
+        <div class="card textbook border-t-4 border-t-red-500">
+            <h2 class="text-3xl font-bold font-sans text-slate-800 mb-6 border-b-2 border-red-500 pb-2"><i class="fab fa-google text-red-500 mr-2"></i>3. Note 5.2: Google TrueTime</h2>
+            
+            <p>Trang 259 đặt vấn đề: Để xây dựng Spanner (CSDL phân tán hỗ trợ transaction toàn cầu), Google nhận ra việc có một mốc thời gian hoàn hảo (infinite precision) là điều bất khả thi.</p>
+
+            <h3 class="text-xl font-bold font-sans text-slate-800 mt-6 mb-3">API TrueTime: Thời gian là một Khoảng</h3>
+            <p>Thay vì trả về "10:00:00", lệnh <code>TT.now()</code> trả về một khoảng bất định <strong>$[T_{lwb}, T_{upb}]$</strong> (Lower bound và Upper bound). Google cam kết bằng hệ thống phần cứng cực kỳ đắt tiền (Atomic clocks + GPS receivers ở mọi Data Center) rằng: <strong>Thời gian tuyệt đối của vũ trụ chắc chắn nằm trong khoảng này.</strong></p>
+            <p>Độ rộng của khoảng bất định là $\epsilon = T_{upb} - T_{lwb}$, hiện tại Google duy trì ở mức $\epsilon \approx 6ms$.</p>
+
+            <div class="bg-red-50 border border-red-200 p-5 rounded-lg my-4">
+                <p class="font-bold text-red-800 mb-2">Thuật toán Commit Wait (Chờ đợi bi quan)</p>
+                <p>Làm sao để đảm bảo thứ tự tuyến tính (linearizability) khi lưu dữ liệu?</p>
+                <ol class="list-decimal pl-6 space-y-2 mt-2">
+                    <li>Giao dịch $Tx$ gọi <code>TT.now()</code>, gán Timestamp cho dữ liệu bằng mốc muộn nhất: $t = T_{upb}$.</li>
+                    <li>Sách viết: <em>"...timestamping may need to be delayed for $\epsilon$ time units... making sure that clients never see any changes before the assigned timestamp"</em>.</li>
+                    <li>Nghĩa là, Hệ thống <strong>BẮT BUỘC PHẢI CHỜ (WAIT)</strong> cho đến khi thời gian thực đi qua mốc $t$ (tức là lệnh <code>TT.after(t)</code> trả về True). Lúc này, mọi máy trên thế giới đều đồng thuận rằng $Tx$ đã thực sự nằm ở quá khứ.</li>
+                </ol>
+            </div>
+
+            <!-- MÔ PHỎNG 3: TRUETIME -->
+            <div class="bg-slate-900 rounded-xl p-6 font-sans shadow-xl text-white mt-8 relative">
+                <h3 class="font-bold text-red-400 mb-4 border-b border-slate-700 pb-2"><i class="fas fa-lock mr-2"></i>Mô phỏng 3: TrueTime Commit Wait</h3>
+                <p class="text-sm text-slate-400 mb-6">Quan sát <strong>Khối Bất Định (Uncertainty Block)</strong> trôi trên trục thời gian. Bạn sẽ thấy Transaction phải chờ cho đến khi toàn bộ khối này vượt qua mốc Timestamp thì mới được phép Public dữ liệu.</p>
+
+                <!-- Timeline Track -->
+                <div class="relative h-16 bg-slate-800 rounded border border-slate-600 mb-6 overflow-hidden">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full h-px bg-slate-500"></div>
+                    </div>
+                    
+                    <!-- Timestamp Marker (T_upb) -->
+                    <div id="sim3-marker" class="absolute w-px h-full bg-red-500 left-[60%] hidden">
+                        <div class="text-[10px] text-red-400 absolute -bottom-5 left-1/2 transform -translate-x-1/2 whitespace-nowrap">Timestamp gán ($T_{upb}$)</div>
+                    </div>
+
+                    <!-- Uncertainty Block (moving) -->
+                    <div id="sim3-block" class="absolute h-full w-24 bg-blue-500/30 border-x-2 border-blue-400 flex flex-col justify-between" style="left: 10%;">
+                        <div class="text-[10px] font-bold text-blue-300 -mt-4 absolute -left-2">$T_{lwb}$</div>
+                        <div class="text-[10px] font-bold text-blue-300 -mt-4 absolute -right-2">$T_{upb}$</div>
+                        <div class="absolute inset-0 flex items-center justify-center text-[10px] text-blue-200">Khoảng $\epsilon$</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4 items-center">
+                    <button id="sim3-btn" class="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold transition w-full sm:w-auto shadow-lg shadow-red-500/30">
+                        Khởi tạo Transaction
+                    </button>
+                    <div class="flex-1 bg-black p-3 rounded-lg border border-slate-700 w-full text-xs font-mono text-green-400 min-h-[60px]" id="sim3-log">
+                        > Spanner sẵn sàng. Chờ lệnh ghi...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        /* =========================================
+           SIMULATION 1: NTP
+           ========================================= */
+        const s1Btn = document.getElementById('sim1-btn');
+        const s1Packet = document.getElementById('sim1-packet');
+        const s1T1 = document.getElementById('sim1-t1');
+        const s1T2 = document.getElementById('sim1-t2');
+        const s1T3 = document.getElementById('sim1-t3');
+        const s1T4 = document.getElementById('sim1-t4');
+        const s1Res = document.getElementById('sim1-result');
+        const s1Off = document.getElementById('sim1-offset');
+        const s1Del = document.getElementById('sim1-delay');
+        const s1Act = document.getElementById('sim1-action');
+
+        let isNtpRunning = false;
+
+        s1Btn.addEventListener('click', () => {
+            if(isNtpRunning) return;
+            isNtpRunning = true;
+            s1Btn.disabled = true;
+            s1Btn.classList.add('opacity-50');
+            
+            // Reset UI
+            s1T1.innerHTML = "T1 (Gửi): --"; s1T2.innerHTML = "T2 (Nhận): --";
+            s1T3.innerHTML = "T3 (Gửi): --"; s1T4.innerHTML = "T4 (Nhận): --";
+            s1Res.classList.add('hidden');
+            s1Packet.className = "absolute w-4 h-4 bg-yellow-400 rounded-full shadow-[0_0_10px_yellow] opacity-0";
+
+            // Giả lập thời gian
+            let A_time = 1000; // Máy A chạy nhanh (T1)
+            let B_time = 980;  // Máy B chạy chuẩn (T2)
+
+            setTimeout(() => {
+                s1T1.innerHTML = `T1 (Gửi): <span class="text-white">${A_time}</span>`;
+                s1Packet.classList.add('anim-req');
+                
+                setTimeout(() => {
+                    s1T2.innerHTML = `T2 (Nhận): <span class="text-white">${B_time + 10}</span>`;
+                    setTimeout(() => {
+                        s1T3.innerHTML = `T3 (Gửi): <span class="text-white">${B_time + 15}</span>`;
+                        s1Packet.className = "absolute w-4 h-4 bg-yellow-400 rounded-full shadow-[0_0_10px_yellow] opacity-0 anim-res";
+                        
+                        setTimeout(() => {
+                            let T4 = A_time + 25;
+                            s1T4.innerHTML = `T4 (Nhận): <span class="text-white">${T4}</span>`;
+                            
+                            // Tính toán Toán học
+                            let T1 = A_time;
+                            let T2 = B_time + 10;
+                            let T3 = B_time + 15;
+                            
+                            let offset = ((T2 - T1) + (T3 - T4)) / 2;
+                            let delay = ((T4 - T1) - (T3 - T2)) / 2;
+                            
+                            s1Off.innerText = offset + " ms";
+                            s1Del.innerText = delay + " ms";
+                            
+                            if(offset < 0) {
+                                s1Act.innerHTML = `OS Action: <br>Đồng hồ A nhanh (${offset}ms). Đổi Interrupt = 9ms (Slow down). KHÔNG CHỈNH LÙI GIỜ!`;
+                            } else {
+                                s1Act.innerHTML = `OS Action: <br>Đồng hồ A chậm (${offset}ms). Đổi Interrupt = 11ms (Speed up).`;
+                            }
+                            
+                            s1Res.classList.remove('hidden');
+                            isNtpRunning = false;
+                            s1Btn.disabled = false;
+                            s1Btn.classList.remove('opacity-50');
+                            s1Btn.innerText = "Chạy lại";
+                        }, 2000); // Bay về
+                    }, 500); // Xử lý tại B
+                }, 2000); // Bay đi
+            }, 100);
+        });
+
+        /* =========================================
+           SIMULATION 2: RBS
+           ========================================= */
+        const s2Btn = document.getElementById('sim2-btn');
+        const s2Wave = document.getElementById('sim2-wave');
+        const s2Log = document.getElementById('sim2-log');
+        const s2Chart = document.getElementById('sim2-chart-container');
+        const s2Points = document.getElementById('sim2-points');
+        const s2Line = document.getElementById('sim2-reg-line');
+        
+        let broadcastCount = 0;
+        let pPoints = [];
+
+        s2Btn.addEventListener('click', () => {
+            if(broadcastCount >= 5) {
+                // Reset
+                broadcastCount = 0;
+                s2Log.innerHTML = "// Chờ tín hiệu Reference...";
+                s2Chart.classList.add('hidden');
+                s2Points.innerHTML = '';
+                s2Btn.innerText = `Phát Broadcast (0/5)`;
+                pPoints = [];
+                return;
+            }
+
+            s2Btn.disabled = true;
+            s2Wave.classList.remove('anim-wave');
+            void s2Wave.offsetWidth;
+            s2Wave.classList.add('anim-wave');
+
+            setTimeout(() => {
+                broadcastCount++;
+                s2Btn.innerText = `Phát Broadcast (${broadcastCount}/5)`;
+                
+                // Giả lập trôi đồng hồ tuyến tính (P nhanh hơn Q)
+                let baseTime = broadcastCount * 10;
+                let offset = broadcastCount * 2 + (Math.random()*0.5); // drift + noise
+                
+                pPoints.push({x: baseTime, y: offset});
+                
+                s2Log.innerHTML = `> [Lần ${broadcastCount}] P nhận: ${baseTime.toFixed(1)} | Q nhận: ${(baseTime - offset).toFixed(1)} <br> => Offset ghi nhận: <span class="text-purple-600 font-bold">${offset.toFixed(2)}</span><br>` + s2Log.innerHTML;
+
+                if(broadcastCount === 5) {
+                    s2Btn.innerText = "Reset RBS";
+                    
+                    // Render Chart
+                    s2Chart.classList.remove('hidden');
+                    s2Points.innerHTML = '';
+                    pPoints.forEach((p, i) => {
+                        // Normalize for SVG
+                        let cx = 10 + (p.x / 50) * 90;
+                        let cy = 90 - (p.y / 12) * 80;
+                        s2Points.innerHTML += `<circle cx="${cx}" cy="${cy}" r="3" fill="purple" />`;
+                    });
+                    
+                    // Animate Regression Line
+                    s2Line.setAttribute('x1', '10');
+                    s2Line.setAttribute('y1', 90 - (pPoints[0].y / 12) * 80);
+                    s2Line.setAttribute('x2', '100');
+                    s2Line.setAttribute('y2', 90 - (pPoints[4].y / 12) * 80);
+                }
+                s2Btn.disabled = false;
+            }, 1000);
+        });
+
+        /* =========================================
+           SIMULATION 3: TRUETIME
+           ========================================= */
+        const s3Btn = document.getElementById('sim3-btn');
+        const s3Block = document.getElementById('sim3-block');
+        const s3Marker = document.getElementById('sim3-marker');
+        const s3Log = document.getElementById('sim3-log');
+
+        let s3AnimFrame;
+        let isS3Running = false;
+
+        s3Btn.addEventListener('click', () => {
+            if(isS3Running) return;
+            isS3Running = true;
+            s3Btn.disabled = true;
+            s3Btn.classList.add('opacity-50');
+            
+            s3Log.innerHTML = "> Đang gọi <code>TT.now()</code>...<br>";
+            
+            // Block starts at 10%
+            let blockLeft = 10;
+            s3Block.style.left = blockLeft + '%';
+            
+            setTimeout(() => {
+                // Place timestamp at Upb (Block Left + width(approx 20%))
+                s3Marker.style.left = (blockLeft + 20) + '%';
+                s3Marker.classList.remove('hidden');
+                
+                s3Log.innerHTML += `> Gán Timestamp $t = T_{upb}$.<br>`;
+                s3Log.innerHTML += `> <span class="text-yellow-400">Tạm khóa dữ liệu (COMMIT WAIT)... Chờ $T_{lwb} > t$</span><br>`;
+                
+                // Move block forward
+                function moveBlock() {
+                    blockLeft += 0.2; // speed
+                    s3Block.style.left = blockLeft + '%';
+                    
+                    // Check if LWB passed the marker
+                    if(blockLeft > parseFloat(s3Marker.style.left)) {
+                        s3Log.innerHTML += `> <span class="text-green-400 font-bold">Hoàn tất Wait! TT.after(t) == True. Dữ liệu public.</span>`;
+                        s3Block.style.backgroundColor = 'rgba(16, 185, 129, 0.3)'; // Greenish
+                        s3Block.style.borderColor = '#34d399';
+                        
+                        setTimeout(() => {
+                            // Reset
+                            s3Marker.classList.add('hidden');
+                            s3Block.style.left = '10%';
+                            s3Block.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+                            s3Block.style.borderColor = '#60a5fa';
+                            isS3Running = false;
+                            s3Btn.disabled = false;
+                            s3Btn.classList.remove('opacity-50');
+                        }, 3000);
+                        return;
+                    }
+                    s3AnimFrame = requestAnimationFrame(moveBlock);
+                }
+                moveBlock();
+            }, 800);
+        });
+
+    </script>
+</body>
+</html>
