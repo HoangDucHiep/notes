@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Từ MLP đến CNN: Nền tảng Mạng Tích Chập</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Cấu hình animation mượt mà cho các ô */
+        .grid-cell { 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            border-width: 2px;
+        }
+
+        /* Trạng thái làm mờ (khi không được chọn) */
+        .cell-dimmed { 
+            opacity: 0.15; 
+            transform: scale(0.95);
+            filter: grayscale(100%);
+        }
+
+        /* Highlight cho Ma trận Đầu vào */
+        .highlight-input { 
+            background-color: #fef08a !important; /* Vàng sáng */
+            border-color: #eab308 !important; /* Viền vàng đậm */
+            color: #854d0e !important; /* Chữ nâu đậm để dễ đọc */
+            transform: scale(1.15); 
+            z-index: 20; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            border-width: 3px;
+        }
+
+        /* Highlight cho Bộ lọc (Kernel) */
+        .highlight-kernel { 
+            background-color: #bfdbfe !important; 
+            border-color: #3b82f6 !important; 
+            color: #1e3a8a !important;
+            transform: scale(1.15); 
+            z-index: 20; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            border-width: 3px;
+        }
+
+        /* Highlight cho Ma trận Đầu ra */
+        .highlight-output { 
+            background-color: #86efac !important; /* Xanh lá sáng */
+            border-color: #16a34a !important; 
+            color: #14532d !important;
+            transform: scale(1.2); 
+            z-index: 20; 
+            box-shadow: 0 10px 20px -5px rgba(22, 163, 74, 0.5);
+            border-width: 3px;
+        }
+
+        .math-container { overflow-x: auto; padding: 1rem 0; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+<div class="max-w-5xl mx-auto p-6 lg:p-8 bg-white shadow-xl rounded-2xl my-8">
+    
+    <!-- HEADER -->
+    <header class="mb-10 text-center border-b pb-6">
+        <h1 class="text-4xl font-extrabold text-slate-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+            Từ Fully Connected Layers đến Convolutions
+        </h1>
+        <p class="text-lg text-slate-600">Hiểu sâu nguyên lý hình thành Mạng Nơ-ron Tích chập (CNN) qua lăng kính Toán học & Trực quan</p>
+    </header>
+
+    <!-- PHẦN 1: LÝ THUYẾT -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-blue-500 pl-4 mb-6">1. Vấn đề của Mạng Nơ-ron Truyền thống (MLP)</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed space-y-4">
+            <p>
+                Khi xử lý hình ảnh (dữ liệu có cấu trúc không gian), Mạng nơ-ron kết nối đầy đủ (MLP - Multilayer Perceptron) gặp phải rào cản cực lớn về lượng tham số.
+            </p>
+            <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                <strong>Ví dụ bài toán phân loại Chó/Mèo:</strong> Nếu đầu vào là một bức ảnh 1 Megapixel (1000x1000 pixels), lớp ẩn (hidden layer) đầu tiên có 1000 nơ-ron. Khi đó, MLP yêu cầu ma trận trọng số (weights) khổng lồ:
+                <div class="math-container text-center text-red-700 font-semibold">
+                    \( 10^6 \text{ (pixels)} \times 10^3 \text{ (nơ-ron)} = 10^9 \text{ (1 Tỷ tham số)} \)
+                </div>
+                Việc tối ưu 1 tỷ tham số cho một lớp duy nhất không chỉ gây tốn kém phần cứng mà còn dễ dẫn đến <em>Overfitting</em>, đồng thời phá hủy hoàn toàn cấu trúc không gian 2D tự nhiên của bức ảnh.
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-blue-500 pl-4 my-6 mt-10">2. Hai Nguyên tắc "Ràng buộc" (Inductive Bias)</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed space-y-4">
+            <p>Để khắc phục, các nhà nghiên cứu lấy cảm hứng từ thị giác con người (như khi chơi trò tìm người "Where's Waldo") và đặt ra 2 nguyên tắc thiết kế cho kiến trúc mạng:</p>
+            <div class="grid md:grid-cols-2 gap-6 mt-4">
+                <div class="bg-blue-50 p-5 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition">
+                    <h3 class="text-lg font-bold text-blue-800 mb-2">A. Bất biến Dịch chuyển (Translation Invariance)</h3>
+                    <p class="text-sm">Mạng nơ-ron phải nhận diện được một vật thể (ví dụ: Waldo, mắt mèo) <strong>bất kể nó nằm ở đâu</strong> trong bức ảnh. Do đó, ta nên dùng <em>cùng một bộ phát hiện (detector/weights)</em> trượt khắp bức ảnh.</p>
+                </div>
+                <div class="bg-indigo-50 p-5 rounded-xl border border-indigo-100 shadow-sm hover:shadow-md transition">
+                    <h3 class="text-lg font-bold text-indigo-800 mb-2">B. Tính Cục bộ (Locality)</h3>
+                    <p class="text-sm">Để tìm ra đặc trưng nào đó (như cái mũi mèo), ta không cần nhìn toàn bộ bức ảnh cùng lúc. Mạng nơ-ron chỉ cần tập trung vào các <strong>vùng lân cận nhỏ (local regions)</strong>. Điều này giúp giảm số lượng kết nối khổng lồ.</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-blue-500 pl-4 my-6 mt-10">3. Toán học của Lớp Tích chập (Convolutional Layer)</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed">
+            <p>Kết hợp 2 nguyên tắc trên, ta biến đổi công thức MLP kết nối đầy đủ thành phép Tích chập (chính xác hơn là <em>Tương quan chéo - Cross-correlation</em> trong Deep Learning):</p>
+            <div class="math-container bg-slate-100 p-4 rounded-lg my-4 overflow-x-auto text-center border border-slate-200">
+                \[ [\mathbf{H}]_{i,j} = u + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} [\mathbf{V}]_{a,b} [\mathbf{X}]_{i+a,j+b} \]
+            </div>
+            <ul class="list-disc pl-6 space-y-2 mt-2">
+                <li>\([\mathbf{X}]\): Ảnh đầu vào 2D.</li>
+                <li>\([\mathbf{H}]_{i,j}\): Đặc trưng đầu ra (Feature map) tại vị trí tọa độ \((i, j)\).</li>
+                <li>\([\mathbf{V}]_{a,b}\): <strong>Ma trận Kernel (Filter / Trọng số)</strong> có kích thước nhỏ. Ví dụ: kernel 3x3 (\(\Delta = 1\)) chỉ có 9 tham số thay vì 1 Tỷ.</li>
+                <li>Hệ thống thực hiện phép <em>nhân từng phần tử (element-wise multiplication)</em> giữa Kernel và một vùng ảnh 3x3 tương ứng, sau đó <em>cộng tổng</em> lại.</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- PHẦN 2: MÔ PHỎNG TRỰC QUAN -->
+    <section class="bg-slate-800 text-white p-6 lg:p-8 rounded-2xl shadow-2xl mt-12 mb-8 relative overflow-hidden">
+        <!-- Background decoration -->
+        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-blue-500 rounded-full mix-blend-multiply filter blur-2xl opacity-20"></div>
+        <div class="absolute bottom-0 left-0 -mb-4 -ml-4 w-32 h-32 bg-green-500 rounded-full mix-blend-multiply filter blur-2xl opacity-20"></div>
+
+        <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-2 relative z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Phòng Thí Nghiệm Tích Chập (Interactive Lab)
+        </h2>
+        <p class="text-slate-300 mb-8 text-sm lg:text-base relative z-10 bg-slate-700/50 inline-block px-4 py-2 rounded-lg border border-slate-600">
+            👉 Hãy <strong>di chuột (hover)</strong> vào các ô màu xanh lá ở "Đầu ra" để xem Kernel trượt và quét qua Đầu vào như thế nào!
+        </p>
+
+        <!-- Control Panel -->
+        <div class="flex flex-wrap gap-4 mb-8 bg-slate-900/60 p-4 rounded-xl border border-slate-700 relative z-10 backdrop-blur-sm">
+            <div class="flex flex-col flex-grow md:flex-grow-0">
+                <label for="kernelSelect" class="text-xs font-semibold text-slate-400 mb-1 tracking-wide uppercase">Chọn Bộ lọc (Kernel):</label>
+                <select id="kernelSelect" class="bg-slate-800 border-2 border-slate-600 text-white rounded-lg px-4 py-2 text-sm font-medium outline-none focus:border-blue-400 transition-colors cursor-pointer">
+                    <option value="edge">Edge Detection (Dò đường biên)</option>
+                    <option value="sharpen">Sharpen (Làm sắc nét)</option>
+                    <option value="boxblur">Box Blur (Làm mờ cơ bản)</option>
+                    <option value="identity">Identity (Giữ nguyên gốc)</option>
+                </select>
+            </div>
+            <div class="flex flex-col justify-end">
+                <button id="randomizeBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition shadow-lg shadow-blue-900/50 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Tạo Input ngẫu nhiên
+                </button>
+            </div>
+        </div>
+
+        <!-- Simulation Visualization -->
+        <div class="flex flex-col lg:flex-row gap-6 lg:gap-10 justify-center items-center relative z-10">
+            
+            <!-- Input Matrix (5x5) -->
+            <div class="flex flex-col items-center">
+                <h3 class="text-slate-300 font-bold mb-3 uppercase tracking-widest text-sm">Đầu vào \(\mathbf{X}\)</h3>
+                <div id="inputGrid" class="grid grid-cols-5 gap-1.5 bg-slate-700 p-3 rounded-xl border border-slate-600 shadow-inner">
+                    <!-- Dựng bằng JS -->
+                </div>
+            </div>
+
+            <div class="hidden lg:flex text-slate-500 text-3xl font-light">*</div>
+
+            <!-- Kernel Matrix (3x3) -->
+            <div class="flex flex-col items-center">
+                <h3 class="text-blue-300 font-bold mb-3 uppercase tracking-widest text-sm">Bộ lọc \(\mathbf{V}\)</h3>
+                <div id="kernelGrid" class="grid grid-cols-3 gap-1.5 bg-blue-900/30 p-3 rounded-xl border border-blue-800/50">
+                    <!-- Dựng bằng JS -->
+                </div>
+            </div>
+
+            <div class="hidden lg:flex text-slate-500 text-3xl font-light">=</div>
+
+            <!-- Output Matrix (3x3) -->
+            <div class="flex flex-col items-center">
+                <h3 class="text-green-300 font-bold mb-3 uppercase tracking-widest text-sm">Đầu ra \(\mathbf{H}\)</h3>
+                <div id="outputGrid" class="grid grid-cols-3 gap-1.5 bg-green-900/30 p-3 rounded-xl border border-green-800/50">
+                    <!-- Dựng bằng JS -->
+                </div>
+                <div class="flex gap-4 mt-3">
+                    <span class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded">Stride = 1</span>
+                    <span class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded">Padding = 0</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Calculation Breakdown -->
+        <div class="mt-10 bg-slate-900/80 rounded-xl p-6 border border-slate-700 min-h-[140px] relative z-10 backdrop-blur-md">
+            <h4 class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                Phép tính Dot Product chi tiết
+            </h4>
+            <div id="calculationDisplay" class="font-mono text-sm leading-loose text-slate-300 transition-all duration-300">
+                <div class="flex items-center justify-center h-full text-slate-500 italic mt-4">
+                    Di chuột vào một ô ở "Đầu ra" để xem thuật toán chạy...
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MỞ RỘNG (Kênh / Channels) -->
+    <section>
+        <h2 class="text-2xl font-bold text-slate-800 border-l-4 border-indigo-500 pl-4 mb-6 mt-8">4. Bổ sung Kênh (Channels): Không gian Đa chiều</h2>
+        <div class="prose max-w-none text-slate-700 leading-relaxed">
+            <p>Phần 7.1.4 của tài liệu nâng cấp bài toán: Hình ảnh thực tế không phẳng như tờ giấy 2D. Nó là một <strong>Tensor 3D</strong> (Chiều cao \(\times\) Chiều rộng \(\times\) Kênh).</p>
+            <ul class="list-disc pl-6 space-y-3">
+                <li><strong class="text-indigo-600">Dữ liệu thực:</strong> Một ảnh màu chuẩn là tổ hợp của 3 kênh màu (Red, Green, Blue). Kích thước của nó là \(H \times W \times 3\).</li>
+                <li><strong class="text-indigo-600">Bộ lọc (Kernel) tiến hóa:</strong> Để xử lý, Bộ lọc \(\mathbf{V}\) cũng phải trở thành khối 3D. Nó trượt dọc, trượt ngang trên bức ảnh (2 chiều không gian), nhưng <em>ôm trọn toàn bộ độ sâu của các kênh</em> cùng một lúc. Nghĩa là kernel cho ảnh màu sẽ có kích thước \(3 \times 3 \times 3\).</li>
+                <li><strong class="text-indigo-600">Feature Maps:</strong> Đầu ra (\(\mathbf{H}\)) sẽ bao gồm <em>rất nhiều kênh</em> chứ không chỉ 1 ma trận 2D. Mỗi kênh là một <strong>Feature Map</strong> đại diện cho một đặc trưng học được: Kênh số 1 tìm kiếm vân gỗ, Kênh số 2 tìm góc nhọn, Kênh số 3 tìm đốm sáng... Lớp này chồng lên lớp kia, tạo nên Mạng Học Sâu (Deep Learning).</li>
+            </ul>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    // -- KERNEL DICTIONARY --
+    const kernels = {
+        edge: [
+            [-1, -1, -1],
+            [-1,  8, -1],
+            [-1, -1, -1]
+        ],
+        sharpen: [
+            [ 0, -1,  0],
+            [-1,  5, -1],
+            [ 0, -1,  0]
+        ],
+        boxblur: [
+            [0.11, 0.11, 0.11],
+            [0.11, 0.11, 0.11],
+            [0.11, 0.11, 0.11]
+        ],
+        identity: [
+            [0, 0, 0],
+            [0, 1, 0],
+            [0, 0, 0]
+        ]
+    };
+
+    let currentInput = [];
+    let currentKernel = kernels.edge;
+    let currentOutput = [];
+
+    const inputSize = 5;
+    const kernelSize = 3;
+    const outputSize = inputSize - kernelSize + 1; // 3
+
+    // DOM Elements
+    const inputGridEl = document.getElementById('inputGrid');
+    const kernelGridEl = document.getElementById('kernelGrid');
+    const outputGridEl = document.getElementById('outputGrid');
+    const kernelSelect = document.getElementById('kernelSelect');
+    const randomizeBtn = document.getElementById('randomizeBtn');
+    const calcDisplay = document.getElementById('calculationDisplay');
+
+    // -- KHỞI TẠO DỮ LIỆU --
+    function generateRandomInput() {
+        currentInput = [];
+        for (let i = 0; i < inputSize; i++) {
+            let row = [];
+            for (let j = 0; j < inputSize; j++) {
+                row.push(Math.floor(Math.random() * 10)); // Số từ 0-9
+            }
+            currentInput.push(row);
+        }
+    }
+
+    function computeOutput() {
+        currentOutput = [];
+        for (let i = 0; i < outputSize; i++) {
+            let row = [];
+            for (let j = 0; j < outputSize; j++) {
+                let sum = 0;
+                for (let ki = 0; ki < kernelSize; ki++) {
+                    for (let kj = 0; kj < kernelSize; kj++) {
+                        sum += currentInput[i + ki][j + kj] * currentKernel[ki][kj];
+                    }
+                }
+                row.push(Math.round(sum * 100) / 100);
+            }
+            currentOutput.push(row);
+        }
+    }
+
+    // -- VẼ GIAO DIỆN CÁC LƯỚI --
+    function renderGrids() {
+        // Render Input
+        inputGridEl.innerHTML = '';
+        for (let i = 0; i < inputSize; i++) {
+            for (let j = 0; j < inputSize; j++) {
+                const cell = document.createElement('div');
+                cell.className = `grid-cell w-11 h-11 md:w-14 md:h-14 flex items-center justify-center text-slate-800 font-bold bg-white rounded border-slate-300 text-base md:text-lg select-none`;
+                cell.id = `in-${i}-${j}`;
+                cell.textContent = currentInput[i][j];
+                inputGridEl.appendChild(cell);
+            }
+        }
+
+        // Render Kernel
+        kernelGridEl.innerHTML = '';
+        for (let i = 0; i < kernelSize; i++) {
+            for (let j = 0; j < kernelSize; j++) {
+                const cell = document.createElement('div');
+                cell.className = `grid-cell w-11 h-11 md:w-14 md:h-14 flex items-center justify-center text-blue-900 font-bold bg-blue-100/90 rounded border-blue-300 text-base md:text-lg select-none`;
+                cell.id = `kr-${i}-${j}`;
+                cell.textContent = currentKernel[i][j];
+                kernelGridEl.appendChild(cell);
+            }
+        }
+
+        // Render Output
+        outputGridEl.innerHTML = '';
+        for (let i = 0; i < outputSize; i++) {
+            for (let j = 0; j < outputSize; j++) {
+                const cell = document.createElement('div');
+                cell.className = `grid-cell w-11 h-11 md:w-14 md:h-14 flex items-center justify-center text-green-900 font-bold bg-green-200/90 rounded border-green-400 cursor-pointer hover:bg-green-300 text-base md:text-lg select-none`;
+                cell.id = `out-${i}-${j}`;
+                cell.textContent = currentOutput[i][j];
+                
+                // Add Hover Interactions
+                cell.addEventListener('mouseenter', () => highlight(i, j));
+                cell.addEventListener('mouseleave', clearHighlight);
+                
+                outputGridEl.appendChild(cell);
+            }
+        }
+    }
+
+    // -- TƯƠNG TÁC (HOVER HIGHLIGHT) --
+    function highlight(outI, outJ) {
+        // Bước 1: Làm mờ toàn bộ lưới input và kernel
+        for (let i = 0; i < inputSize; i++) {
+            for (let j = 0; j < inputSize; j++) {
+                document.getElementById(`in-${i}-${j}`).classList.add('cell-dimmed');
+            }
+        }
+        for (let i = 0; i < kernelSize; i++) {
+            for (let j = 0; j < kernelSize; j++) {
+                document.getElementById(`kr-${i}-${j}`).classList.add('cell-dimmed');
+            }
+        }
+        // Làm mờ cả các ô output khác
+        for (let i = 0; i < outputSize; i++) {
+            for (let j = 0; j < outputSize; j++) {
+                if (i !== outI || j !== outJ) {
+                    document.getElementById(`out-${i}-${j}`).classList.add('cell-dimmed');
+                }
+            }
+        }
+
+        // Bước 2: Highlight ô Output được chọn
+        document.getElementById(`out-${outI}-${outJ}`).classList.remove('cell-dimmed');
+        document.getElementById(`out-${outI}-${outJ}`).classList.add('highlight-output');
+
+        let calcHtml = `<div class="flex flex-wrap items-center gap-y-3 gap-x-2 animate-[fadeIn_0.2s_ease-out]">`;
+        let totalSum = 0;
+
+        // Bước 3: Highlight vùng Input tương ứng và Kernel
+        for (let ki = 0; ki < kernelSize; ki++) {
+            for (let kj = 0; kj < kernelSize; kj++) {
+                let inI = outI + ki;
+                let inJ = outJ + kj;
+                
+                // Bỏ mờ và add highlight cho Input
+                let inCell = document.getElementById(`in-${inI}-${inJ}`);
+                inCell.classList.remove('cell-dimmed');
+                inCell.classList.add('highlight-input');
+                
+                // Bỏ mờ và add highlight cho Kernel
+                let krCell = document.getElementById(`kr-${ki}-${kj}`);
+                krCell.classList.remove('cell-dimmed');
+                krCell.classList.add('highlight-kernel');
+
+                // Tính toán để hiển thị
+                let inVal = currentInput[inI][inJ];
+                let krVal = currentKernel[ki][kj];
+                let product = inVal * krVal;
+                totalSum += product;
+
+                let opacityClass = krVal !== 0 ? 'opacity-100' : 'opacity-40';
+                calcHtml += `<span class="${opacityClass} bg-slate-800 px-2 py-1 rounded-md border border-slate-700 shadow-sm flex items-center gap-1">
+                    <span class="text-yellow-400 font-bold">${inVal}</span> 
+                    <span class="text-slate-500 text-xs">&times;</span> 
+                    <span class="text-blue-300 font-bold">${krVal}</span>
+                </span>`;
+                
+                if (ki !== kernelSize -1 || kj !== kernelSize -1) {
+                    calcHtml += `<span class="text-slate-500 font-bold">+</span>`;
+                }
+            }
+        }
+        
+        totalSum = Math.round(totalSum * 100) / 100;
+        calcHtml += `<span class="text-white font-bold text-xl ml-3 flex items-center gap-2">
+            = <span class="text-green-900 bg-green-400 px-3 py-1 rounded-md shadow-[0_0_15px_rgba(74,222,128,0.4)]">${totalSum}</span>
+        </span>`;
+        calcHtml += `</div>`;
+        
+        calcDisplay.innerHTML = calcHtml;
+    }
+
+    function clearHighlight() {
+        // Xóa class dim và highlight khỏi tất cả các ô
+        const allCells = document.querySelectorAll('.grid-cell');
+        allCells.forEach(cell => {
+            cell.classList.remove('cell-dimmed', 'highlight-input', 'highlight-kernel', 'highlight-output');
+        });
+        
+        calcDisplay.innerHTML = `
+            <div class="flex items-center justify-center h-full text-slate-500 italic mt-4">
+                Di chuột vào một ô ở "Đầu ra" để xem thuật toán chạy...
+            </div>`;
+    }
+
+    // -- SỰ KIỆN NÚT BẤM --
+    kernelSelect.addEventListener('change', (e) => {
+        currentKernel = kernels[e.target.value];
+        computeOutput();
+        renderGrids();
+        clearHighlight();
+    });
+
+    randomizeBtn.addEventListener('click', () => {
+        generateRandomInput();
+        computeOutput();
+        renderGrids();
+        clearHighlight();
+    });
+
+    // -- KHỞI CHẠY LẦN ĐẦU --
+    generateRandomInput();
+    computeOutput();
+    renderGrids();
+
+    // Add CSS keyframes for animation
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    `;
+    document.head.appendChild(style);
+
+</script>
+</body>
+</html>
