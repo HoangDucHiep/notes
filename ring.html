@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô phỏng Thuật toán Ring</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* CSS Variables based on the provided screenshots */
+        :root {
+            --bg-main: #2b2b2b;
+            --bg-card: #3a3a3e;
+            --text-heading: #ecd3de; /* Pale pink */
+            --text-body: #d4d4d4;
+            --accent-pink: #f4a8a8; /* Thick left border color */
+            --accent-blue: #a5c8ff; /* Active node color */
+            --node-border: #d4d4d4;
+            --line-color: #888888;
+            --msg-election: #f59e0b;
+            --msg-coordinator: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-body);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Typography */
+        h1, h2, h3, .mono-text {
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: var(--text-heading);
+            font-weight: normal;
+        }
+
+        h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.5rem; margin-bottom: 1rem; }
+
+        /* Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards mimicking the screenshot style */
+        .styled-card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border-left: 8px solid var(--accent-pink);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .styled-card.blue-border {
+            border-left-color: var(--accent-blue);
+        }
+
+        /* Simulation Canvas Area */
+        .canvas-container {
+            background-color: var(--bg-main);
+            border: 2px solid var(--bg-card);
+            border-radius: 16px;
+            position: relative;
+            min-height: 500px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #ring-svg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .ring-line {
+            stroke: var(--line-color);
+            stroke-width: 2;
+            stroke-dasharray: 6, 6;
+            fill: none;
+        }
+
+        /* Nodes */
+        .node {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid var(--node-border);
+            background-color: var(--bg-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-body);
+            font-family: 'Consolas', monospace;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .node:hover {
+            transform: scale(1.1);
+        }
+
+        .node.coordinator {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: var(--bg-main);
+            font-weight: bold;
+        }
+
+        .node.dead {
+            border-color: #555;
+            color: #555;
+            background-color: transparent;
+            opacity: 0.5;
+        }
+
+        /* Messages */
+        .message {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            z-index: 20;
+            transition: all 1s linear;
+            display: flex;
+            justify-content: center;
+        }
+
+        .msg-election { background-color: var(--msg-election); box-shadow: 0 0 10px var(--msg-election); }
+        .msg-coordinator { background-color: var(--msg-coordinator); box-shadow: 0 0 10px var(--msg-coordinator); }
+
+        .msg-label {
+            position: absolute;
+            top: -30px;
+            background-color: var(--bg-card);
+            color: var(--text-heading);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            border: 1px solid #555;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            background-color: transparent;
+            border: 2px solid var(--text-heading);
+            color: var(--text-heading);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Consolas', monospace;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background-color: var(--text-heading);
+            color: var(--bg-main);
+        }
+
+        .btn-danger {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        .btn-danger:hover {
+            background-color: #ef4444;
+            color: #fff;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: var(--bg-main);
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #8ab4f8;
+            border-color: #8ab4f8;
+        }
+
+        select {
+            background-color: var(--bg-main);
+            color: var(--text-body);
+            border: 1px solid #555;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-family: 'Consolas', monospace;
+            width: 100%;
+            outline: none;
+        }
+
+        /* Logs */
+        .log-container {
+            flex-grow: 1;
+            background-color: #222;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 400px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .log-entry { border-bottom: 1px solid #333; padding: 0.5rem 0; }
+        .log-time { color: #888; font-size: 0.8rem; margin-right: 0.5rem; }
+        .log-info { color: var(--text-body); }
+        .log-warn { color: var(--msg-election); }
+        .log-success { color: var(--msg-coordinator); }
+        .log-error { color: #ef4444; }
+
+        /* Setup Node Pulse */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .initiating { animation: pulse 1.5s infinite; border-color: var(--msg-election); }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            justify-content: center;
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.5rem; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .dot.elec { background-color: var(--msg-election); }
+        .dot.coord { background-color: var(--msg-coordinator); }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Mô phỏng thuật toán Ring</h1>
+            <p style="color: var(--line-color); font-family: 'Consolas', monospace;">Logical Ring Leader Election - Click vào node để bật/tắt</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Left: Canvas -->
+            <div style="display: flex; flex-direction: column;">
+                <div class="canvas-container" id="canvas-container">
+                    <svg id="ring-svg"></svg>
+                    <!-- Nodes injected via JS -->
+                </div>
+                <div class="legend">
+                    <div class="legend-item"><div class="dot elec"></div> Tin nhắn ELECTION [Danh sách ID]</div>
+                    <div class="legend-item"><div class="dot coord"></div> Tin nhắn COORDINATOR</div>
+                </div>
+            </div>
+
+            <!-- Right: Panel -->
+            <div class="styled-card blue-border">
+                <h2 class="mono-text">Bảng điều khiển</h2>
+                
+                <div class="controls">
+                    <button class="btn" onclick="sim.resetSimulation()">
+                        <i class="fa-solid fa-rotate-right"></i> Khôi phục mạng
+                    </button>
+                    
+                    <button class="btn btn-danger" onclick="sim.killCoordinator()">
+                        <i class="fa-solid fa-power-off"></i> Đánh sập Leader hiện tại
+                    </button>
+
+                    <div style="background-color: var(--bg-main); padding: 1rem; border-radius: 8px; border: 1px solid #555; margin-top: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-family: 'Consolas';">Chọn Node phát hiện lỗi:</label>
+                        <select id="startNode"></select>
+                        <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="sim.triggerElection()">
+                            <i class="fa-solid fa-paper-plane"></i> Phát động Bầu cử
+                        </button>
+                    </div>
+                </div>
+
+                <h2 class="mono-text" style="margin-top: 1rem; border-top: 1px solid #555; padding-top: 1rem;">Trạng thái (Logs)</h2>
+                <div class="log-container" id="log-panel">
+                    <!-- Logs go here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class RingSimulation {
+            constructor(containerId, numNodes = 6) {
+                this.container = document.getElementById(containerId);
+                this.svgArea = document.getElementById('ring-svg');
+                this.numNodes = numNodes;
+                this.nodes = [];
+                this.isSimulating = false;
+                this.radius = 0;
+                this.centerX = 0;
+                this.centerY = 0;
+                
+                this.init();
+            }
+
+            init() {
+                // Resize observer to handle responsive layout
+                const resizeObserver = new ResizeObserver(() => {
+                    this.calculateLayout();
+                    this.updateNodePositions();
+                });
+                resizeObserver.observe(this.container);
+
+                this.createNodes();
+            }
+
+            calculateLayout() {
+                const width = this.container.clientWidth;
+                const height = this.container.clientHeight;
+                this.centerX = width / 2;
+                this.centerY = height / 2;
+                this.radius = Math.min(width, height) / 2 - 60; // Padding
+            }
+
+            createNodes() {
+                const children = Array.from(this.container.children);
+                children.forEach(c => { if(c.id !== 'ring-svg') c.remove(); });
+                this.nodes = [];
+                
+                for (let i = 0; i < this.numNodes; i++) {
+                    const isCoordinator = (i === this.numNodes - 1);
+                    const node = {
+                        id: i,
+                        isAlive: true,
+                        isCoordinator: isCoordinator,
+                        el: document.createElement('div')
+                    };
+
+                    node.el.className = `node ${isCoordinator ? 'coordinator' : ''}`;
+                    node.el.innerHTML = isCoordinator ? `${i} <i class="fa-solid fa-star" style="position:absolute; top:-10px; right:-5px; color:var(--accent-pink); font-size:14px;"></i>` : i;
+                    
+                    node.el.onclick = () => {
+                        if (this.isSimulating) return;
+                        this.toggleNode(node.id);
+                    };
+
+                    this.nodes.push(node);
+                    this.container.appendChild(node.el);
+                }
+                
+                // Need layout calculated before positioning
+                this.calculateLayout();
+                this.updateNodePositions();
+                this.updateSelectOptions();
+                this.log(`Khởi tạo mạng với ${this.numNodes} nodes. Leader: Node ${this.numNodes - 1}.`, 'log-info');
+            }
+
+            updateNodePositions() {
+                this.svgArea.innerHTML = '';
+                
+                this.nodes.forEach((node, i) => {
+                    // Start from top, clockwise
+                    const angle = (Math.PI * 2 * i) / this.numNodes - Math.PI / 2;
+                    const x = this.centerX + this.radius * Math.cos(angle) - 25; // 25 is half width
+                    const y = this.centerY + this.radius * Math.sin(angle) - 25;
+                    
+                    node.x = x + 25; // Center x for lines
+                    node.y = y + 25; // Center y
+                    
+                    node.el.style.left = `${x}px`;
+                    node.el.style.top = `${y}px`;
+                });
+
+                // Draw dashed lines
+                for(let i = 0; i < this.numNodes; i++) {
+                    const from = this.nodes[i];
+                    const to = this.nodes[(i + 1) % this.numNodes];
+                    
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', from.x);
+                    line.setAttribute('y1', from.y);
+                    line.setAttribute('x2', to.x);
+                    line.setAttribute('y2', to.y);
+                    line.setAttribute('class', 'ring-line');
+                    this.svgArea.appendChild(line);
+                }
+            }
+
+            toggleNode(id) {
+                const node = this.nodes[id];
+                node.isAlive = !node.isAlive;
+                
+                if (!node.isAlive) {
+                    node.el.classList.add('dead');
+                    node.el.classList.remove('coordinator');
+                    if (node.isCoordinator) {
+                        node.isCoordinator = false;
+                        node.el.innerHTML = `${id}`; // Remove star
+                        this.log(`Node ${id} (Leader) đã mất kết nối!`, 'log-error');
+                    } else {
+                        this.log(`Node ${id} đã ngừng hoạt động (Chờ Bypass).`, 'log-info');
+                    }
+                } else {
+                    node.el.classList.remove('dead');
+                    this.log(`Node ${id} đã khôi phục.`, 'log-info');
+                }
+                this.updateSelectOptions();
+            }
+
+            killCoordinator() {
+                if (this.isSimulating) return;
+                const coord = this.nodes.find(n => n.isCoordinator && n.isAlive);
+                if (coord) {
+                    this.toggleNode(coord.id);
+                } else {
+                    this.log("Không tìm thấy Leader đang chạy.", "log-error");
+                }
+            }
+
+            resetSimulation() {
+                if (this.isSimulating) return;
+                this.createNodes();
+                document.getElementById('log-panel').innerHTML = '';
+                this.log("Mạng đã được khôi phục về trạng thái ban đầu.", "log-info");
+            }
+
+            updateSelectOptions() {
+                const select = document.getElementById('startNode');
+                const val = select.value;
+                select.innerHTML = '';
+                let hasOptions = false;
+                this.nodes.forEach(n => {
+                    if (n.isAlive && !n.isCoordinator) {
+                        const opt = document.createElement('option');
+                        opt.value = n.id;
+                        opt.textContent = `Node ${n.id}`;
+                        select.appendChild(opt);
+                        hasOptions = true;
+                    }
+                });
+                if (val && [...select.options].some(o => o.value === val)) {
+                    select.value = val;
+                }
+            }
+
+            log(message, typeClass = 'log-info') {
+                const panel = document.getElementById('log-panel');
+                const time = new Date().toLocaleTimeString('vi-VN', {hour12:false});
+                const el = document.createElement('div');
+                el.className = `log-entry`;
+                el.innerHTML = `<span class="log-time">[${time}]</span> <span class="${typeClass}">${message}</span>`;
+                panel.appendChild(el);
+                panel.scrollTop = panel.scrollHeight;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            getSuccessor(currentId) {
+                let nextId = (currentId + 1) % this.numNodes;
+                while (nextId !== currentId) {
+                    if (this.nodes[nextId].isAlive) return nextId;
+                    nextId = (nextId + 1) % this.numNodes;
+                }
+                return -1; 
+            }
+
+            async animateMessage(fromId, toId, type, labelText) {
+                const fromNode = this.nodes[fromId];
+                const toNode = this.nodes[toId];
+                
+                const msg = document.createElement('div');
+                msg.className = `message msg-${type.toLowerCase()}`;
+                msg.style.left = `${fromNode.x - 8}px`;
+                msg.style.top = `${fromNode.y - 8}px`;
+
+                if (labelText) {
+                    const label = document.createElement('div');
+                    label.className = 'msg-label';
+                    label.innerText = labelText;
+                    msg.appendChild(label);
+                }
+
+                this.container.appendChild(msg);
+                void msg.offsetWidth; // force reflow
+
+                msg.style.left = `${toNode.x - 8}px`;
+                msg.style.top = `${toNode.y - 8}px`;
+
+                await this.delay(1000); 
+                msg.remove();
+            }
+
+            triggerElection() {
+                if (this.isSimulating) return;
+                const select = document.getElementById('startNode');
+                if (!select.value) {
+                    this.log("Không có node hợp lệ để bắt đầu.", "log-error");
+                    return;
+                }
+                const id = parseInt(select.value);
+                this.startElectionProcess(id);
+            }
+
+            async startElectionProcess(initiatorId) {
+                this.isSimulating = true;
+                this.nodes[initiatorId].el.classList.add('initiating');
+                
+                this.log(`--- BẮT ĐẦU BẦU CỬ TỪ NODE ${initiatorId} ---`, 'log-warn');
+                
+                let currentId = initiatorId;
+                let idList = [currentId];
+
+                // Phase 1: Collect IDs
+                while(true) {
+                    let nextId = this.getSuccessor(currentId);
+                    
+                    if (nextId === -1) {
+                        this.log(`Node ${initiatorId} là node duy nhất còn sống!`, 'log-error');
+                        break;
+                    }
+
+                    if (nextId === initiatorId) {
+                        await this.animateMessage(currentId, nextId, 'election', `[${idList.join(',')}]`);
+                        this.log(`Tin nhắn đi đủ vòng. Danh sách: [${idList.join(',')}]`, 'log-warn');
+                        break;
+                    }
+
+                    if (nextId !== (currentId + 1) % this.numNodes) {
+                         this.log(`-> Bypass node chết, nhảy tới Node ${nextId}`, 'log-info');
+                    }
+
+                    await this.animateMessage(currentId, nextId, 'election', `[${idList.join(',')}]`);
+                    
+                    currentId = nextId;
+                    idList.push(currentId);
+                    this.log(`Node ${currentId} thêm ID vào danh sách: [${idList.join(',')}]`, 'log-info');
+                }
+
+                this.nodes[initiatorId].el.classList.remove('initiating');
+
+                // Find Winner
+                let newCoordinatorId = Math.max(...idList);
+                this.log(`=> ID lớn nhất là ${newCoordinatorId}. Node ${newCoordinatorId} trở thành Leader mới!`, 'log-success');
+
+                this.nodes.forEach(n => {
+                    n.isCoordinator = false;
+                    if(n.isAlive) {
+                        n.el.classList.remove('coordinator');
+                        n.el.innerHTML = `${n.id}`;
+                    }
+                });
+
+                const winnerNode = this.nodes[newCoordinatorId];
+                winnerNode.isCoordinator = true;
+                winnerNode.el.classList.add('coordinator');
+                winnerNode.el.innerHTML = `${winnerNode.id} <i class="fa-solid fa-star" style="position:absolute; top:-10px; right:-5px; color:var(--accent-pink); font-size:14px;"></i>`;
+
+                // Phase 2: Inform all
+                this.log(`Truyền tin nhắn COORDINATOR để thông báo...`, 'log-success');
+                currentId = initiatorId;
+                
+                while(true) {
+                    let nextId = this.getSuccessor(currentId);
+                    if (nextId === -1 || nextId === initiatorId) break;
+
+                    await this.animateMessage(currentId, nextId, 'coordinator', `LEADER:${newCoordinatorId}`);
+                    currentId = nextId;
+                }
+
+                this.log(`Hoàn tất bầu cử. Mạng đã ổn định.`, 'log-success');
+                this.isSimulating = false;
+                this.updateSelectOptions();
+            }
+        }
+
+        // Init
+        let sim;
+        window.onload = () => {
+            sim = new RingSimulation('canvas-container', 6);
+        };
+    </script>
+</body>
+</html>
