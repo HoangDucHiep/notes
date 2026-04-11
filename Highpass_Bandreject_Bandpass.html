@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Highpass, Bandreject, and Bandpass Filters</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    [data-lucide] { display: inline-block; }
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-slate-50 pb-20 font-sans text-slate-800 leading-relaxed">
+
+  <!-- HEADER -->
+  <header class="bg-gradient-to-br from-teal-900 via-slate-800 to-cyan-900 text-white py-16 px-6 shadow-xl relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="max-w-4xl mx-auto relative z-10">
+      <span class="text-teal-300 font-bold tracking-widest uppercase text-sm mb-2 block">Chương 3 - Section 3.7</span>
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-teal-100 to-cyan-200">
+        Highpass, Bandreject & Bandpass
+      </h1>
+      <p class="text-xl text-teal-100 font-light max-w-3xl">
+        Tuyệt chiêu tạo ra mọi bộ lọc phức tạp (Thông cao, Triệt dải, Thông dải) chỉ bằng cách lắp ghép từ một Bộ lọc Thông thấp (Lowpass Filter) cơ bản.
+      </p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6">
+    
+    <!-- PHẦN 1: LÝ THUYẾT Ở MIỀN TẦN SỐ -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-teal-500 pb-2 inline-block">
+        1. Xây dựng bộ lọc từ Miền Tần Số (Hình 3.52)
+      </h2>
+      <p class="mb-4 text-slate-700">
+        Có 4 loại bộ lọc tuyến tính cơ bản: Lowpass (Thông thấp), Highpass (Thông cao), Bandreject (Triệt dải), và Bandpass (Thông dải). Thay vì thiết kế từng cái ở miền không gian, ta sẽ nhìn chúng dưới góc độ đồ thị hàm truyền ở miền tần số (nơi mọi thứ trực quan như những khối xếp hình).
+      </p>
+
+      <!-- SVG Transfer Function Simulator -->
+      <div class="bg-white border border-slate-200 p-6 rounded-xl shadow-md my-6">
+        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <i data-lucide="bar-chart-2" class="w-5 h-5 text-teal-600"></i> Mô phỏng Đồ thị Hàm truyền (Transfer Functions)
+        </h4>
+        
+        <!-- Tabs -->
+        <div class="flex flex-wrap gap-2 mb-6">
+          <button onclick="drawGraph('lp')" id="btn-lp" class="graph-btn px-4 py-2 rounded-lg font-semibold bg-teal-600 text-white transition">Lowpass</button>
+          <button onclick="drawGraph('hp')" id="btn-hp" class="graph-btn px-4 py-2 rounded-lg font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Highpass = 1 - LP</button>
+          <button onclick="drawGraph('br')" id="btn-br" class="graph-btn px-4 py-2 rounded-lg font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Bandreject = LP1 + HP2</button>
+          <button onclick="drawGraph('bp')" id="btn-bp" class="graph-btn px-4 py-2 rounded-lg font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Bandpass = 1 - BR</button>
+        </div>
+
+        <div class="relative bg-slate-50 border border-slate-200 rounded p-4 overflow-hidden h-64 flex items-center justify-center">
+           <!-- Trục tọa độ -->
+           <svg width="100%" height="100%" viewBox="0 0 400 200" class="absolute inset-0">
+             <!-- Lưới -->
+             <line x1="0" y1="150" x2="400" y2="150" stroke="#94a3b8" stroke-width="2" />
+             <line x1="200" y1="20" x2="200" y2="180" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4" />
+             <!-- Labels -->
+             <text x="390" y="140" text-anchor="end" class="text-xs font-serif italic">u (Tần số)</text>
+             <text x="10" y="45" class="text-xs font-mono">1</text>
+             <text x="10" y="165" class="text-xs font-mono">0</text>
+             <text x="200" y="165" text-anchor="middle" class="text-xs font-mono">0</text>
+           </svg>
+           
+           <!-- Đường Line đồ thị -->
+           <svg width="100%" height="100%" viewBox="0 0 400 200" class="absolute inset-0">
+             <path id="graph-path" d="" fill="rgba(13, 148, 136, 0.15)" stroke="#0d9488" stroke-width="3" class="transition-all duration-500" />
+           </svg>
+           
+           <div id="graph-explanation" class="absolute top-4 right-4 bg-white/90 p-3 rounded shadow text-sm border border-teal-100 max-w-xs text-slate-700 fade-in">
+             <!-- Text inserted by JS -->
+           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHẦN 2: CHUYỂN ĐỔI SANG MIỀN KHÔNG GIAN -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-teal-500 pb-2 inline-block">
+        2. Dịch sang Miền Không Gian (Table 3.7)
+      </h2>
+      <p class="mb-4 text-slate-700">
+        Sự tuyệt vời của biến đổi Fourier là sự đối ngẫu. Các phép toán Cộng/Trừ hàm số ở miền tần số giữ nguyên y hệt khi đưa về miền không gian!
+      </p>
+      <div class="bg-amber-50 p-4 border-l-4 border-amber-500 rounded text-amber-900 text-sm mb-6 shadow-sm">
+        <strong class="text-amber-900 block mb-1">Chìa khóa (The Key Point):</strong> 
+        Số <strong class="font-mono text-lg">1</strong> (Hằng số vô tận ở miền Tần số) khi biến đổi ngược về miền Không gian sẽ trở thành <strong class="font-mono text-lg">δ(x,y)</strong> (Xung đơn vị - Unit Impulse). 
+        <br>Xung đơn vị là một mảng toàn số 0, chỉ duy nhất phần tử ở tâm có giá trị bằng 1.
+      </div>
+
+      <div class="overflow-x-auto shadow-sm rounded-lg border border-slate-200">
+        <table class="w-full text-left border-collapse bg-white">
+          <thead>
+            <tr class="bg-slate-100 text-slate-800">
+              <th class="p-4 border-b font-bold w-1/3">Loại bộ lọc (Filter Type)</th>
+              <th class="p-4 border-b font-bold">Kernel Không gian (tính theo Lowpass - lp)</th>
+            </tr>
+          </thead>
+          <tbody class="text-slate-700">
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-4 border-b font-semibold text-teal-700">Lowpass (Thông thấp)</td>
+              <td class="p-4 border-b font-serif text-lg">lp(x,y)</td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-4 border-b font-semibold text-rose-700">Highpass (Thông cao)</td>
+              <td class="p-4 border-b font-serif text-lg">
+                hp(x,y) = <span class="text-amber-600 font-bold">δ(x,y)</span> - lp(x,y)
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-4 border-b font-semibold text-purple-700">Bandreject (Triệt dải)</td>
+              <td class="p-4 border-b font-serif text-lg">
+                br(x,y) = lp<sub>1</sub>(x,y) + hp<sub>2</sub>(x,y) <br>
+                <span class="pl-16">= lp<sub>1</sub>(x,y) + [<span class="text-amber-600 font-bold">δ(x,y)</span> - lp<sub>2</sub>(x,y)]</span>
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-4 font-semibold text-blue-700">Bandpass (Thông dải)</td>
+              <td class="p-4 font-serif text-lg">
+                bp(x,y) = <span class="text-amber-600 font-bold">δ(x,y)</span> - br(x,y) <br>
+                <span class="pl-16">= <span class="text-amber-600 font-bold">δ(x,y)</span> - [lp<sub>1</sub>(x,y) + <span class="text-amber-600 font-bold">δ(x,y)</span> - lp<sub>2</sub>(x,y)]</span><br>
+                <span class="pl-16 text-blue-700 font-bold">= lp<sub>2</sub>(x,y) - lp<sub>1</sub>(x,y)</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-4 text-sm text-slate-500 italic text-center">Tâm của xung đơn vị δ(x,y) và tâm của các Kernel lọc luôn trùng nhau.</p>
+    </section>
+
+    <!-- PHẦN 3: VÍ DỤ TRỰC QUAN ZONE PLATE -->
+    <section>
+      <h2 class="text-2xl font-bold text-slate-800 mt-12 mb-6 border-b-2 border-teal-500 pb-2 inline-block">
+        3. Ví dụ thực tế: Tấm Zone Plate (Hình 3.53 - 3.56)
+      </h2>
+      <p class="mb-4 text-slate-700">
+        <strong>Zone Plate</strong> là một mẫu ảnh thử nghiệm kinh điển (được vẽ bằng phương trình toán học lượng giác). Đặc điểm cực kỳ quan trọng của nó là: <strong>Tần số không gian tăng dần từ tâm ra ngoài viền</strong> (các vòng tròn càng xa tâm thì càng hẹp và sát nhau).
+      </p>
+      <p class="mb-6 text-slate-700">
+        Chính vì tính chất này, Zone Plate là "bài test" hoàn hảo nhất để nhìn thấy bằng mắt thường một bộ lọc đang cho phép tần số nào đi qua, và chặn tần số nào lại!
+      </p>
+
+      <!-- CANVAS ZONE PLATE SIMULATOR -->
+      <div class="bg-slate-900 p-6 rounded-xl shadow-xl flex flex-col md:flex-row gap-8 items-center text-white">
+        
+        <!-- Controls -->
+        <div class="flex-1 w-full flex flex-col gap-4">
+          <h4 class="font-bold text-teal-300 text-lg border-b border-slate-700 pb-2">Trình mô phỏng Filter trên Zone Plate</h4>
+          
+          <button onclick="drawCanvasFilter('orig')" id="btn-c-orig" class="canvas-btn px-4 py-3 rounded text-left font-medium transition bg-teal-600 text-white">
+            Ảnh gốc (Original Zone Plate)
+          </button>
+          <button onclick="drawCanvasFilter('lp')" id="btn-c-lp" class="canvas-btn px-4 py-3 rounded text-left font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Lọc Lowpass (Thông thấp)
+          </button>
+          <button onclick="drawCanvasFilter('hp')" id="btn-c-hp" class="canvas-btn px-4 py-3 rounded text-left font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Lọc Highpass (Thông cao)
+          </button>
+          <button onclick="drawCanvasFilter('br')" id="btn-c-br" class="canvas-btn px-4 py-3 rounded text-left font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Lọc Bandreject (Triệt dải giữa)
+          </button>
+          <button onclick="drawCanvasFilter('bp')" id="btn-c-bp" class="canvas-btn px-4 py-3 rounded text-left font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Lọc Bandpass (Thông dải giữa)
+          </button>
+
+          <div id="canvas-note" class="mt-4 text-sm text-slate-400 bg-black/50 p-4 rounded border border-slate-700 min-h-[80px]">
+            Ảnh gốc sắc nét từ tâm ra rìa.
+          </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="shrink-0 relative bg-black p-2 border border-slate-700 rounded-lg shadow-inner">
+          <canvas id="zoneplate-canvas" width="300" height="300" class="block w-[250px] h-[250px] md:w-[300px] md:h-[300px]"></canvas>
+          <div class="absolute bottom-4 right-4 text-[10px] font-mono text-slate-500 bg-black/70 px-1 rounded">Generated via JS Math</div>
+        </div>
+
+      </div>
+      
+      <div class="bg-slate-100 p-5 rounded-lg border border-slate-300 mt-6 shadow-sm">
+        <h4 class="font-bold text-slate-800 mb-2">Lưu ý về vấn đề co giãn (Scaling)</h4>
+        <p class="text-sm text-slate-700">
+          Các bộ lọc Highpass, Bandreject, Bandpass đều có chứa phép trừ (khởi nguồn từ biểu thức $1 - LP$). Điều này dẫn đến việc ảnh kết quả sẽ có <strong>các giá trị âm</strong>. Để hiển thị lên màn hình (vốn chỉ nhận giá trị dương từ 0-255), ta phải dùng kỹ thuật Scaling. Đó là lý do vì sao ở chế độ Highpass và Bandpass, <strong>nền ảnh (background) thường có màu xám đục</strong> thay vì màu đen hay trắng hoàn toàn (Xem lại Hình 3.56 trong sách).
+        </p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-24 py-10 bg-slate-900 text-slate-400 text-center text-sm border-t border-slate-800">
+    <div class="max-w-xl mx-auto">
+      <p class="mb-2 text-slate-300 font-semibold">Tài liệu tương tác: Digital Image Processing (Chương 3)</p>
+      <p>Highpass, Bandreject, and Bandpass Filters từ nền tảng Lowpass.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts Logic -->
+  <script>
+    lucide.createIcons();
+
+    // --- GRAPH SIMULATOR ---
+    const graphData = {
+      lp: {
+        path: "M 0,150 L 100,150 L 100,50 L 300,50 L 300,150 L 400,150",
+        text: "<strong>Lowpass:</strong> Chỉ cho tần số thấp (giữa đồ thị) đi qua. Chặn tần số cao (hai bên)."
+      },
+      hp: {
+        path: "M 0,50 L 100,50 L 100,150 L 300,150 L 300,50 L 400,50",
+        text: "<strong>Highpass (1 - LP):</strong> Đảo ngược của Lowpass. Chặn tần số thấp ở giữa, mở cổng cho tần số cao."
+      },
+      br: {
+        path: "M 0,50 L 100,50 L 100,150 L 160,150 L 160,50 L 240,50 L 240,150 L 300,150 L 300,50 L 400,50",
+        text: "<strong>Bandreject:</strong> Đào một cái hố (notch/stopband) để chặn riêng một dải tần số cụ thể ở giữa. Giữ nguyên thấp và cao."
+      },
+      bp: {
+        path: "M 0,150 L 100,150 L 100,50 L 160,50 L 160,150 L 240,150 L 240,50 L 300,50 L 300,150 L 400,150",
+        text: "<strong>Bandpass (1 - BR):</strong> Chỉ lấy duy nhất phần dải tần số đã bị đào hố ở trên. Lọc vứt bỏ cả cực thấp và cực cao."
+      }
+    };
+
+    function drawGraph(type) {
+      // Update buttons
+      document.querySelectorAll('.graph-btn').forEach(btn => {
+        btn.classList.remove('bg-teal-600', 'text-white');
+        btn.classList.add('bg-slate-100', 'text-slate-600');
+      });
+      document.getElementById(`btn-${type}`).classList.remove('bg-slate-100', 'text-slate-600');
+      document.getElementById(`btn-${type}`).classList.add('bg-teal-600', 'text-white');
+
+      // Update Path
+      const pathEl = document.getElementById('graph-path');
+      pathEl.setAttribute('d', graphData[type].path + " L 400,200 L 0,200 Z"); // Close path for fill
+
+      // Update Text
+      const textEl = document.getElementById('graph-explanation');
+      textEl.innerHTML = graphData[type].text;
+      
+      // Trigger animation
+      textEl.classList.remove('fade-in');
+      void textEl.offsetWidth; // trigger reflow
+      textEl.classList.add('fade-in');
+    }
+
+
+    // --- CANVAS ZONE PLATE SIMULATOR ---
+    function drawCanvasFilter(type) {
+      // Update buttons
+      const activeClass = "bg-teal-600 text-white";
+      const inactiveClass = "bg-slate-800 text-slate-300 hover:bg-slate-700";
+      
+      document.querySelectorAll('.canvas-btn').forEach(btn => btn.className = `canvas-btn px-4 py-3 rounded text-left font-medium transition ${inactiveClass}`);
+      document.getElementById(`btn-c-${type}`).className = `canvas-btn px-4 py-3 rounded text-left font-medium transition ${activeClass}`;
+
+      // Update note
+      const notes = {
+        orig: "<strong>Ảnh gốc:</strong> Mẫu Zone Plate kinh điển. Tâm ảnh là tần số thấp (rộng), càng ra rìa tần số càng cao (dày đặc).",
+        lp: "<strong>Lowpass:</strong> Tâm ảnh (tần số thấp) rõ nét. Các viền gợn sóng ở rìa ngoài (tần số cao) bị mờ xịt đi.",
+        hp: "<strong>Highpass:</strong> Rìa ngoài được giữ lại sắc nét. Tâm ảnh bị san phẳng thành một khối màu xám do bị mất cấu trúc tần số thấp.",
+        br: "<strong>Bandreject:</strong> Chặn dải tần số trung bình. Bạn sẽ thấy một vùng hình vành khăn (ring) ở giữa bị mờ đi xám xịt, trong khi tâm và viền ngoài vẫn sắc.",
+        bp: "<strong>Bandpass:</strong> Ngược lại hoàn toàn với Bandreject. Chỉ duy nhất vành khăn ở giữa được giữ lại, tâm và viền bị xóa sạch thành màu xám nền."
+      };
+      document.getElementById('canvas-note').innerHTML = notes[type];
+
+      // Draw Canvas Math
+      const canvas = document.getElementById('zoneplate-canvas');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const imgData = ctx.createImageData(width, height);
+      const cx = width / 2;
+      const cy = height / 2;
+
+      // Tái tạo lại hiệu ứng lọc bằng phương pháp Envelope (áp Radial mask)
+      // Vì bán kính r tương đương với tần số. Lọc tần số = Nhân với Mask theo r.
+      for(let y = 0; y < height; y++) {
+        for(let x = 0; x < width; x++) {
+          // Map coordinates like the book [-8.2, 8.2]
+          const mapX = ((x - cx) / cx) * 8.2;
+          const mapY = ((y - cy) / cy) * 8.2;
+          const r2 = mapX*mapX + mapY*mapY;
+          const r = Math.sqrt(r2);
+
+          // Phương trình Zone Plate gốc: z(x,y) = 0.5 * [1 + cos(r^2)]
+          let origVal = 0.5 * (1 + Math.cos(r2));
+          let finalVal = origVal;
+
+          // Bordering black region as described in book (r > 8.2)
+          if (r > 8.2) {
+             finalVal = 0;
+          } else {
+             // Áp dụng bộ lọc (Mô phỏng Frequency Response trên không gian ảnh vì r ~ frequency)
+             if (type === 'orig') {
+               finalVal = origVal;
+             } 
+             else if (type === 'lp') {
+               // Gaussian Lowpass mask: e^(-r2 / 2σ^2)
+               const sigmaLP = 3.5;
+               const mask = Math.exp(-r2 / (2 * sigmaLP*sigmaLP));
+               // Mix smooth gray (0.5) with actual value based on mask
+               finalVal = 0.5 + (origVal - 0.5) * mask; 
+             } 
+             else if (type === 'hp') {
+               // Highpass: 1 - Lowpass
+               const sigmaLP = 2.0;
+               const mask = 1 - Math.exp(-r2 / (2 * sigmaLP*sigmaLP));
+               finalVal = 0.5 + (origVal - 0.5) * mask; // 0.5 is the scaled gray baseline
+             } 
+             else if (type === 'bp') {
+               // Bandpass: Difference of Gaussians (DoG)
+               const sigma1 = 5.0; // wider
+               const sigma2 = 2.5; // narrower
+               let mask = Math.exp(-r2 / (2 * sigma1*sigma1)) - Math.exp(-r2 / (2 * sigma2*sigma2));
+               // Normalize mask roughly to 0-1 range for visual
+               mask = mask * 2.5;
+               finalVal = 0.5 + (origVal - 0.5) * mask;
+             } 
+             else if (type === 'br') {
+               // Bandreject: 1 - Bandpass
+               const sigma1 = 5.0; 
+               const sigma2 = 2.5; 
+               let bpMask = Math.exp(-r2 / (2 * sigma1*sigma1)) - Math.exp(-r2 / (2 * sigma2*sigma2));
+               let mask = 1 - (bpMask * 2.5);
+               finalVal = 0.5 + (origVal - 0.5) * mask;
+             }
+          }
+
+          // Cắt và gán màu (0-255)
+          let c = Math.max(0, Math.min(255, finalVal * 255));
+          const idx = (y * width + x) * 4;
+          imgData.data[idx] = c;
+          imgData.data[idx+1] = c;
+          imgData.data[idx+2] = c;
+          imgData.data[idx+3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+      drawGraph('lp');
+      drawCanvasFilter('orig');
+    });
+  </script>
+</body>
+</html>
