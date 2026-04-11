@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Combining Spatial Enhancement Methods</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    [data-lucide] { display: inline-block; }
+    .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Flowchart lines */
+    .flow-line { position: relative; }
+    .flow-line::after {
+      content: ''; position: absolute; width: 2px; background: #cbd5e1;
+      left: 50%; top: 100%; height: 2rem; transform: translateX(-50%);
+    }
+    .flow-line:last-child::after { display: none; }
+  </style>
+</head>
+<body class="bg-zinc-50 pb-20 font-sans text-zinc-800 leading-relaxed">
+
+  <!-- HEADER -->
+  <header class="bg-gradient-to-br from-zinc-900 via-slate-800 to-zinc-950 text-white py-16 px-6 shadow-xl relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+    <div class="max-w-4xl mx-auto relative z-10">
+      <span class="text-cyan-400 font-bold tracking-widest uppercase text-sm mb-2 block">Chương 3 - Section 3.8</span>
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-cyan-100 to-blue-200">
+        Combining Spatial Methods
+      </h1>
+      <p class="text-xl text-cyan-100 font-light max-w-3xl">
+        Bài toán thực tế đỉnh cao: Kết hợp Laplacian, Gradient, Box Filter và Power-law để "cứu" một bức ảnh y tế chụp X-quang xương toàn thân.
+      </p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6">
+    
+    <!-- PHẦN 1: BÀI TOÁN -->
+    <section>
+      <h2 class="text-2xl font-bold text-zinc-800 mt-12 mb-6 border-b-2 border-cyan-500 pb-2 inline-block">
+        1. Đặt vấn đề (The Problem)
+      </h2>
+      <p class="mb-4 text-zinc-700">
+        Chúng ta có một bức ảnh chụp quét xương toàn thân (Bone scan) dùng trong y tế. Bức ảnh gốc <strong>(a)</strong> bị mờ, dải nhạy sáng hẹp, các chi tiết xương sườn, xương cột sống không rõ ràng.
+      </p>
+      <div class="bg-red-50 p-5 rounded-lg border-l-4 border-red-500 text-red-900 mb-8">
+        <h4 class="font-bold flex items-center gap-2 mb-2">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i> Sai lầm thường gặp
+        </h4>
+        <p class="text-sm">
+          Nếu ta chỉ dùng toán tử <strong>Laplacian</strong> để làm sắc nét rồi cộng thẳng vào ảnh gốc (công thức Unsharp cơ bản), ta sẽ được ảnh <strong>(c)</strong>. Lập tức, sự nhạy cảm của Laplacian với nhiễu sẽ làm bức ảnh chứa đầy những hạt nhiễu gai góc ở phần nền xám. Trong y tế, nhiễu (noise) lấm tấm này là không thể chấp nhận được!
+        </p>
+      </div>
+    </section>
+
+    <!-- PHẦN 2: QUY TRÌNH KẾT HỢP -->
+    <section>
+      <h2 class="text-2xl font-bold text-zinc-800 mt-12 mb-6 border-b-2 border-cyan-500 pb-2 inline-block">
+        2. Quy trình xử lý kết hợp (The Pipeline)
+      </h2>
+      <p class="mb-6 text-zinc-700">
+        Để giải quyết vấn đề nhiễu của Laplacian, ta sẽ dùng <strong>Gradient</strong> (Đạo hàm bậc 1) làm "Lá chắn" (Mask). Dưới đây là sơ đồ tương tác từng bước một. Hãy bấm vào các nút để xem giải thích chi tiết:
+      </p>
+
+      <div class="flex flex-col md:flex-row gap-8">
+        
+        <!-- Cột Sơ Đồ -->
+        <div class="w-full md:w-1/3 flex flex-col gap-4">
+          <!-- Step A -->
+          <button onclick="showStep('a')" id="btn-a" class="w-full text-left p-4 rounded-xl border-2 border-cyan-500 bg-cyan-50 font-bold text-cyan-900 shadow-md transition-all">
+            (a) Ảnh gốc
+          </button>
+          
+          <div class="flex gap-4 items-center pl-8 -my-2 opacity-50"><i data-lucide="arrow-down" class="w-5 h-5"></i></div>
+          
+          <!-- Step B & D (Parallel) -->
+          <div class="flex gap-2">
+            <button onclick="showStep('b')" id="btn-b" class="flex-1 p-3 rounded-lg border-2 border-zinc-200 bg-white font-semibold text-zinc-600 hover:border-cyan-300 transition-all text-sm text-center">
+              (b) Laplacian
+            </button>
+            <button onclick="showStep('d')" id="btn-d" class="flex-1 p-3 rounded-lg border-2 border-zinc-200 bg-white font-semibold text-zinc-600 hover:border-cyan-300 transition-all text-sm text-center">
+              (d) Gradient (Sobel)
+            </button>
+          </div>
+          
+          <div class="flex justify-end pr-8 -my-2 opacity-50"><i data-lucide="arrow-down" class="w-5 h-5"></i></div>
+
+          <!-- Step E -->
+          <div class="flex justify-end">
+            <button onclick="showStep('e')" id="btn-e" class="w-[48%] p-3 rounded-lg border-2 border-zinc-200 bg-white font-semibold text-zinc-600 hover:border-cyan-300 transition-all text-sm text-center">
+              (e) Box Filter 5x5
+            </button>
+          </div>
+          
+          <div class="flex gap-4 justify-center -my-2 opacity-50">
+            <i data-lucide="x" class="w-5 h-5 text-rose-500"></i> <!-- Multiply icon -->
+          </div>
+
+          <!-- Step F -->
+          <button onclick="showStep('f')" id="btn-f" class="w-full text-left p-4 rounded-xl border-2 border-zinc-200 bg-white font-bold text-zinc-700 shadow-sm hover:border-cyan-300 transition-all">
+            (f) Mask = (b) × (e)
+          </button>
+
+          <div class="flex justify-center -my-2 opacity-50">
+            <i data-lucide="plus" class="w-5 h-5 text-blue-500"></i> <!-- Add icon -->
+          </div>
+
+          <!-- Step G -->
+          <button onclick="showStep('g')" id="btn-g" class="w-full text-left p-4 rounded-xl border-2 border-zinc-200 bg-white font-bold text-zinc-700 shadow-sm hover:border-cyan-300 transition-all">
+            (g) Sắc nét = (a) + (f)
+          </button>
+
+          <div class="flex justify-center -my-2 opacity-50">
+            <i data-lucide="arrow-down" class="w-5 h-5"></i>
+          </div>
+
+          <!-- Step H -->
+          <button onclick="showStep('h')" id="btn-h" class="w-full text-left p-4 rounded-xl border-2 border-zinc-200 bg-white font-bold text-zinc-700 shadow-sm hover:border-cyan-300 transition-all">
+            (h) Power-law (Gamma)
+          </button>
+        </div>
+
+        <!-- Cột Nội Dung Hiển Thị -->
+        <div class="w-full md:w-2/3">
+          <div id="step-content" class="bg-white p-8 rounded-2xl border border-zinc-200 shadow-lg min-h-[400px] flex flex-col">
+            <!-- Nội dung sẽ được JS chèn vào đây -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PHẦN 3: GAMMA SIMULATOR -->
+    <section>
+      <h2 class="text-2xl font-bold text-zinc-800 mt-16 mb-6 border-b-2 border-cyan-500 pb-2 inline-block">
+        3. Cú chốt hạ: Tăng cường dải động (Power-law)
+      </h2>
+      <p class="mb-6 text-zinc-700">
+        Bước cuối cùng từ <strong>(g) sang (h)</strong> sử dụng biến đổi Power-law (Luật lũy thừa / Gamma correction). Sau khi làm sắc nét, ảnh (g) vẫn có các vùng nền quá tối. Áp dụng Gamma với $\gamma = 0.5$ sẽ có tác dụng <strong>"kéo giãn" (expand) các giá trị cường độ tối</strong>, làm sáng rực lên các chi tiết mô thịt và các khớp xương bị khuất.
+      </p>
+
+      <div class="bg-zinc-900 p-8 rounded-2xl text-white shadow-xl mb-10 flex flex-col md:flex-row gap-8 items-center">
+        <!-- Đồ thị Gamma -->
+        <div class="flex-1 w-full max-w-[300px] relative bg-black p-4 rounded-xl border border-zinc-700">
+          <h4 class="text-center font-bold text-cyan-400 mb-2 text-sm">s = c · r<sup>γ</sup></h4>
+          <canvas id="gamma-canvas" width="250" height="250" class="w-full h-auto bg-zinc-900 rounded border border-zinc-800"></canvas>
+          <div class="flex justify-between text-[10px] text-zinc-500 mt-1 font-mono">
+            <span>Input (r): 0</span>
+            <span>255</span>
+          </div>
+          <div class="absolute top-1/2 -left-6 transform -translate-y-1/2 -rotate-90 text-[10px] text-zinc-500 font-mono">
+            Output (s)
+          </div>
+        </div>
+
+        <!-- Điều khiển Gamma -->
+        <div class="flex-1 w-full">
+          <h4 class="font-bold text-lg mb-2">Trình mô phỏng đường cong Gamma</h4>
+          <p class="text-sm text-zinc-400 mb-6">Trong ví dụ 3.22, sách dùng $\gamma = 0.5$ để đưa các vùng tối lấp ló ra ngoài ánh sáng.</p>
+          
+          <label class="block text-sm font-bold text-cyan-300 mb-2">
+            Giá trị Gamma (γ): <span id="gamma-val-display" class="text-white text-xl ml-2">0.5</span>
+          </label>
+          <input type="range" id="gamma-slider" min="0.1" max="3" step="0.1" value="0.5" class="w-full accent-cyan-500 h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer">
+          
+          <div id="gamma-effect-text" class="mt-6 p-4 rounded-lg bg-cyan-900/30 border border-cyan-800 text-sm">
+            Với γ = 0.5 (< 1): Đường cong vồng lên. Giá trị tối ở Input bị đẩy lên cao ở Output. Làm sáng các vùng tối, lộ ra chi tiết ẩn.
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-20 py-10 bg-zinc-900 text-zinc-400 text-center text-sm border-t border-zinc-800">
+    <div class="max-w-xl mx-auto">
+      <p class="mb-2 text-zinc-300 font-semibold">Tài liệu tương tác: Digital Image Processing (Chương 3)</p>
+      <p>Ví dụ 3.22: Sức mạnh của việc kết hợp Spatial Methods.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts Logic -->
+  <script>
+    lucide.createIcons();
+
+    // DỮ LIỆU CÁC BƯỚC PIPELINE
+    const stepData = {
+      'a': {
+        title: '(a) Ảnh gốc (Original Image)',
+        icon: 'image',
+        color: 'cyan',
+        desc: 'Ảnh chụp quét xương toàn thân (Bone scan). Vấn đề: Ảnh mờ, dải nhạy sáng hẹp, nhiễu nền rải rác.',
+        math: 'f(x,y)',
+        detail: 'Mục tiêu của chúng ta là làm nổi bật tối đa cấu trúc xương (edges) mà không làm tăng độ nhiễu (noise) vốn có ở các vùng nền nhẵn (mô cơ thể, background).'
+      },
+      'b': {
+        title: '(b) Toán tử Laplacian',
+        icon: 'activity',
+        color: 'zinc',
+        desc: 'Lấy đạo hàm bậc 2 của ảnh gốc.',
+        math: '∇²f(x,y)',
+        detail: 'Laplacian cực kỳ xuất sắc trong việc lấy ra chi tiết siêu nhỏ (fine details). <strong>Tuy nhiên:</strong> Đạo hàm bậc 2 khuếch đại nhiễu (noise) một cách dữ dội. Bức ảnh này sẽ có cực nhiều nhiễu hạt ở những vùng lẽ ra phải trơn nhẵn.'
+      },
+      'd': {
+        title: '(d) Gradient (Toán tử Sobel)',
+        icon: 'scan',
+        color: 'zinc',
+        desc: 'Lấy độ lớn đạo hàm bậc 1 của ảnh gốc.',
+        math: '|g<sub>x</sub>| + |g<sub>y</sub>|',
+        detail: 'Khác với Laplacian, Gradient (đạo hàm bậc 1) có phản ứng cực mạnh với các mép cạnh lớn (edges/steps) nhưng lại phản ứng RẤT ÍT với nhiễu. Bức ảnh Gradient sẽ có viền xương rất sáng, nổi bật rõ ràng.'
+      },
+      'e': {
+        title: '(e) Làm mờ Gradient (Box Filter 5x5)',
+        icon: 'droplets',
+        color: 'zinc',
+        desc: 'Chập ảnh Gradient (d) với bộ lọc trung bình 5x5.',
+        math: 'Smoothed Gradient',
+        detail: 'Tại sao phải làm mờ Gradient? Vì ta sẽ dùng nó làm Mặt nạ. Làm mờ giúp các đường viền trong Gradient lan rộng ra, tạo thành một dải bao bọc mềm mại, loại bỏ các đứt gãy nhỏ.'
+      },
+      'f': {
+        title: '(f) Tạo Mặt nạ siêu việt (Masking)',
+        icon: 'x',
+        color: 'blue',
+        desc: 'Nhân ảnh Laplacian (b) với ảnh Gradient đã làm mờ (e).',
+        math: 'Mask = (b) × (e)',
+        detail: '<strong class="text-blue-700">Đây là bước thiên tài:</strong> <br>Ở các vùng phẳng nhiều nhiễu, Gradient (e) có giá trị xấp xỉ 0. Khi nhân vào, nó sẽ <strong>triệt tiêu hoàn toàn nhiễu</strong> của Laplacian (b). <br>Ở các vùng cạnh xương, Gradient (e) có giá trị lớn. Khi nhân vào, nó <strong>bảo toàn và khuếch đại</strong> chi tiết sắc bén của Laplacian (b).<br>Kết quả: Một mặt nạ (Mask) chứa cạnh cực sắc nhưng nền cực sạch!'
+      },
+      'g': {
+        title: '(g) Hình ảnh Sắc nét',
+        icon: 'plus',
+        color: 'blue',
+        desc: 'Cộng ảnh gốc (a) với mặt nạ (f).',
+        math: 'g(x,y) = (a) + (f)',
+        detail: 'Kết quả của quá trình cộng này mang lại độ sắc nét hoàn hảo cho bộ xương sườn, tủy sống, xương chậu... Vượt trội hoàn toàn so với việc chỉ cộng (a) với (b).'
+      },
+      'h': {
+        title: '(h) Biến đổi Power-law (Hậu kỳ)',
+        icon: 'sun',
+        color: 'cyan',
+        desc: 'Áp dụng hàm lũy thừa với γ = 0.5 lên ảnh (g).',
+        math: 's = c · r<sup>0.5</sup>',
+        detail: 'Bước cuối cùng để làm hài lòng mắt người. Việc làm sắc nét không thay đổi nhiều dải động cường độ. Biến đổi Power-law (< 1) giúp kéo sáng vùng tối, làm lộ ra rõ nét mô mềm và hình dáng toàn thân bên ngoài bộ xương.'
+      }
+    };
+
+    function showStep(stepId) {
+      // 1. Cập nhật UI nút bấm
+      document.querySelectorAll('[id^="btn-"]').forEach(btn => {
+        btn.classList.remove('border-cyan-500', 'bg-cyan-50', 'text-cyan-900', 'border-blue-500', 'bg-blue-50', 'text-blue-900');
+        if (btn.id !== 'btn-e' && btn.id !== 'btn-d' && btn.id !== 'btn-b') { // Keep secondary buttons simple
+           btn.classList.add('border-zinc-200', 'bg-white', 'text-zinc-700');
+        } else {
+           btn.classList.remove('border-cyan-400', 'bg-cyan-50');
+           btn.classList.add('border-zinc-200', 'bg-white', 'text-zinc-600');
+        }
+      });
+      
+      const btn = document.getElementById(`btn-${stepId}`);
+      const color = stepData[stepId].color;
+      
+      if (color === 'cyan') {
+        btn.classList.remove('border-zinc-200', 'bg-white', 'text-zinc-700');
+        btn.classList.add('border-cyan-500', 'bg-cyan-50', 'text-cyan-900');
+      } else if (color === 'blue') {
+        btn.classList.remove('border-zinc-200', 'bg-white', 'text-zinc-700');
+        btn.classList.add('border-blue-500', 'bg-blue-50', 'text-blue-900');
+      } else {
+        btn.classList.remove('border-zinc-200', 'bg-white', 'text-zinc-600');
+        btn.classList.add('border-cyan-400', 'bg-cyan-50', 'text-cyan-800');
+      }
+
+      // 2. Render nội dung
+      const data = stepData[stepId];
+      const content = document.getElementById('step-content');
+      
+      // Tailwind classes cho màu sắc dynamically
+      const colorMap = {
+        'cyan': { bg: 'bg-cyan-100', text: 'text-cyan-600', border: 'border-cyan-200', badge: 'bg-cyan-50 text-cyan-800' },
+        'blue': { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200', badge: 'bg-blue-50 text-blue-800' },
+        'zinc': { bg: 'bg-zinc-100', text: 'text-zinc-600', border: 'border-zinc-200', badge: 'bg-zinc-50 text-zinc-800' }
+      };
+      const theme = colorMap[data.color];
+
+      content.innerHTML = `
+        <div class="fade-in flex flex-col h-full">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="p-3 rounded-full ${theme.bg} ${theme.text}">
+              <i data-lucide="${data.icon}" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-zinc-800">${data.title}</h3>
+          </div>
+          
+          <div class="mb-6 p-4 rounded-xl ${theme.badge} border ${theme.border} font-serif text-lg text-center font-bold tracking-widest shadow-sm">
+            ${data.math}
+          </div>
+          
+          <p class="text-lg text-zinc-800 font-semibold mb-4 leading-relaxed">${data.desc}</p>
+          
+          <div class="bg-zinc-50 p-5 rounded-xl border border-zinc-200 flex-1">
+            <h4 class="font-bold text-zinc-600 text-xs uppercase tracking-widest mb-2 border-b border-zinc-200 pb-2">Phân tích chuyên sâu</h4>
+            <p class="text-zinc-700 leading-relaxed text-sm">${data.detail}</p>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    // --- GAMMA SIMULATOR ---
+    const gammaSim = {
+      canvas: document.getElementById('gamma-canvas'),
+      ctx: null,
+      init() {
+        this.ctx = this.canvas.getContext('2d');
+        const slider = document.getElementById('gamma-slider');
+        slider.addEventListener('input', (e) => this.render(e.target.value));
+        this.render(slider.value);
+      },
+      render(gammaStr) {
+        const gamma = parseFloat(gammaStr);
+        document.getElementById('gamma-val-display').textContent = gamma.toFixed(1);
+        
+        // Cập nhật text giải thích
+        const textDiv = document.getElementById('gamma-effect-text');
+        if (gamma < 1) {
+          textDiv.innerHTML = `Với <strong>γ = ${gamma} (< 1)</strong>: Đường cong vồng lên. Các giá trị tối ở ảnh gốc (Input) được đẩy lên giá trị sáng hơn rất nhiều ở Output. Làm lộ ra chi tiết bị khuất trong bóng tối.`;
+          textDiv.className = "mt-6 p-4 rounded-lg bg-cyan-900/30 border border-cyan-800 text-sm text-cyan-200";
+        } else if (gamma === 1) {
+          textDiv.innerHTML = `Với <strong>γ = 1</strong>: Đường thẳng tuyến tính (Linear). Output giống hệt Input, không có gì thay đổi.`;
+          textDiv.className = "mt-6 p-4 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-300";
+        } else {
+          textDiv.innerHTML = `Với <strong>γ = ${gamma} (> 1)</strong>: Đường cong võng xuống. Các giá trị sáng bị dìm tối đi. Làm tăng độ tương phản ở các vùng rất sáng. (Không dùng cho bài toán xương này).`;
+          textDiv.className = "mt-6 p-4 rounded-lg bg-rose-900/30 border border-rose-800 text-sm text-rose-200";
+        }
+
+        // Vẽ đồ thị
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        this.ctx.clearRect(0, 0, width, height);
+
+        // Vẽ lưới nền
+        this.ctx.strokeStyle = '#27272a';
+        this.ctx.lineWidth = 1;
+        for(let i=0; i<=5; i++) {
+           let pos = i * (width/5);
+           this.ctx.beginPath(); this.ctx.moveTo(pos, 0); this.ctx.lineTo(pos, height); this.ctx.stroke();
+           this.ctx.beginPath(); this.ctx.moveTo(0, pos); this.ctx.lineTo(width, pos); this.ctx.stroke();
+        }
+
+        // Vẽ đường linear y=x tham chiếu
+        this.ctx.strokeStyle = '#52525b';
+        this.ctx.setLineDash([4, 4]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, height);
+        this.ctx.lineTo(width, 0);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]); // reset
+
+        // Vẽ đường cong Gamma
+        this.ctx.strokeStyle = '#06b6d4'; // cyan-500
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        
+        for (let x = 0; x <= width; x++) {
+          // Normalize x to 0..1
+          let r = x / width;
+          // Apply gamma: s = r^gamma
+          let s = Math.pow(r, gamma);
+          // Map back to canvas coords (y is inverted)
+          let y = height - (s * height);
+          
+          if (x === 0) this.ctx.moveTo(x, y);
+          else this.ctx.lineTo(x, y);
+        }
+        this.ctx.stroke();
+      }
+    };
+
+    // Khởi tạo
+    document.addEventListener('DOMContentLoaded', () => {
+      showStep('a'); // Default active step
+      gammaSim.init();
+    });
+  </script>
+</body>
+</html>
